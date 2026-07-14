@@ -1,9 +1,11 @@
 services:
   api:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: nestjs_api
+    env_file:
+      - .env
     ports:
       - "${PORT:-3000}:3000"
     environment:
