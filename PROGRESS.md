@@ -17,11 +17,11 @@
   - [x] Auth Modülü (Kayıt/Giriş/Çıkış)
   - [x] Workspace Yönetimi ve Rol Yapısı
   - [x] Kullanıcı Rolleri ve İzin Sınırları
-- [ ] **Faz 4: Operasyonel Modüller / Görev Yönetimi** (Projeler, Görevler, Yorumlar, Dosyalar)
+- [x] **Faz 4: Operasyonel Modüller / Görev Yönetimi** (Projeler, Görevler, Yorumlar, Dosyalar)
   - [x] Task Modülü CRUD İşlemleri
   - [x] Proje Modülü
   - [x] Yorumlar Modülü
-  - [ ] Dosyalar
+  - [x] Dosyalar Modülü
 - [ ] **Faz 5: Gelişmiş Özellikler** (Redis Caching, WebSockets, Time Tracking)
 - [ ] **Faz 6: Frontend (Flutter) Hazırlığı** (Mimari kurulum, state management)
 - [ ] **Faz 7: Frontend Entegrasyonu** (Tüm backend servislerinin UI ile bağlanması)
@@ -102,3 +102,14 @@
 - `CommentController`: `@Controller('workspaces/:workspaceId/tasks/:taskId/comments')`, `@ApiTags('Comments')`, `@ApiBearerAuth()`, `@UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)` ile korunan `POST /` (`@Roles('Admin', 'Member')`) ve `GET /` (rol kısıtlaması yok, herkes okuyabilir) endpoint'leri Swagger dekoratörleriyle belgelendi.
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `/workspaces/:workspaceId/tasks/:taskId/comments` route'larının başarıyla kaydedildiği doğrulandı.
 - Guard zinciri canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan `GET`/`POST` istekleri `401` döndürdü.
+
+### [14 Temmuz 2026] - Faz 4: Dosyalar Modülü (Faz 4 Tamamlandı)
+- **Dosyalar Modülü tamamlandı.**
+- `nest g module/controller/service file` komutlarıyla File modülü iskeleti oluşturuldu.
+- `src/file/dto/create-file.dto.ts`: `file_name`, `file_url` (`IsUrl`), `file_type` alanları zorunlu olarak eklendi.
+- `FileService`: `create` (`task_id` ve `user_id` ile `files` tablosuna kayıt), `findAll` (ilgili `taskId`'ye ait dosyaları `created_at`'e göre sıralı listeler), `remove` (`fileId` ile silme, bulunamazsa `NotFoundException`) metotları Supabase istemcisiyle uygulandı.
+- `FileController`: `@Controller('workspaces/:workspaceId/tasks/:taskId/files')`, `@ApiTags('Files')`, `@ApiBearerAuth()`, `@UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)` ile korunan `POST /`, `GET /`, `DELETE /:fileId` endpoint'leri Swagger dekoratörleriyle belgelendi.
+- **Bonus - User Projection:** `CommentService.findAll` güncellendi; yorumlardaki `user_id`'ler üzerinden `profiles` tablosundan eşleşen kayıtlar ayrıca çekilip her yoruma `author` alanı olarak simüle edilmiş bir join ile eklendi (gerçek bir foreign-key join yerine iki ayrı sorgu + `Map` ile eşleştirme kullanıldı, çünkü PostgREST anon istemcisi `auth.users` şemasını doğrudan açmıyor).
+- Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `/workspaces/:workspaceId/tasks/:taskId/files` route'larının başarıyla kaydedildiği doğrulandı.
+- Guard zinciri canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan `GET`/`POST`/`DELETE` istekleri `401` döndürdü.
+- **Faz 4: Operasyonel Modüller (Projeler, Görevler, Yorumlar, Dosyalar) tamamen tamamlandı.**

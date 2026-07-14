@@ -29,10 +29,7 @@ export class CommentService {
   async findAll(taskId: string) {
     const client = this.supabaseService.getClient();
 
-    // Supabase'in anon istemcisi `auth.users` şemasına doğrudan erişemediği için
-    // yorumlar şimdilik `user_id` ile birlikte döndürülüyor; kullanıcı profili bilgisi
-    // (ad, e-posta vb.) ileride bir `profiles` tablosu eklendiğinde buraya join edilebilir.
-    const { data, error } = await client
+    const { data: comments, error } = await client
       .from('comments')
       .select('*')
       .eq('task_id', taskId)
@@ -42,6 +39,31 @@ export class CommentService {
       throw new BadRequestException(error.message);
     }
 
-    return data;
+    if (!comments || comments.length === 0) {
+      return [];
+    }
+
+    // PostgREST, `auth.users` şemasını anon istemciye açmadığı için gerçek bir
+    // foreign-key join yerine `profiles` tablosundan ilgili kullanıcıları ayrıca
+    // çekip `user_id` üzerinden eşleştiriyoruz (simüle edilmiş join).
+    const userIds = [...new Set(comments.map((comment: any) => comment.user_id))];
+
+    const { data: profiles, error: profilesError } = await client
+      .from('profiles')
+      .select('id, name')
+      .in('id', userIds);
+
+    if (profilesError) {
+      return comments.map((comment: any) => ({ ...comment, author: null }));
+    }
+
+    const profileById = new Map(
+      (profiles ?? []).map((profile: any) => [profile.id, profile]),
+    );
+
+    return comments.map((comment: any) => ({
+      ...comment,
+      author: profileById.get(comment.user_id) ?? null,
+    }));
   }
 }
