@@ -12,6 +12,7 @@ import { ProjectModule } from './project/project.module';
 import { CommentModule } from './comment/comment.module';
 import { FileModule } from './file/file.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
     CommentModule,
     FileModule,
     ActivityLogModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

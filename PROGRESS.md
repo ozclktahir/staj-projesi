@@ -28,9 +28,13 @@
   - [x] Redis Caching Entegrasyonu
   - [ ] WebSockets
   - [ ] Time Tracking
-- [ ] **Faz 6: Frontend (Flutter) Hazırlığı** (Mimari kurulum, state management)
-- [ ] **Faz 7: Frontend Entegrasyonu** (Tüm backend servislerinin UI ile bağlanması)
-- [ ] **Faz 8: Test, Optimizasyon ve Sunum**
+- [x] **Faz 6: Deployment Hazırlığı ve Canlıya Alma** (Güvenlik, CORS, Healthcheck)
+  - [x] CORS Yapılandırması
+  - [x] Helmet ile HTTP Güvenlik Başlıkları
+  - [x] Healthcheck Modülü
+- [ ] **Faz 7: Frontend (Flutter) Hazırlığı** (Mimari kurulum, state management)
+- [ ] **Faz 8: Frontend Entegrasyonu** (Tüm backend servislerinin UI ile bağlanması)
+- [ ] **Faz 9: Test, Optimizasyon ve Sunum**
 
 ### 🔮 Gelecek Planları (Zaman Kalırsa eklenecekler)
 - [ ] AI ile görev önerileri, özeti ve deadline tahmini.
@@ -148,3 +152,14 @@
 - `npm run build` ile derleme testi hatasız tamamlandı.
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `CacheModule dependencies initialized` mesajının başarıyla geldiği ve Redis bağlantısında hata oluşmadığı doğrulandı.
 - Guard zinciri canlı olarak test edildi: `CacheInterceptor` eklenmesine rağmen token olmadan ve geçersiz token ile yapılan `GET /workspaces/:workspaceId/projects` istekleri `401` döndürdü (guard'lar interceptor'dan önce çalıştığı için önbellekleme guard akışını bozmadı).
+
+### [14 Temmuz 2026] - Faz 6: Deployment Hazırlığı ve Canlıya Alma
+- **CORS Yapılandırması, Helmet ile HTTP Güvenlik Başlıkları ve Healthcheck Modülü tamamlandı.**
+- `helmet` paketi backend'e kuruldu.
+- `main.ts`: `app.use(helmet())` ile HTTP yanıt başlıkları (Content-Security-Policy, X-Content-Type-Options, X-Frame-Options vb.) güvene alındı; `app.enableCors({ origin: true, credentials: true })` ile ileride bağlanacak Flutter/web istemcilerinden gelecek isteklere (kimlik bilgileriyle birlikte) izin verildi.
+- `nest g module/controller health` komutlarıyla Health modülü iskeleti oluşturuldu; `HealthController` içindeki `GET /health` endpoint'i bilinçli olarak herhangi bir guard'a bağlanmadı (public), sadece `{ status: 'ok', timestamp: new Date().toISOString() }` döndürüyor — bu endpoint ileride bir orkestrasyon/monitoring aracının (Docker healthcheck, uptime monitor vb.) servis canlılığını kontrol etmesi için kullanılabilir.
+- `backend/.env.example` dosyası oluşturuldu; `PORT`, `SUPABASE_URL`, `SUPABASE_KEY`, `REDIS_URL`, `REDIS_HOST`, `REDIS_PORT` değişkenleri değerleri boş bırakılarak referans amacıyla eklendi (gerçek secret'lar `.env`'de kalıyor, repoya girmiyor).
+- `npm run build` ile derleme testi hatasız tamamlandı.
+- Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `HealthController {/health}` ve `Mapped {/health, GET}` route'larının başarıyla kaydedildiği doğrulandı.
+- Canlı olarak test edildi: `GET /health` tokensız `200` ile `{ status: 'ok', timestamp: ... }` döndürdü; yanıt başlıklarında Helmet'in eklediği `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` başlıkları doğrulandı; korumalı `GET /workspaces/:workspaceId/projects` endpoint'i token olmadan hâlâ `401` döndürerek mevcut guard zincirinin bozulmadığı teyit edildi.
+- Yol haritasındaki fazlar yeniden numaralandırıldı: Deployment Hazırlığı Faz 6 olarak eklendiği için Frontend Hazırlığı Faz 7'ye, Frontend Entegrasyonu Faz 8'e, Test/Optimizasyon/Sunum Faz 9'a kaydırıldı.
