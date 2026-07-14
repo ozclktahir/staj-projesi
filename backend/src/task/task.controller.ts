@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -19,6 +20,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { WorkspaceRoleGuard } from '../auth/guards/workspace-role.guard';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { GetTasksFilterDto } from './dto/get-tasks-filter.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskService } from './task.service';
 
@@ -46,10 +48,16 @@ export class TaskController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Çalışma alanına ait tüm görevleri listeler' })
+  @ApiOperation({
+    summary:
+      'Çalışma alanına ait görevleri arama, filtreleme ve sayfalama ile listeler',
+  })
   @ApiResponse({ status: 200, description: 'Görevler listelendi.' })
-  findAll(@Param('workspaceId') workspaceId: string) {
-    return this.taskService.findAll(workspaceId);
+  findAll(
+    @Param('workspaceId') workspaceId: string,
+    @Query() filterDto: GetTasksFilterDto,
+  ) {
+    return this.taskService.findAll(workspaceId, filterDto);
   }
 
   @Get(':id')

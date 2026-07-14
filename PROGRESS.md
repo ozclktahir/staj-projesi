@@ -24,6 +24,7 @@
   - [x] Dosyalar Modülü
 - [ ] **Faz 5: Sistem Cilası ve Optimizasyon** (Activity Log, Redis Caching, WebSockets, Time Tracking)
   - [x] Activity Log (Aktivite Günlüğü) Modülü
+  - [x] Task Modülü Arama ve Sayfalama (Pagination)
   - [ ] Redis Caching
   - [ ] WebSockets
   - [ ] Time Tracking
@@ -127,3 +128,13 @@
 - `ActivityLogService`, ileride diğer modüllerin (Task, Project, Comment vb.) aksiyonları otomatik loglayabilmesi için `ActivityLogModule`'den `exports` edildi.
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `/workspaces/:workspaceId/activity-logs` route'larının başarıyla kaydedildiği doğrulandı.
 - Guard zinciri canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan `GET`/`POST` istekleri `401` döndürdü.
+
+### [14 Temmuz 2026] - Faz 5: Task Modülü Arama, Filtreleme ve Sayfalama (Pagination)
+- **Task Modülü Arama ve Sayfalama (Pagination) tamamlandı.**
+- `src/task/dto/get-tasks-filter.dto.ts`: `search` (string), `status`/`priority` (enum, `CreateTaskDto` ile aynı tip tanımları paylaşılıyor), `page`/`limit` (varsayılan sırasıyla `1`/`10`) opsiyonel alanları `class-validator` ile eklendi; `page`/`limit` için `class-transformer`'dan `@Type(() => Number)` kullanılarak query string değerlerinin sayıya çevrilmesi sağlandı.
+- `main.ts`: Global `ValidationPipe`'a `transform: true` eklendi; bu sayede `@Type(() => Number)` dekoratörünün gerçekten devreye girip `@Query()` ile gelen DTO alanlarını sayıya çevirmesi garantilendi (önceden sadece `whitelist: true` vardı, transform olmadan tip dönüşümü validasyon aşamasında uygulanıp controller'a orijinal (string) değer geçiyordu).
+- `TaskController.findAll`: `@Query() filterDto: GetTasksFilterDto` parametresi eklendi, servise iletildi.
+- `TaskService.findAll(workspaceId, filterDto)`: Supabase sorgusu dinamik hâle getirildi — `select('*', { count: 'exact' })` ile başlayıp, `status`/`priority` varsa `.eq(...)`, `search` varsa `.ilike('title', '%...%')` (büyük/küçük harf duyarsız) filtreleri koşullu olarak eklendi; `page`/`limit`'ten hesaplanan `from`/`to` ile `.range(from, to)` uygulanarak sayfalama yapıldı. Yanıt artık `{ data, meta: { total, page, limit, totalPages } }` formatında dönüyor.
+- `npm run build` ile derleme testi yapıldı; `isolatedModules` ayarı nedeniyle `TaskStatus`/`TaskPriority` tip importlarının `import type` ile yapılması gerektiği görüldü ve düzeltildi.
+- Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `/workspaces/:workspaceId/tasks` `GET` route'unun hatasız kaydedildiği doğrulandı.
+- Guard zinciri, `search`/`status`/`priority`/`page`/`limit` query parametreleriyle birlikte canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan istekler `401` döndürdü (parametrelerin varlığı guard/pipe akışını bozmadı).

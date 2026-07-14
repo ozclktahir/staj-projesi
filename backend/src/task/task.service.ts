@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { GetTasksFilterDto } from './dto/get-tasks-filter.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
 @Injectable()
@@ -27,19 +28,49 @@ export class TaskService {
     return data;
   }
 
-  async findAll(workspaceId: string) {
+  async findAll(workspaceId: string, filterDto: GetTasksFilterDto) {
     const client = this.supabaseService.getClient();
+    const { search, status, priority } = filterDto;
+    const page = filterDto.page ?? 1;
+    const limit = filterDto.limit ?? 10;
 
-    const { data, error } = await client
+    let query = client
       .from('tasks')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('workspace_id', workspaceId);
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    if (priority) {
+      query = query.eq('priority', priority);
+    }
+
+    if (search) {
+      query = query.ilike('title', `%${search}%`);
+    }
+
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    const { data, error, count } = await query.range(from, to);
 
     if (error) {
       throw new BadRequestException(error.message);
     }
 
-    return data;
+    const total = count ?? 0;
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(workspaceId: string, taskId: string) {
