@@ -25,7 +25,7 @@
 - [ ] **Faz 5: Sistem Cilası ve Optimizasyon** (Activity Log, Redis Caching, WebSockets, Time Tracking)
   - [x] Activity Log (Aktivite Günlüğü) Modülü
   - [x] Task Modülü Arama ve Sayfalama (Pagination)
-  - [ ] Redis Caching
+  - [x] Redis Caching Entegrasyonu
   - [ ] WebSockets
   - [ ] Time Tracking
 - [ ] **Faz 6: Frontend (Flutter) Hazırlığı** (Mimari kurulum, state management)
@@ -138,3 +138,13 @@
 - `npm run build` ile derleme testi yapıldı; `isolatedModules` ayarı nedeniyle `TaskStatus`/`TaskPriority` tip importlarının `import type` ile yapılması gerektiği görüldü ve düzeltildi.
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `/workspaces/:workspaceId/tasks` `GET` route'unun hatasız kaydedildiği doğrulandı.
 - Guard zinciri, `search`/`status`/`priority`/`page`/`limit` query parametreleriyle birlikte canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan istekler `401` döndürdü (parametrelerin varlığı guard/pipe akışını bozmadı).
+
+### [14 Temmuz 2026] - Faz 5: Redis Caching Entegrasyonu
+- **Redis Caching Entegrasyonu tamamlandı.**
+- `@nestjs/cache-manager`, `cache-manager` ve `cache-manager-redis-yet` paketleri backend'e kuruldu. Not: `cache-manager-redis-yet@5.1.5` sadece `cache-manager@5.x` ile uyumlu olduğundan (v6+ artık Keyv tabanlı çalışıyor), paketler `@nestjs/cache-manager@2.3.0` + `cache-manager@5.7.6` + `cache-manager-redis-yet@5.1.5` üçlüsüyle uyumlu sürümlere sabitlendi.
+- `@nestjs/cache-manager@2.3.0`'ın peer bağımlılığı henüz NestJS 11'i resmi olarak listelemediğinden (`^9.0.0 || ^10.0.0`), kurulum ve Docker build'lerinde tutarlı davranış için `backend/.npmrc` dosyasına `legacy-peer-deps=true` eklendi; `Dockerfile`'daki `COPY package*.json ./` satırı `.npmrc`'yi de kopyalayacak şekilde güncellendi.
+- `app.module.ts`: `CacheModule.registerAsync({ isGlobal: true, useFactory: ... })` eklendi; `useFactory` içinde `cache-manager-redis-yet`'ten `redisStore({ url: process.env.REDIS_URL || 'redis://redis:6379' })` ile Redis store yapılandırıldı (mevcut `docker-compose.yml`'daki `redis:6379` servisine bağlanıyor).
+- `project.controller.ts`: Sık okunup nadiren değişen bir kaynak olması nedeniyle `GET /workspaces/:workspaceId/projects` (`findAll`) endpoint'i `@UseInterceptors(CacheInterceptor)` ve `@CacheTTL(60000)` (60 saniye) ile önbelleğe alındı.
+- `npm run build` ile derleme testi hatasız tamamlandı.
+- Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `CacheModule dependencies initialized` mesajının başarıyla geldiği ve Redis bağlantısında hata oluşmadığı doğrulandı.
+- Guard zinciri canlı olarak test edildi: `CacheInterceptor` eklenmesine rağmen token olmadan ve geçersiz token ile yapılan `GET /workspaces/:workspaceId/projects` istekleri `401` döndürdü (guard'lar interceptor'dan önce çalıştığı için önbellekleme guard akışını bozmadı).

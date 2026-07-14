@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -36,6 +46,8 @@ export class ProjectController {
   }
 
   @Get()
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(60000)
   @ApiOperation({ summary: 'Çalışma alanına ait tüm projeleri listeler' })
   @ApiResponse({ status: 200, description: 'Projeler listelendi.' })
   findAll(@Param('workspaceId') workspaceId: string) {
