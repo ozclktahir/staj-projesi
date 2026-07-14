@@ -6,7 +6,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { GetUser } from '../auth/decorators/get-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
+import { WorkspaceRoleGuard } from '../auth/guards/workspace-role.guard';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { WorkspaceService } from './workspace.service';
@@ -41,6 +43,8 @@ export class WorkspaceController {
   }
 
   @Post(':id/invite')
+  @Roles('Admin')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({
     summary: 'Belirtilen çalışma alanına yeni bir üye davet eder',
   })

@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
@@ -55,23 +55,6 @@ export class WorkspaceService {
 
   async invite(workspaceId: string, inviterId: string, dto: InviteMemberDto) {
     const client = this.supabaseService.getClient();
-
-    const { data: membership, error: membershipError } = await client
-      .from('workspace_members')
-      .select('role')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', inviterId)
-      .maybeSingle();
-
-    if (membershipError) {
-      throw new BadRequestException(membershipError.message);
-    }
-
-    if (!membership || membership.role !== 'Admin') {
-      throw new ForbiddenException(
-        'Bu çalışma alanına davet gönderebilmek için Admin rolüne sahip olmanız gerekiyor.',
-      );
-    }
 
     const { data: invitation, error: invitationError } = await client
       .from('workspace_invitations')
