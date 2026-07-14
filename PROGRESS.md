@@ -19,7 +19,7 @@
   - [x] Kullanıcı Rolleri ve İzin Sınırları
 - [ ] **Faz 4: Operasyonel Modüller / Görev Yönetimi** (Projeler, Görevler, Yorumlar, Dosyalar)
   - [x] Task Modülü CRUD İşlemleri
-  - [ ] Proje Modülü
+  - [x] Proje Modülü
   - [ ] Yorumlar
   - [ ] Dosyalar
 - [ ] **Faz 5: Gelişmiş Özellikler** (Redis Caching, WebSockets, Time Tracking)
@@ -83,3 +83,13 @@
 - RBAC: `POST`, `PATCH`, `DELETE` endpoint'lerine `@Roles('Admin', 'Member')` eklendi; `GET` endpoint'lerinde rol kısıtlaması yok, böylece `Guest` rolündeki kullanıcılar sadece görevleri okuyabiliyor, değiştiremiyor.
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan tüm route'ların (`/workspaces/:workspaceId/tasks` altında) başarıyla kaydedildiği doğrulandı.
 - Guard zinciri canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan `GET`/`POST`/`PATCH` istekleri `401` döndürdü.
+
+### [14 Temmuz 2026] - Faz 4: Proje Modülü
+- **Proje Modülü tamamlandı.**
+- `nest g module/controller/service project` komutlarıyla Project modülü iskeleti oluşturuldu.
+- `src/project/dto/create-project.dto.ts`: `name` (zorunlu) ve `description` (opsiyonel) alanları validasyonlu şekilde eklendi.
+- `ProjectService`: `create` (`workspace_id` ve `created_by` ile `projects` tablosuna kayıt), `findAll` (workspace'e ait projeleri listeler), `remove` (bulunamazsa `NotFoundException`) metotları Supabase istemcisiyle uygulandı.
+- `ProjectController`: `@Controller('workspaces/:workspaceId/projects')`, `@ApiTags('Projects')`, `@ApiBearerAuth()`, `@UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)` ile korunan `POST /`, `GET /`, `DELETE /:id` endpoint'leri Swagger dekoratörleriyle belgelendi; oluşturma ve silme işlemlerine `@Roles('Admin', 'Member')` eklendi.
+- Task modülü bilinçli olarak izole tutuldu; `tasks` tablosundaki `project_id` alanına şimdilik dokunulmadı.
+- Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan tüm route'ların (`/workspaces/:workspaceId/projects` altında) başarıyla kaydedildiği doğrulandı.
+- Guard zinciri canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan `GET`/`POST`/`DELETE` istekleri `401` döndürdü.

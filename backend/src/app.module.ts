@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { TaskModule } from './task/task.module';
+import { ProjectModule } from './project/project.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { TaskModule } from './task/task.module';
     AuthModule,
     WorkspaceModule,
     TaskModule,
+    ProjectModule,
   ],
   controllers: [AppController],
   providers: [AppService],
