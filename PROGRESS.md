@@ -17,7 +17,11 @@
   - [x] Auth Modülü (Kayıt/Giriş/Çıkış)
   - [x] Workspace Yönetimi ve Rol Yapısı
   - [x] Kullanıcı Rolleri ve İzin Sınırları
-- [ ] **Faz 4: Operasyonel Modüller** (Projeler, Görevler, Yorumlar, Dosyalar)
+- [ ] **Faz 4: Operasyonel Modüller / Görev Yönetimi** (Projeler, Görevler, Yorumlar, Dosyalar)
+  - [x] Task Modülü CRUD İşlemleri
+  - [ ] Proje Modülü
+  - [ ] Yorumlar
+  - [ ] Dosyalar
 - [ ] **Faz 5: Gelişmiş Özellikler** (Redis Caching, WebSockets, Time Tracking)
 - [ ] **Faz 6: Frontend (Flutter) Hazırlığı** (Mimari kurulum, state management)
 - [ ] **Faz 7: Frontend Entegrasyonu** (Tüm backend servislerinin UI ile bağlanması)
@@ -69,3 +73,13 @@
 - `workspace.service.ts` içindeki manuel Admin rol kontrolü kaldırıldı; bu sorumluluk artık tamamen `WorkspaceRoleGuard`'a devredildi.
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; route'ların hatasız kaydedildiği ve guard zincirinin (önce `SupabaseAuthGuard`, sonra `WorkspaceRoleGuard`) doğru çalıştığı canlı testle doğrulandı: token olmadan/geçersiz token ile `/workspace/:id/invite` isteği `401` döndürdü.
 - **Faz 3: Temel Modüller tamamen tamamlandı.**
+
+### [14 Temmuz 2026] - Faz 4: Görev Yönetimi (Task Modülü)
+- **Task Modülü CRUD İşlemleri tamamlandı.**
+- `nest g module/controller/service task` komutlarıyla Task modülü iskeleti oluşturuldu.
+- `src/task/dto`: `CreateTaskDto` (`title` zorunlu, `description`/`status`('TODO'|'IN_PROGRESS'|'DONE')/`priority`('LOW'|'MEDIUM'|'HIGH')/`assigned_to`(UUID)/`due_date` opsiyonel) ve `UpdateTaskDto` (`PartialType(CreateTaskDto)` ile türetildi) validasyonlu DTO'lar eklendi.
+- `TaskService`: `create` (`workspace_id` ve `created_by` ile `tasks` tablosuna kayıt), `findAll`, `findOne` (bulunamazsa `NotFoundException`), `update` (`updated_at` dahil), `remove` metotları Supabase istemcisiyle uygulandı.
+- `TaskController`: `@Controller('workspaces/:workspaceId/tasks')`, `@ApiTags('Tasks')`, `@ApiBearerAuth()`, `@UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)` ile korunan `POST /`, `GET /`, `GET /:id`, `PATCH /:id`, `DELETE /:id` endpoint'leri Swagger dekoratörleriyle belgelendi.
+- RBAC: `POST`, `PATCH`, `DELETE` endpoint'lerine `@Roles('Admin', 'Member')` eklendi; `GET` endpoint'lerinde rol kısıtlaması yok, böylece `Guest` rolündeki kullanıcılar sadece görevleri okuyabiliyor, değiştiremiyor.
+- Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan tüm route'ların (`/workspaces/:workspaceId/tasks` altında) başarıyla kaydedildiği doğrulandı.
+- Guard zinciri canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan `GET`/`POST`/`PATCH` istekleri `401` döndürdü.

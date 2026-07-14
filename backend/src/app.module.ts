@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { WorkspaceModule } from './workspace/workspace.module';
+import { TaskModule } from './task/task.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { WorkspaceModule } from './workspace/workspace.module';
     SupabaseModule,
     AuthModule,
     WorkspaceModule,
+    TaskModule,
   ],
   controllers: [AppController],
   providers: [AppService],
