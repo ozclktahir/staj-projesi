@@ -22,7 +22,11 @@
   - [x] Proje Modülü
   - [x] Yorumlar Modülü
   - [x] Dosyalar Modülü
-- [ ] **Faz 5: Gelişmiş Özellikler** (Redis Caching, WebSockets, Time Tracking)
+- [ ] **Faz 5: Sistem Cilası ve Optimizasyon** (Activity Log, Redis Caching, WebSockets, Time Tracking)
+  - [x] Activity Log (Aktivite Günlüğü) Modülü
+  - [ ] Redis Caching
+  - [ ] WebSockets
+  - [ ] Time Tracking
 - [ ] **Faz 6: Frontend (Flutter) Hazırlığı** (Mimari kurulum, state management)
 - [ ] **Faz 7: Frontend Entegrasyonu** (Tüm backend servislerinin UI ile bağlanması)
 - [ ] **Faz 8: Test, Optimizasyon ve Sunum**
@@ -113,3 +117,13 @@
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `/workspaces/:workspaceId/tasks/:taskId/files` route'larının başarıyla kaydedildiği doğrulandı.
 - Guard zinciri canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan `GET`/`POST`/`DELETE` istekleri `401` döndürdü.
 - **Faz 4: Operasyonel Modüller (Projeler, Görevler, Yorumlar, Dosyalar) tamamen tamamlandı.**
+
+### [14 Temmuz 2026] - Faz 5: Sistem Cilası ve Optimizasyon Başladı — Activity Log Modülü
+- **Activity Log (Aktivite Günlüğü) Modülü tamamlandı.**
+- `nest g module/controller/service activity-log` komutlarıyla ActivityLog modülü iskeleti oluşturuldu.
+- `src/activity-log/dto/create-activity-log.dto.ts`: `entity_type` (String), `entity_id` (UUID), `action` (String) zorunlu; `details` (opsiyonel JSON/Object) alanları validasyonlu şekilde eklendi.
+- `ActivityLogService`: `logAction(workspaceId, userId, dto)` (`workspace_id` ve `user_id` ile `activity_logs` tablosuna kayıt), `findAllByWorkspace(workspaceId)` (`created_at`'e göre en yeniden eskiye/`DESC` sıralı listeler) metotları Supabase istemcisiyle uygulandı.
+- `ActivityLogController`: `@Controller('workspaces/:workspaceId/activity-logs')`, `@ApiTags('Activity Logs')`, `@ApiBearerAuth()`, `@UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)` ile korunan `POST /` ve `GET /` endpoint'leri, her ikisi de `@Roles('Admin', 'Member')` kısıtlamasıyla (Guest'ler aktivite loglarını göremiyor) Swagger dekoratörleriyle belgelendi.
+- `ActivityLogService`, ileride diğer modüllerin (Task, Project, Comment vb.) aksiyonları otomatik loglayabilmesi için `ActivityLogModule`'den `exports` edildi.
+- Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `/workspaces/:workspaceId/activity-logs` route'larının başarıyla kaydedildiği doğrulandı.
+- Guard zinciri canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan `GET`/`POST` istekleri `401` döndürdü.

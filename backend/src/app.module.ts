@@ -9,6 +9,7 @@ import { TaskModule } from './task/task.module';
 import { ProjectModule } from './project/project.module';
 import { CommentModule } from './comment/comment.module';
 import { FileModule } from './file/file.module';
+import { ActivityLogModule } from './activity-log/activity-log.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { FileModule } from './file/file.module';
     ProjectModule,
     CommentModule,
     FileModule,
+    ActivityLogModule,
   ],
   controllers: [AppController],
   providers: [AppService],
