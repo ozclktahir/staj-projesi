@@ -20,7 +20,7 @@
 - [ ] **Faz 4: Operasyonel Modüller / Görev Yönetimi** (Projeler, Görevler, Yorumlar, Dosyalar)
   - [x] Task Modülü CRUD İşlemleri
   - [x] Proje Modülü
-  - [ ] Yorumlar
+  - [x] Yorumlar Modülü
   - [ ] Dosyalar
 - [ ] **Faz 5: Gelişmiş Özellikler** (Redis Caching, WebSockets, Time Tracking)
 - [ ] **Faz 6: Frontend (Flutter) Hazırlığı** (Mimari kurulum, state management)
@@ -93,3 +93,12 @@
 - Task modülü bilinçli olarak izole tutuldu; `tasks` tablosundaki `project_id` alanına şimdilik dokunulmadı.
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan tüm route'ların (`/workspaces/:workspaceId/projects` altında) başarıyla kaydedildiği doğrulandı.
 - Guard zinciri canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan `GET`/`POST`/`DELETE` istekleri `401` döndürdü.
+
+### [14 Temmuz 2026] - Faz 4: Yorumlar Modülü
+- **Yorumlar Modülü tamamlandı.**
+- `nest g module/controller/service comment` komutlarıyla Comment modülü iskeleti oluşturuldu.
+- `src/comment/dto/create-comment.dto.ts`: `content` (zorunlu, `IsString`/`IsNotEmpty`) alanı validasyonlu şekilde eklendi.
+- `CommentService`: `create` (`task_id` ve `user_id` ile `comments` tablosuna kayıt), `findAll` (ilgili `taskId`'ye ait yorumları `created_at`'e göre sıralı listeler) metotları Supabase istemcisiyle uygulandı. Not: Supabase anon istemcisi `auth.users` şemasına doğrudan erişemediğinden, yorumlar şimdilik `user_id` ile birlikte dönüyor; kullanıcı profil bilgisi ileride bir `profiles` tablosu eklendiğinde join edilebilir.
+- `CommentController`: `@Controller('workspaces/:workspaceId/tasks/:taskId/comments')`, `@ApiTags('Comments')`, `@ApiBearerAuth()`, `@UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)` ile korunan `POST /` (`@Roles('Admin', 'Member')`) ve `GET /` (rol kısıtlaması yok, herkes okuyabilir) endpoint'leri Swagger dekoratörleriyle belgelendi.
+- Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `/workspaces/:workspaceId/tasks/:taskId/comments` route'larının başarıyla kaydedildiği doğrulandı.
+- Guard zinciri canlı olarak test edildi: token olmadan ve geçersiz token ile yapılan `GET`/`POST` istekleri `401` döndürdü.

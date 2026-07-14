@@ -7,6 +7,7 @@ import { SupabaseModule } from './supabase/supabase.module';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { TaskModule } from './task/task.module';
 import { ProjectModule } from './project/project.module';
+import { CommentModule } from './comment/comment.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ProjectModule } from './project/project.module';
     WorkspaceModule,
     TaskModule,
     ProjectModule,
+    CommentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
