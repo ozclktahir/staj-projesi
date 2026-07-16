@@ -51,11 +51,19 @@ export class CreateTaskDto {
 
   @ApiPropertyOptional({
     example: '3f1b1b3a-1c2d-4e5f-8a9b-0c1d2e3f4a5b',
-    description: 'Görevin atandığı kullanıcının UUID değeri',
+    description: 'Görevin atandığı kullanıcının UUID değeri (eski alan)',
   })
   @IsOptional()
   @IsUUID()
   assigned_to?: string;
+
+  @ApiPropertyOptional({
+    example: '3f1b1b3a-1c2d-4e5f-8a9b-0c1d2e3f4a5b',
+    description: 'Görevin atandığı kullanıcının UUID değeri',
+  })
+  @IsOptional()
+  @IsUUID()
+  assignee_id?: string;
 
   @ApiPropertyOptional({
     example: '2026-08-01T00:00:00.000Z',
@@ -64,4 +72,12 @@ export class CreateTaskDto {
   @IsOptional()
   @IsDateString()
   due_date?: string;
+
+  @ApiPropertyOptional({
+    example: '7a2c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e',
+    description: 'Üst görevin UUID değeri (alt görev ilişkisi için)',
+  })
+  @IsOptional()
+  @IsUUID()
+  parent_task_id?: string;
 }

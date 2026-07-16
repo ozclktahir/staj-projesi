@@ -34,6 +34,14 @@
   - [x] CORS Yapılandırması
   - [x] Helmet ile HTTP Güvenlik Başlıkları
   - [x] Healthcheck Modülü
+- [ ] **Faz 6: İleri Düzey Kurumsal Özellikler**
+  - [x] Görev Geliştirmeleri (Atanan Kişi, Son Teslim Tarihi, Alt Görevler)
+  - [x] Kullanıcı Profili (Avatar, Tema)
+  - [ ] Gerçek Dosya Yükleme (Supabase Storage Entegrasyonu)
+  - [ ] İstatistiksel Dashboard (Tamamlanan/Geciken Görevler)
+  - [ ] Soft Delete (Çöp Kutusu / Arşiv Mantığı)
+  - [ ] Zaman Takibi (Time Tracking Modülü)
+  - [ ] Bildirim Sistemi ve WebSockets
 - [ ] **Faz 7: Frontend (Flutter) Hazırlığı** (Mimari kurulum, state management)
 - [ ] **Faz 8: Frontend Entegrasyonu** (Tüm backend servislerinin UI ile bağlanması)
 - [ ] **Faz 9: Test, Optimizasyon ve Sunum**
@@ -187,3 +195,10 @@
 - `npm run build` ile derleme testi hatasız tamamlandı.
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `Mapped {/workspaces/:workspaceId/notes/dashboard/me, GET}` route'unun `Mapped {/workspaces/:workspaceId/notes/:id, GET}`'ten **önce** kaydedildiği (route çakışmasının önlendiği) doğrulandı.
 - Guard zinciri canlı olarak test edildi: token olmadan yapılan `POST`/`GET`/`GET /dashboard/me`/`GET /:id`/`PATCH /:id`/`DELETE /:id` istekleri hepsi `401` döndürdü.
+
+### [16 Temmuz 2026] - Faz 6: İleri Düzey Kurumsal Özellikler — Görev Geliştirmeleri
+- Yol haritasına **Faz 6: İleri Düzey Kurumsal Özellikler** ana başlığı eklendi; alt maddeler: Görev Geliştirmeleri ve Kullanıcı Profili tamamlandı olarak işaretlendi; Gerçek Dosya Yükleme, İstatistiksel Dashboard, Soft Delete, Zaman Takibi ve Bildirim/WebSockets bekleyen maddeler olarak bırakıldı.
+- `CreateTaskDto`: Opsiyonel `assignee_id` (UUID) ve `parent_task_id` (UUID) alanları eklendi; mevcut `due_date` (`IsDateString`) alanı korundu.
+- `GetTasksFilterDto`: Opsiyonel `assignee_id` ve `parent_task_id` filtre alanları eklendi.
+- `TaskService.findAll`: `assignee_id` ve `parent_task_id` varsa Supabase sorgusuna sırasıyla `.eq('assignee_id', ...)` ve `.eq('parent_task_id', ...)` koşulları dinamik olarak eklendi.
+- Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; değişikliklerin canlıya yansıdığı doğrulandı.

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import {
   TASK_PRIORITIES,
   TASK_STATUSES,
@@ -34,6 +34,22 @@ export class GetTasksFilterDto {
   @IsOptional()
   @IsIn(TASK_PRIORITIES)
   priority?: TaskPriority;
+
+  @ApiPropertyOptional({
+    example: '3f1b1b3a-1c2d-4e5f-8a9b-0c1d2e3f4a5b',
+    description: 'Atanan kişiye göre filtreleme',
+  })
+  @IsOptional()
+  @IsUUID()
+  assignee_id?: string;
+
+  @ApiPropertyOptional({
+    example: '7a2c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e',
+    description: 'Üst göreve göre alt görevleri filtreleme',
+  })
+  @IsOptional()
+  @IsUUID()
+  parent_task_id?: string;
 
   @ApiPropertyOptional({
     example: 1,
