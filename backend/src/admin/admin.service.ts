@@ -52,15 +52,59 @@ export class AdminService {
 
   /**
    * Kullanıcıyı workspace üyeliklerinden kaldırır.
+   * Kendini silme ve son Admin korumaları uygulanır.
    */
-  async removeUser(workspaceId: string, userId: string) {
+  async removeUser(
+    workspaceId: string,
+    targetUserId: string,
+    actorUserId: string,
+  ) {
+    if (actorUserId === targetUserId) {
+      throw new BadRequestException(
+        'Kendinizi workspace\'ten çıkaramazsınız',
+      );
+    }
+
     const client = this.supabaseService.getClient();
+
+    const { data: targetMember, error: targetError } = await client
+      .from('workspace_members')
+      .select('user_id, role')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', targetUserId)
+      .maybeSingle();
+
+    if (targetError) {
+      throw new BadRequestException(targetError.message);
+    }
+
+    if (!targetMember) {
+      throw new NotFoundException('Kullanıcı bu çalışma alanında bulunamadı.');
+    }
+
+    if (targetMember.role === 'Admin') {
+      const { count, error: adminCountError } = await client
+        .from('workspace_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
+        .eq('role', 'Admin');
+
+      if (adminCountError) {
+        throw new BadRequestException(adminCountError.message);
+      }
+
+      if ((count ?? 0) <= 1) {
+        throw new BadRequestException(
+          'Workspace\'in tek yöneticisi silinemez. Önce yetki devri yapın',
+        );
+      }
+    }
 
     const { data, error } = await client
       .from('workspace_members')
       .delete()
       .eq('workspace_id', workspaceId)
-      .eq('user_id', userId)
+      .eq('user_id', targetUserId)
       .select()
       .maybeSingle();
 
@@ -74,7 +118,7 @@ export class AdminService {
 
     return {
       message: 'Kullanıcı çalışma alanından başarıyla kaldırıldı.',
-      userId,
+      userId: targetUserId,
       workspaceId,
     };
   }

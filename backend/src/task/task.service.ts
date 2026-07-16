@@ -221,6 +221,37 @@ export class TaskService {
     return { message: 'Görev başarıyla arşivlendi.' };
   }
 
+  /**
+   * Soft-delete edilmiş görevi geri getirir (deleted_at = null).
+   */
+  async restore(workspaceId: string, taskId: string) {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('tasks')
+      .update({
+        deleted_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('workspace_id', workspaceId)
+      .eq('id', taskId)
+      .not('deleted_at', 'is', null)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    if (!data) {
+      throw new NotFoundException(
+        'Arşivlenmiş görev bulunamadı veya görev zaten aktif.',
+      );
+    }
+
+    return data;
+  }
+
   private resolveAssigneeId(
     assigneeId?: string | null,
     assignedTo?: string | null,

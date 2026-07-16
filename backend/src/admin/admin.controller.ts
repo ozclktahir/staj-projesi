@@ -5,6 +5,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { GetUser } from '../auth/decorators/get-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { WorkspaceRoleGuard } from '../auth/guards/workspace-role.guard';
@@ -42,6 +43,11 @@ export class AdminController {
     description: 'Kullanıcı çalışma alanından kaldırıldı.',
   })
   @ApiResponse({
+    status: 400,
+    description:
+      'Kendini silme veya son Admin koruması nedeniyle işlem reddedildi.',
+  })
+  @ApiResponse({
     status: 403,
     description: 'Bu işlem için Admin rolüne sahip olmanız gerekir.',
   })
@@ -52,7 +58,8 @@ export class AdminController {
   removeUser(
     @Param('workspaceId') workspaceId: string,
     @Param('userId') userId: string,
+    @GetUser() actor: { id: string },
   ) {
-    return this.adminService.removeUser(workspaceId, userId);
+    return this.adminService.removeUser(workspaceId, userId, actor.id);
   }
 }

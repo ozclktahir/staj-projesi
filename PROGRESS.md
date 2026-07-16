@@ -47,6 +47,9 @@
   - [x] Bildirim HTTP Uç Noktaları (Listeleme / Okundu / Tümünü Okundu)
   - [x] Project ↔ Task Hiyerarşisi API Entegrasyonu (projectId Filtreleme)
   - [x] Davet Kabul ve Üye Ekleme Akışı (Invitation Accept)
+  - [x] Admin Yetki Korumaları (Kendini Silme & Son Admin Kontrolü)
+  - [x] Çöp Kutusundan Görev Kurtarma (Soft Delete Restore)
+  - [x] Veritabanı SQL Şema Değişikliklerinin Dokümante Edilmesi
 - [ ] **Faz 7: Test, Optimizasyon ve Sunum**
 
 ### 🔮 Gelecek Planları (Zaman Kalırsa eklenecekler)

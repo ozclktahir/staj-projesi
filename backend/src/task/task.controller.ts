@@ -72,6 +72,28 @@ export class TaskController {
     return this.taskService.findOne(workspaceId, id);
   }
 
+  @Patch(':id/restore')
+  @Roles('Admin', 'Member')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
+  @ApiOperation({
+    summary: 'Soft-delete edilmiş görevi çöp kutusundan geri getirir',
+  })
+  @ApiResponse({ status: 200, description: 'Görev başarıyla geri getirildi.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Görev geri getirmek için Admin veya Member rolüne sahip olmanız gerekir.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Arşivlenmiş görev bulunamadı.',
+  })
+  restore(
+    @Param('workspaceId') workspaceId: string,
+    @Param('id') id: string,
+  ) {
+    return this.taskService.restore(workspaceId, id);
+  }
+
   @Patch(':id')
   @Roles('Admin', 'Member')
   @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
