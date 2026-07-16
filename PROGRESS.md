@@ -38,7 +38,7 @@
   - [x] Görev Geliştirmeleri (Atanan Kişi, Son Teslim Tarihi, Alt Görevler)
   - [x] Kullanıcı Profili (Avatar, Tema)
   - [x] Gerçek Dosya Yükleme (Supabase Storage Entegrasyonu)
-  - [ ] İstatistiksel Dashboard (Tamamlanan/Geciken Görevler)
+  - [x] İstatistiksel Dashboard (Tamamlanan/Geciken Görevler)
   - [ ] Soft Delete (Çöp Kutusu / Arşiv Mantığı)
   - [ ] Zaman Takibi (Time Tracking Modülü)
   - [ ] Bildirim Sistemi ve WebSockets
@@ -209,3 +209,10 @@
 - `SupabaseService.uploadFile(file, path)` eklendi: `storage.from('uploads').upload(...)` ile dosyayı yükleyip `getPublicUrl` üzerinden public URL döndürüyor.
 - Mevcut File modülü (görev dosya metadata CRUD'u) korundu; üzerine `POST .../files/upload` endpoint'i eklendi. `FileInterceptor('file', { storage: memoryStorage() })` ile buffer üzerinden yükleme yapılıyor; yanıt `{ url, file_name, file_type, path }` formatında.
 - Not: `nest g module/controller/service file` yeniden çalıştırılmadı — File modülü Faz 4'ten beri mevcuttu; mevcut yapı genişletildi.
+
+### [16 Temmuz 2026] - Faz 6: İstatistiksel Dashboard (PostgreSQL RPC)
+- **İstatistiksel Dashboard tamamlandı.**
+- `nest g module/controller/service dashboard` ile `DashboardModule` oluşturuldu; `SupabaseModule` import edildi.
+- `DashboardService.getWorkspaceStats(workspaceId)`: Supabase `.rpc('get_workspace_statistics', { p_workspace_id: workspaceId })` çağrısıyla workspace istatistiklerini (tamamlanan/geciken görevler vb.) getiriyor.
+- `DashboardController`: `GET /workspaces/:workspaceId/statistics` endpoint'i `@UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)` ile korundu.
+- Kişisel pano (`GET .../notes/dashboard/me`) Note modülünde bırakıldı; istatistiksel dashboard ayrı bir modül olarak konumlandırıldı.

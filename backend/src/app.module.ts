@@ -15,6 +15,7 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
 import { HealthModule } from './health/health.module';
 import { ProgressReportModule } from './progress-report/progress-report.module';
 import { NoteModule } from './note/note.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { NoteModule } from './note/note.module';
     HealthModule,
     ProgressReportModule,
     NoteModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
