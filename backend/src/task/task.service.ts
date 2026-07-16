@@ -37,7 +37,8 @@ export class TaskService {
     let query = client
       .from('tasks')
       .select('*', { count: 'exact' })
-      .eq('workspace_id', workspaceId);
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null);
 
     if (status) {
       query = query.eq('status', status);
@@ -129,9 +130,10 @@ export class TaskService {
 
     const { data, error } = await client
       .from('tasks')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('workspace_id', workspaceId)
       .eq('id', taskId)
+      .is('deleted_at', null)
       .select()
       .maybeSingle();
 
@@ -143,6 +145,6 @@ export class TaskService {
       throw new NotFoundException('Görev bulunamadı.');
     }
 
-    return { message: 'Görev başarıyla silindi.' };
+    return { message: 'Görev başarıyla arşivlendi.' };
   }
 }

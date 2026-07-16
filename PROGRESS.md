@@ -39,7 +39,7 @@
   - [x] Kullanıcı Profili (Avatar, Tema)
   - [x] Gerçek Dosya Yükleme (Supabase Storage Entegrasyonu)
   - [x] İstatistiksel Dashboard (Tamamlanan/Geciken Görevler)
-  - [ ] Soft Delete (Çöp Kutusu / Arşiv Mantığı)
+  - [x] Soft Delete (Çöp Kutusu / Arşiv Mantığı)
   - [ ] Zaman Takibi (Time Tracking Modülü)
   - [ ] Bildirim Sistemi ve WebSockets
 - [ ] **Faz 7: Frontend (Flutter) Hazırlığı** (Mimari kurulum, state management)
@@ -216,3 +216,9 @@
 - `DashboardService.getWorkspaceStats(workspaceId)`: Supabase `.rpc('get_workspace_statistics', { p_workspace_id: workspaceId })` çağrısıyla workspace istatistiklerini (tamamlanan/geciken görevler vb.) getiriyor.
 - `DashboardController`: `GET /workspaces/:workspaceId/statistics` endpoint'i `@UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)` ile korundu.
 - Kişisel pano (`GET .../notes/dashboard/me`) Note modülünde bırakıldı; istatistiksel dashboard ayrı bir modül olarak konumlandırıldı.
+
+### [16 Temmuz 2026] - Faz 6: Soft Delete (Çöp Kutusu / Arşiv Mantığı)
+- **Soft Delete tamamlandı.**
+- `TaskService.findAll`: sorgulara `.is('deleted_at', null)` eklendi; arşivlenmiş görevler listeden hariç tutuluyor.
+- `TaskService.remove`: hard delete yerine `update({ deleted_at: new Date().toISOString() })` ile soft delete uygulandı.
+- `ProjectService.findAll` ve `remove` aynı soft delete deseniyle güncellendi.

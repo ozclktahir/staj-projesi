@@ -32,7 +32,8 @@ export class ProjectService {
     const { data, error } = await client
       .from('projects')
       .select('*')
-      .eq('workspace_id', workspaceId);
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null);
 
     if (error) {
       throw new BadRequestException(error.message);
@@ -46,9 +47,10 @@ export class ProjectService {
 
     const { data, error } = await client
       .from('projects')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('workspace_id', workspaceId)
       .eq('id', projectId)
+      .is('deleted_at', null)
       .select()
       .maybeSingle();
 
@@ -60,6 +62,6 @@ export class ProjectService {
       throw new NotFoundException('Proje bulunamadı.');
     }
 
-    return { message: 'Proje başarıyla silindi.' };
+    return { message: 'Proje başarıyla arşivlendi.' };
   }
 }
