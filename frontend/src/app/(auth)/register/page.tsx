@@ -16,10 +16,7 @@ import { Label } from "@/components/ui/label";
 
 export default function RegisterPage() {
   return (
-    <AuthSplitShell
-      title="Hoş Geldiniz"
-      subtitle="Hemen ücretsiz hesabını oluştur, ekiplerinle görev yönetimine başla."
-    >
+    <AuthSplitShell>
       <Card className="rounded-[var(--radius)] border-border/80 shadow-sm">
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl">Kayıt Ol</CardTitle>

@@ -16,10 +16,7 @@ import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   return (
-    <AuthSplitShell
-      title="Hoş Geldiniz"
-      subtitle="Çalışma alanlarınıza, görevlerinize ve ekibinize tek yerden güvenle erişin."
-    >
+    <AuthSplitShell>
       <Card className="rounded-[var(--radius)] border-border/80 shadow-sm">
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl">Giriş Yap</CardTitle>
