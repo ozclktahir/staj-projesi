@@ -42,6 +42,8 @@
   - [x] Role Enforcement (Yetki Denetimi ve Güvenlik Sıkılaştırması)
   - [x] Görevlere Dosya (file_url) İlişkilendirmesi
   - [x] Admin Paneli ve İstatistik Uç Noktaları
+  - [x] Rotalarda Workspace Üyeliği Zorunluluğu (Global Membership Enforcement)
+  - [x] Görev Atama ve Durum Değişikliklerinde Tetiklenen Real-time Bildirim Entegrasyonu
 - [ ] **Faz 7: Test, Optimizasyon ve Sunum**
 
 ### 🔮 Gelecek Planları (Zaman Kalırsa eklenecekler)
