@@ -13,6 +13,7 @@ import { CommentModule } from './comment/comment.module';
 import { FileModule } from './file/file.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
 import { HealthModule } from './health/health.module';
+import { ProgressReportModule } from './progress-report/progress-report.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { HealthModule } from './health/health.module';
     FileModule,
     ActivityLogModule,
     HealthModule,
+    ProgressReportModule,
   ],
   controllers: [AppController],
   providers: [AppService],

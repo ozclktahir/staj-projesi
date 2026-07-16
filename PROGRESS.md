@@ -28,6 +28,7 @@
   - [x] Redis Caching Entegrasyonu
   - [ ] WebSockets
   - [ ] Time Tracking
+  - [x] Progress Report (İlerleme Raporu) Modülü
 - [x] **Faz 6: Deployment Hazırlığı ve Canlıya Alma** (Güvenlik, CORS, Healthcheck)
   - [x] CORS Yapılandırması
   - [x] Helmet ile HTTP Güvenlik Başlıkları
@@ -163,3 +164,14 @@
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `HealthController {/health}` ve `Mapped {/health, GET}` route'larının başarıyla kaydedildiği doğrulandı.
 - Canlı olarak test edildi: `GET /health` tokensız `200` ile `{ status: 'ok', timestamp: ... }` döndürdü; yanıt başlıklarında Helmet'in eklediği `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` başlıkları doğrulandı; korumalı `GET /workspaces/:workspaceId/projects` endpoint'i token olmadan hâlâ `401` döndürerek mevcut guard zincirinin bozulmadığı teyit edildi.
 - Yol haritasındaki fazlar yeniden numaralandırıldı: Deployment Hazırlığı Faz 6 olarak eklendiği için Frontend Hazırlığı Faz 7'ye, Frontend Entegrasyonu Faz 8'e, Test/Optimizasyon/Sunum Faz 9'a kaydırıldı.
+
+### [16 Temmuz 2026] - Faz 5: Progress Report (İlerleme Raporu) Modülü
+- **Progress Report Modülü tamamlandı.**
+- `nest g module/controller/service progress-report` komutlarıyla ProgressReport modülü iskeleti oluşturuldu; `ProgressReportModule`, diğer modüllerle aynı desene uygun olarak `SupabaseModule`'ü import edecek şekilde güncellendi.
+- `src/progress-report/dto/create-progress-report.dto.ts`: `report_type` (`'DAILY' | 'WEEKLY' | 'MONTHLY'` enum, `@IsIn`), `title` ve `content` (`@IsString`/`@IsNotEmpty`) zorunlu alanları eklendi.
+- `src/progress-report/dto/get-reports-filter.dto.ts`: Task modülündeki `GetTasksFilterDto` ile aynı desende, opsiyonel `report_type` (enum), `user_id` (UUID) ve `page`/`limit` (varsayılan sırasıyla `1`/`10`, `@Type(() => Number)` ile dönüştürülen) sayfalama alanları eklendi.
+- `ProgressReportService`: `create` (`workspace_id` ve `user_id` ile `progress_reports` tablosuna kayıt), `findAll` (Task modülündeki gibi `count: 'exact'` ile başlayıp `report_type`/`user_id` filtrelerini koşullu uygulayan, `created_at`'e göre en yeniden eskiye sıralı, `{ data, meta: { total, page, limit, totalPages } }` formatında dönen sayfalanmış sorgu), `findOne` (bulunamazsa `NotFoundException`), `remove` (şimdilik sadece `id` ile silme; "sadece oluşturan kişi veya Workspace Admin silebilir" iş kuralı için `userId` parametresi imzada tutuldu, ileride genişletilecek) metotları Supabase istemcisiyle uygulandı.
+- `ProgressReportController`: `@Controller('workspaces/:workspaceId/progress-reports')`, `@ApiTags('Progress Reports')`, `@ApiBearerAuth()`, `@UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)` ile korunan `POST /`, `GET /` (`@Query() filterDto` ile filtre/sayfalama), `GET /:id`, `DELETE /:id` endpoint'leri Swagger dekoratörleriyle belgelendi.
+- `npm run build` ile derleme testi hatasız tamamlandı.
+- Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `/workspaces/:workspaceId/progress-reports` altındaki tüm route'ların (`POST`, `GET`, `GET /:id`, `DELETE /:id`) başarıyla kaydedildiği doğrulandı.
+- Guard zinciri canlı olarak test edildi: token olmadan yapılan `POST`/`GET`/`GET /:id`/`DELETE /:id` istekleri hepsi `401` döndürdü.
