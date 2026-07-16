@@ -22,12 +22,11 @@
   - [x] Proje Modülü
   - [x] Yorumlar Modülü
   - [x] Dosyalar Modülü
-- [ ] **Faz 5: Sistem Cilası ve Optimizasyon** (Activity Log, Redis Caching, WebSockets, Time Tracking)
+- [ ] **Faz 5: Sistem Cilası ve Optimizasyon** (Activity Log, Redis Caching, WebSockets)
   - [x] Activity Log (Aktivite Günlüğü) Modülü
   - [x] Task Modülü Arama ve Sayfalama (Pagination)
   - [x] Redis Caching Entegrasyonu
   - [ ] WebSockets
-  - [ ] Time Tracking
   - [x] Progress Report (İlerleme Raporu) Modülü
   - [x] Notion Tarzı Notlar ve Kişisel Pano Modülü
 - [x] **Faz 6: Deployment Hazırlığı ve Canlıya Alma** (Güvenlik, CORS, Healthcheck)
@@ -40,8 +39,7 @@
   - [x] Gerçek Dosya Yükleme (Supabase Storage Entegrasyonu)
   - [x] İstatistiksel Dashboard (Tamamlanan/Geciken Görevler)
   - [x] Soft Delete (Çöp Kutusu / Arşiv Mantığı)
-  - [ ] Zaman Takibi (Time Tracking Modülü)
-  - [ ] Bildirim Sistemi ve WebSockets
+  - [x] Bildirim Sistemi ve WebSockets (Gerçek Zamanlı Güncellemeler).
 - [ ] **Faz 7: Frontend (Flutter) Hazırlığı** (Mimari kurulum, state management)
 - [ ] **Faz 8: Frontend Entegrasyonu** (Tüm backend servislerinin UI ile bağlanması)
 - [ ] **Faz 9: Test, Optimizasyon ve Sunum**
