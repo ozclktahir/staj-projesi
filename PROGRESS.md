@@ -54,6 +54,7 @@
   - [x] Veritabanı SQL Şema Değişikliklerinin Dokümante Edilmesi
 - [ ] **Faz 7: Web Frontend Geliştirme (Next.js)**
   - [x] Next.js 14+ (App Router) ve Tailwind CSS kurulumu (Altyapı ve Axios entegrasyonu tamamlandı)
+  - [x] Turuncu-Siyah tema, Shadcn/UI kurulumu ve Aydınlık/Karanlık mod altyapısı
   - [ ] Auth (Giriş/Kayıt) sayfaları ve JWT entegrasyonu
   - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
   - [ ] Task (Görev) yönetimi ve detay ekranları
