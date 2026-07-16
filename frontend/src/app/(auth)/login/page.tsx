@@ -17,9 +17,11 @@ import { Label } from "@/components/ui/label";
 export default function LoginPage() {
   return (
     <AuthSplitShell>
-      <Card className="rounded-[var(--radius)] border-border/80 shadow-sm">
+      <Card className="rounded-[var(--radius)] border border-neutral-800 shadow-xl">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl">Giriş Yap</CardTitle>
+          <CardTitle className="text-2xl text-neutral-800 dark:text-neutral-200">
+            Giriş Yap
+          </CardTitle>
           <CardDescription>
             Hesabınıza giriş yapmak için e-posta ve şifrenizi girin.
           </CardDescription>

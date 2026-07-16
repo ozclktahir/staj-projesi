@@ -13,18 +13,18 @@ export function AuthSplitShell({ children }: AuthSplitShellProps) {
           className="pointer-events-none absolute inset-0 opacity-50"
           style={{
             background:
-              "radial-gradient(circle at 30% 30%, hsl(38 92% 50% / 0.35), transparent 50%), radial-gradient(circle at 70% 70%, hsl(38 92% 50% / 0.15), transparent 45%)",
+              "radial-gradient(circle at 30% 30%, hsl(24 100% 50% / 0.35), transparent 50%), radial-gradient(circle at 70% 70%, hsl(24 100% 50% / 0.15), transparent 45%)",
           }}
         />
         <div className="relative z-10 flex flex-col items-center justify-center gap-4">
           <p className="text-sm font-medium tracking-[0.25em] text-primary uppercase">
             staj-projesi
           </p>
-          <h1 className="text-4xl font-semibold tracking-tight text-white md:text-5xl">
+          <h1 className="text-4xl font-semibold tracking-tight text-neutral-100 md:text-5xl">
             Task{" "}
             <span className="text-primary">Management</span>
           </h1>
-          <p className="max-w-sm text-sm leading-relaxed text-white/70 md:text-base">
+          <p className="max-w-sm text-sm leading-relaxed text-neutral-300 md:text-base">
             Ekiplerin için net, hızlı ve odaklı görev yönetimi.
           </p>
           <div className="mt-2 h-1 w-16 rounded-[var(--radius)] bg-primary" />
