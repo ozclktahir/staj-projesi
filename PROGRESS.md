@@ -29,6 +29,7 @@
   - [ ] WebSockets
   - [ ] Time Tracking
   - [x] Progress Report (İlerleme Raporu) Modülü
+  - [x] Notion Tarzı Notlar ve Kişisel Pano Modülü
 - [x] **Faz 6: Deployment Hazırlığı ve Canlıya Alma** (Güvenlik, CORS, Healthcheck)
   - [x] CORS Yapılandırması
   - [x] Helmet ile HTTP Güvenlik Başlıkları
@@ -175,3 +176,14 @@
 - `npm run build` ile derleme testi hatasız tamamlandı.
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `/workspaces/:workspaceId/progress-reports` altındaki tüm route'ların (`POST`, `GET`, `GET /:id`, `DELETE /:id`) başarıyla kaydedildiği doğrulandı.
 - Guard zinciri canlı olarak test edildi: token olmadan yapılan `POST`/`GET`/`GET /:id`/`DELETE /:id` istekleri hepsi `401` döndürdü.
+
+### [16 Temmuz 2026] - Faz 5: Notion Tarzı Notlar ve Kişisel Pano (Dashboard) Modülü
+- **Notion Tarzı Notlar ve Kişisel Pano Modülü tamamlandı.**
+- `nest g module/controller/service note` komutlarıyla Note modülü iskeleti oluşturuldu; `NoteModule`, diğer modüllerle aynı desende `SupabaseModule`'ü import edecek şekilde güncellendi.
+- `src/note/dto/create-note.dto.ts`: `title` (`@IsNotEmpty`/`@IsString`, zorunlu) ve `content` (`@IsOptional`/`@IsObject`, JSONB olarak saklanacak zengin metin/blok yapısı) alanları eklendi; `update-note.dto.ts`, `PartialType(CreateNoteDto)` ile türetildi.
+- `NoteService`: `create`/`findAll`/`findOne`/`update`/`remove` standart CRUD metotları, notların kişisel olması nedeniyle her sorguda `workspace_id` ile birlikte `user_id`'ye göre de filtrelenecek şekilde (kullanıcı sadece kendi notlarını görüp değiştirebiliyor) Supabase istemcisiyle uygulandı.
+- **Killer Feature — `getUserDashboard(workspaceId, userId)`:** `Promise.all` ile eşzamanlı olarak (a) kullanıcının `updated_at DESC` sıralı en son 5 notu, (b) workspace'teki en fazla 5 proje ve (c) `status` değeri `TODO`/`IN_PROGRESS` olan en güncel 10 görev çekildi. `tasks` tablosunda bir `user_id` kolonu bulunmadığı (görevler `created_by`/`assigned_to` ile ilişkilendiriliyor) tespit edildiğinden, görev sorgusu talep edildiği şekilde kullanıcıya özel filtre yerine workspace bazlı çalışacak şekilde kurgulandı. Sonuç `{ recentNotes, activeProjects, currentTasks }` biçiminde tek bir nesne olarak dönüyor.
+- `NoteController`: `@Controller('workspaces/:workspaceId/notes')`, `@ApiTags('Notes')`, `@ApiBearerAuth()`, `@UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)` ile korunan endpoint'ler eklendi. `GET /dashboard/me` route'u, Express/Nest router'ın `dashboard` değerini `:id` parametresi olarak yakalamasını önlemek amacıyla bilinçli olarak `GET /:id`'den **önce** tanımlandı; kullanıcı kimliği mevcut `@GetUser()` dekoratörü (`request.user`, Supabase `auth.getUser` sonucu) üzerinden alındı. Standart CRUD endpoint'leri (`POST /`, `GET /`, `GET /:id`, `PATCH /:id`, `DELETE /:id`) Swagger dekoratörleriyle belgelendi.
+- `npm run build` ile derleme testi hatasız tamamlandı.
+- Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; loglardan `Mapped {/workspaces/:workspaceId/notes/dashboard/me, GET}` route'unun `Mapped {/workspaces/:workspaceId/notes/:id, GET}`'ten **önce** kaydedildiği (route çakışmasının önlendiği) doğrulandı.
+- Guard zinciri canlı olarak test edildi: token olmadan yapılan `POST`/`GET`/`GET /dashboard/me`/`GET /:id`/`PATCH /:id`/`DELETE /:id` istekleri hepsi `401` döndürdü.
