@@ -6,6 +6,28 @@ import { CreateFileDto } from './dto/create-file.dto';
 export class FileService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
+  async upload(
+    file: Express.Multer.File,
+    workspaceId: string,
+    taskId: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Yüklenecek dosya bulunamadı.');
+    }
+
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${workspaceId}/${taskId}/${Date.now()}-${safeName}`;
+
+    const url = await this.supabaseService.uploadFile(file, path);
+
+    return {
+      url,
+      file_name: file.originalname,
+      file_type: file.mimetype,
+      path,
+    };
+  }
+
   async create(taskId: string, userId: string, dto: CreateFileDto) {
     const client = this.supabaseService.getClient();
 

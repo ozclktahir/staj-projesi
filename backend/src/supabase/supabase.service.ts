@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
@@ -31,5 +31,29 @@ export class SupabaseService implements OnModuleInit {
       );
     }
     return this.client;
+  }
+
+  /**
+   * 'uploads' bucket'ına dosya yükler ve oluşan public URL'i döner.
+   */
+  async uploadFile(file: Express.Multer.File, path: string): Promise<string> {
+    const client = this.getClient();
+
+    const { data, error } = await client.storage
+      .from('uploads')
+      .upload(path, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    const { data: publicUrlData } = client.storage
+      .from('uploads')
+      .getPublicUrl(data.path);
+
+    return publicUrlData.publicUrl;
   }
 }

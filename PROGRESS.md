@@ -37,7 +37,7 @@
 - [ ] **Faz 6: İleri Düzey Kurumsal Özellikler**
   - [x] Görev Geliştirmeleri (Atanan Kişi, Son Teslim Tarihi, Alt Görevler)
   - [x] Kullanıcı Profili (Avatar, Tema)
-  - [ ] Gerçek Dosya Yükleme (Supabase Storage Entegrasyonu)
+  - [x] Gerçek Dosya Yükleme (Supabase Storage Entegrasyonu)
   - [ ] İstatistiksel Dashboard (Tamamlanan/Geciken Görevler)
   - [ ] Soft Delete (Çöp Kutusu / Arşiv Mantığı)
   - [ ] Zaman Takibi (Time Tracking Modülü)
@@ -202,3 +202,10 @@
 - `GetTasksFilterDto`: Opsiyonel `assignee_id` ve `parent_task_id` filtre alanları eklendi.
 - `TaskService.findAll`: `assignee_id` ve `parent_task_id` varsa Supabase sorgusuna sırasıyla `.eq('assignee_id', ...)` ve `.eq('parent_task_id', ...)` koşulları dinamik olarak eklendi.
 - Docker imajı yeniden build edilip konteynerler ayağa kaldırıldı; değişikliklerin canlıya yansıdığı doğrulandı.
+
+### [16 Temmuz 2026] - Faz 6: Gerçek Dosya Yükleme (Supabase Storage)
+- **Gerçek Dosya Yükleme (Supabase Storage Entegrasyonu) tamamlandı.**
+- `multer` ve `@types/multer` paketleri kuruldu (`@nestjs/platform-express` zaten mevcuttu).
+- `SupabaseService.uploadFile(file, path)` eklendi: `storage.from('uploads').upload(...)` ile dosyayı yükleyip `getPublicUrl` üzerinden public URL döndürüyor.
+- Mevcut File modülü (görev dosya metadata CRUD'u) korundu; üzerine `POST .../files/upload` endpoint'i eklendi. `FileInterceptor('file', { storage: memoryStorage() })` ile buffer üzerinden yükleme yapılıyor; yanıt `{ url, file_name, file_type, path }` formatında.
+- Not: `nest g module/controller/service file` yeniden çalıştırılmadı — File modülü Faz 4'ten beri mevcuttu; mevcut yapı genişletildi.
