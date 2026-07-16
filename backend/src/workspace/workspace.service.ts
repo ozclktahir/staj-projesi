@@ -63,6 +63,7 @@ export class WorkspaceService {
         email: dto.email,
         role: dto.role,
         invited_by: inviterId,
+        status: 'PENDING',
       })
       .select()
       .single();

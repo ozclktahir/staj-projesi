@@ -44,6 +44,9 @@
   - [x] Admin Paneli ve İstatistik Uç Noktaları
   - [x] Rotalarda Workspace Üyeliği Zorunluluğu (Global Membership Enforcement)
   - [x] Görev Atama ve Durum Değişikliklerinde Tetiklenen Real-time Bildirim Entegrasyonu
+  - [x] Bildirim HTTP Uç Noktaları (Listeleme / Okundu / Tümünü Okundu)
+  - [x] Project ↔ Task Hiyerarşisi API Entegrasyonu (projectId Filtreleme)
+  - [x] Davet Kabul ve Üye Ekleme Akışı (Invitation Accept)
 - [ ] **Faz 7: Test, Optimizasyon ve Sunum**
 
 ### 🔮 Gelecek Planları (Zaman Kalırsa eklenecekler)

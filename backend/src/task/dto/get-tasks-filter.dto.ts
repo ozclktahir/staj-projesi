@@ -52,6 +52,14 @@ export class GetTasksFilterDto {
   parent_task_id?: string;
 
   @ApiPropertyOptional({
+    example: '3f1b1b3a-1c2d-4e5f-8a9b-0c1d2e3f4a5b',
+    description: 'Projeye göre görevleri filtreleme (project_id)',
+  })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
+
+  @ApiPropertyOptional({
     example: 1,
     description: 'Sayfa numarası',
     default: 1,

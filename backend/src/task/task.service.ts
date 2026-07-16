@@ -33,6 +33,7 @@ export class TaskService {
         assignee_id: dto.assignee_id,
         due_date: dto.due_date,
         parent_task_id: dto.parent_task_id,
+        project_id: dto.project_id,
         file_url: dto.file_url,
         workspace_id: workspaceId,
         created_by: userId,
@@ -60,7 +61,8 @@ export class TaskService {
 
   async findAll(workspaceId: string, filterDto: GetTasksFilterDto) {
     const client = this.supabaseService.getClient();
-    const { search, status, priority, assignee_id, parent_task_id } = filterDto;
+    const { search, status, priority, assignee_id, parent_task_id, projectId } =
+      filterDto;
     const page = filterDto.page ?? 1;
     const limit = filterDto.limit ?? 10;
 
@@ -84,6 +86,10 @@ export class TaskService {
 
     if (parent_task_id) {
       query = query.eq('parent_task_id', parent_task_id);
+    }
+
+    if (projectId) {
+      query = query.eq('project_id', projectId);
     }
 
     if (search) {

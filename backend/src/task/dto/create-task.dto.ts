@@ -82,6 +82,14 @@ export class CreateTaskDto {
   parent_task_id?: string;
 
   @ApiPropertyOptional({
+    example: '3f1b1b3a-1c2d-4e5f-8a9b-0c1d2e3f4a5b',
+    description: 'Görevin ait olduğu projenin UUID değeri',
+  })
+  @IsOptional()
+  @IsUUID()
+  project_id?: string;
+
+  @ApiPropertyOptional({
     example: 'https://example.supabase.co/storage/v1/object/public/uploads/task-file.pdf',
     description: 'Göreve ilişkilendirilmiş dosya URL değeri',
   })

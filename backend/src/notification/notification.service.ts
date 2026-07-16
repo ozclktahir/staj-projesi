@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationGateway } from './notification.gateway';
@@ -62,23 +66,59 @@ export class NotificationService {
   /**
    * Bildirimi okundu olarak işaretler ve kullanıcıya güncelleme emit eder.
    */
-  async markAsRead(notificationId: string, userId: string) {
+  async markAsRead(workspaceId: string, notificationId: string, userId: string) {
     const client = this.supabaseService.getClient();
 
     const { data, error } = await client
       .from('notifications')
       .update({ is_read: true })
       .eq('id', notificationId)
+      .eq('workspace_id', workspaceId)
       .eq('user_id', userId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       throw new BadRequestException(error.message);
     }
 
+    if (!data) {
+      throw new NotFoundException('Bildirim bulunamadı.');
+    }
+
     this.notificationGateway.emitToUser(userId, 'notification_read', data);
 
     return data;
+  }
+
+  /**
+   * Kullanıcının workspace içindeki tüm bildirimlerini okundu yapar.
+   */
+  async markAllAsRead(workspaceId: string, userId: string) {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .eq('is_read', false)
+      .select();
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    const updated = data ?? [];
+    this.notificationGateway.emitToUser(userId, 'notifications_read_all', {
+      workspace_id: workspaceId,
+      count: updated.length,
+    });
+
+    return {
+      message: 'Tüm bildirimler okundu olarak işaretlendi.',
+      count: updated.length,
+      data: updated,
+    };
   }
 }

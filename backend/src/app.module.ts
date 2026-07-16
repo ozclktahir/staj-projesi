@@ -18,6 +18,7 @@ import { NoteModule } from './note/note.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationModule } from './notification/notification.module';
 import { AdminModule } from './admin/admin.module';
+import { InvitationModule } from './invitation/invitation.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { AdminModule } from './admin/admin.module';
     DashboardModule,
     NotificationModule,
     AdminModule,
+    InvitationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
