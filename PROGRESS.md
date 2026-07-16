@@ -53,7 +53,7 @@
   - [x] Çöp Kutusundan Görev Kurtarma (Soft Delete Restore)
   - [x] Veritabanı SQL Şema Değişikliklerinin Dokümante Edilmesi
 - [ ] **Faz 7: Web Frontend Geliştirme (Next.js)**
-  - [ ] Next.js, Tailwind CSS ve Shadcn/UI kurulumu
+  - [x] Next.js 14+ (App Router) ve Tailwind CSS kurulumu (Altyapı ve Axios entegrasyonu tamamlandı)
   - [ ] Auth (Giriş/Kayıt) sayfaları ve JWT entegrasyonu
   - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
   - [ ] Task (Görev) yönetimi ve detay ekranları
