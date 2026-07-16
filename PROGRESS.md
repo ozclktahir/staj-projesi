@@ -54,8 +54,9 @@
   - [x] Veritabanı SQL Şema Değişikliklerinin Dokümante Edilmesi
 - [ ] **Faz 7: Web Frontend Geliştirme (Next.js)**
   - [x] Next.js 14+ (App Router) ve Tailwind CSS kurulumu (Altyapı ve Axios entegrasyonu tamamlandı)
-  - [x] Turuncu-Siyah tema, Shadcn/UI kurulumu ve Aydınlık/Karanlık mod altyapısı
-  - [x] Login ve Register sayfalarının (Split Screen) tasarımı
+  - [x] Turuncu-Siyah tema tasarımı, renk ve stil (border-radius) ayarları tamamlandı
+  - [x] Aydınlık/Karanlık mod altyapısı aktif
+  - [x] Auth (Login/Register) sayfalarının tasarımı ve Split-Screen düzeni tamamlandı
   - [ ] Auth (Giriş/Kayıt) sayfaları ve JWT entegrasyonu
   - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
   - [ ] Task (Görev) yönetimi ve detay ekranları
@@ -239,3 +240,8 @@
 - `TaskService.findAll`: sorgulara `.is('deleted_at', null)` eklendi; arşivlenmiş görevler listeden hariç tutuluyor.
 - `TaskService.remove`: hard delete yerine `update({ deleted_at: new Date().toISOString() })` ile soft delete uygulandı.
 - `ProjectService.findAll` ve `remove` aynı soft delete deseniyle güncellendi.
+
+### [16 Temmuz 2026] - Faz 7: Web Frontend (Next.js) — Auth UI ve Tema
+- Next.js App Router frontend kuruldu; `dev` script `3001` portuna alındı; Axios `api-client` + JWT Bearer interceptor eklendi.
+- Shadcn/UI (New York / Slate), turuncu–siyah tema (`--primary: 24 100% 50%`, `--radius: 0.5rem`) ve `next-themes` ile aydınlık/karanlık mod altyapısı tamamlandı.
+- Login/Register sayfaları Split Screen mimarisiyle tasarlandı (`(auth)/login`, `(auth)/register`); Shadcn Card/Input/Label/Button kullanıldı (UI-only).
