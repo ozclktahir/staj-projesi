@@ -33,6 +33,7 @@ export class TaskController {
 
   @Post()
   @Roles('Admin', 'Member')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Çalışma alanı içinde yeni bir görev oluşturur' })
   @ApiResponse({ status: 201, description: 'Görev başarıyla oluşturuldu.' })
   @ApiResponse({
@@ -73,6 +74,7 @@ export class TaskController {
 
   @Patch(':id')
   @Roles('Admin', 'Member')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Belirtilen görevi günceller' })
   @ApiResponse({ status: 200, description: 'Görev başarıyla güncellendi.' })
   @ApiResponse({
@@ -90,6 +92,7 @@ export class TaskController {
 
   @Delete(':id')
   @Roles('Admin', 'Member')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Belirtilen görevi siler' })
   @ApiResponse({ status: 200, description: 'Görev başarıyla silindi.' })
   @ApiResponse({

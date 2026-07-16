@@ -31,6 +31,7 @@ export class ProjectController {
 
   @Post()
   @Roles('Admin', 'Member')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Çalışma alanı içinde yeni bir proje oluşturur' })
   @ApiResponse({ status: 201, description: 'Proje başarıyla oluşturuldu.' })
   @ApiResponse({
@@ -56,6 +57,7 @@ export class ProjectController {
 
   @Delete(':id')
   @Roles('Admin', 'Member')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Belirtilen projeyi siler' })
   @ApiResponse({ status: 200, description: 'Proje başarıyla silindi.' })
   @ApiResponse({

@@ -1,11 +1,10 @@
 # 🚀 İş Yönetim Sistemi (staj-projesi) - İlerleme Günlüğü
 
 ## 🛠 Kullanılacak Teknolojiler
-- **Frontend:** Flutter
 - **Backend API:** Node.js (NestJS) + Swagger (Dokümantasyon)
 - **Veritabanı & Auth:** Supabase (PostgreSQL)
 - **Dosya Depolama:** Supabase Storage
-- **Gerçek Zamanlı İletişim:** Supabase Realtime
+- **Gerçek Zamanlı İletişim:** Supabase Realtime / WebSockets
 - **Önbellekleme (Cache) & Oturum:** Redis
 - **DevOps:** Docker & Docker Compose
 - **Versiyon Kontrolü:** Git & GitHub
@@ -40,9 +39,10 @@
   - [x] İstatistiksel Dashboard (Tamamlanan/Geciken Görevler)
   - [x] Soft Delete (Çöp Kutusu / Arşiv Mantığı)
   - [x] Bildirim Sistemi ve WebSockets (Gerçek Zamanlı Güncellemeler).
-- [ ] **Faz 7: Frontend (Flutter) Hazırlığı** (Mimari kurulum, state management)
-- [ ] **Faz 8: Frontend Entegrasyonu** (Tüm backend servislerinin UI ile bağlanması)
-- [ ] **Faz 9: Test, Optimizasyon ve Sunum**
+  - [x] Role Enforcement (Yetki Denetimi ve Güvenlik Sıkılaştırması)
+  - [x] Görevlere Dosya (file_url) İlişkilendirmesi
+  - [x] Admin Paneli ve İstatistik Uç Noktaları
+- [ ] **Faz 7: Test, Optimizasyon ve Sunum**
 
 ### 🔮 Gelecek Planları (Zaman Kalırsa eklenecekler)
 - [ ] AI ile görev önerileri, özeti ve deadline tahmini.

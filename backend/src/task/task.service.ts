@@ -14,7 +14,15 @@ export class TaskService {
     const { data, error } = await client
       .from('tasks')
       .insert({
-        ...dto,
+        title: dto.title,
+        description: dto.description,
+        status: dto.status,
+        priority: dto.priority,
+        assigned_to: dto.assigned_to,
+        assignee_id: dto.assignee_id,
+        due_date: dto.due_date,
+        parent_task_id: dto.parent_task_id,
+        file_url: dto.file_url,
         workspace_id: workspaceId,
         created_by: userId,
       })

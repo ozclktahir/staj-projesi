@@ -17,6 +17,7 @@ import { ProgressReportModule } from './progress-report/progress-report.module';
 import { NoteModule } from './note/note.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationModule } from './notification/notification.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { NotificationModule } from './notification/notification.module';
     NoteModule,
     DashboardModule,
     NotificationModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
