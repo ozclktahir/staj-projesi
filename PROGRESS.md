@@ -2,6 +2,8 @@
 
 ## 🛠 Kullanılacak Teknolojiler
 - **Backend API:** Node.js (NestJS) + Swagger (Dokümantasyon)
+- **Web Frontend:** Next.js + Tailwind CSS + Shadcn/UI *(öncelikli)*
+- **Mobil Uygulama:** Flutter *(web fazı tamamlandıktan sonra)*
 - **Veritabanı & Auth:** Supabase (PostgreSQL)
 - **Dosya Depolama:** Supabase Storage
 - **Gerçek Zamanlı İletişim:** Supabase Realtime / WebSockets
@@ -50,7 +52,14 @@
   - [x] Admin Yetki Korumaları (Kendini Silme & Son Admin Kontrolü)
   - [x] Çöp Kutusundan Görev Kurtarma (Soft Delete Restore)
   - [x] Veritabanı SQL Şema Değişikliklerinin Dokümante Edilmesi
-- [ ] **Faz 7: Test, Optimizasyon ve Sunum**
+- [ ] **Faz 7: Web Frontend Geliştirme (Next.js)**
+  - [ ] Next.js, Tailwind CSS ve Shadcn/UI kurulumu
+  - [ ] Auth (Giriş/Kayıt) sayfaları ve JWT entegrasyonu
+  - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
+  - [ ] Task (Görev) yönetimi ve detay ekranları
+- [ ] **Faz 8: Mobil Uygulama Geliştirme (Flutter)**
+  - [ ] Flutter proje kurulumu ve mimari yapılandırma (Web fazı tamamlandıktan sonra başlanacak)
+  - [ ] Mobil için Auth, Workspace ve Task ekranlarının geliştirilmesi
 
 ### 🔮 Gelecek Planları (Zaman Kalırsa eklenecekler)
 - [ ] AI ile görev önerileri, özeti ve deadline tahmini.
