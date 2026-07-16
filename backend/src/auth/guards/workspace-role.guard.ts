@@ -21,16 +21,20 @@ export class WorkspaceRoleGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    if (!requiredRoles || requiredRoles.length === 0) {
+    const request = context.switchToHttp().getRequest();
+    const workspaceId = this.resolveWorkspaceId(request);
+    const userId = request.user?.id;
+
+    // Workspace bağlamı yoksa (ör. global auth-only route) üyelik kontrolü uygulanmaz.
+    if (!workspaceId) {
+      if (requiredRoles && requiredRoles.length > 0) {
+        throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+      }
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const workspaceId = request.params?.id ?? request.params?.workspaceId;
-    const userId = request.user?.id;
-
-    if (!workspaceId || !userId) {
-      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    if (!userId) {
+      throw new ForbiddenException('Bu workspace\'e erişim izniniz yok');
     }
 
     const { data: membership, error } = await this.supabaseService
@@ -41,10 +45,43 @@ export class WorkspaceRoleGuard implements CanActivate {
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (error || !membership || !requiredRoles.includes(membership.role)) {
+    // Üyelik zorunlu: @Roles olmasa bile workspace üyesi olmayan herkes engellenir.
+    if (error || !membership) {
+      throw new ForbiddenException('Bu workspace\'e erişim izniniz yok');
+    }
+
+    if (
+      requiredRoles &&
+      requiredRoles.length > 0 &&
+      !requiredRoles.includes(membership.role)
+    ) {
       throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
     }
 
     return true;
+  }
+
+  private resolveWorkspaceId(request: {
+    params?: Record<string, string>;
+    body?: Record<string, unknown>;
+    query?: Record<string, unknown>;
+  }): string | undefined {
+    const fromParams =
+      request.params?.workspaceId ?? request.params?.id ?? undefined;
+    if (fromParams) {
+      return fromParams;
+    }
+
+    const fromBody = request.body?.workspaceId;
+    if (typeof fromBody === 'string' && fromBody.length > 0) {
+      return fromBody;
+    }
+
+    const fromQuery = request.query?.workspaceId;
+    if (typeof fromQuery === 'string' && fromQuery.length > 0) {
+      return fromQuery;
+    }
+
+    return undefined;
   }
 }
