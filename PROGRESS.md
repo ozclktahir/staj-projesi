@@ -57,7 +57,7 @@
   - [x] Turuncu-Siyah tema tasarımı, renk ve stil (border-radius) ayarları tamamlandı
   - [x] Aydınlık/Karanlık mod altyapısı aktif
   - [x] Auth (Login/Register) sayfalarının tasarımı ve Split-Screen düzeni tamamlandı
-  - [ ] Auth (Giriş/Kayıt) sayfaları ve JWT entegrasyonu
+  - [x] Auth (Giriş/Kayıt) sayfalarının UI tasarımı, form validasyonları (Zod + React Hook Form) ve API entegrasyonu tamamlandı.
   - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
   - [ ] Task (Görev) yönetimi ve detay ekranları
 - [ ] **Faz 8: Mobil Uygulama Geliştirme (Flutter)**
