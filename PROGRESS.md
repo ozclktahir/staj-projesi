@@ -16,6 +16,7 @@
 - [x] **Faz 2: Supabase ve Swagger Entegrasyonu** (Veritabanı bağlantısı, dokümantasyon altyapısı)
 - [x] **Faz 3: Temel Modüller** (Auth, Workspace, Kullanıcı Rolleri)
   - [x] Auth Modülü (Kayıt/Giriş/Çıkış)
+  - [x] Kayıt işlemi için User modeline Ad (firstName) ve Soyad (lastName) eklendi ve Frontend'e bağlandı.
   - [x] Workspace Yönetimi ve Rol Yapısı
   - [x] Kullanıcı Rolleri ve İzin Sınırları
 - [x] **Faz 4: Operasyonel Modüller / Görev Yönetimi** (Projeler, Görevler, Yorumlar, Dosyalar)

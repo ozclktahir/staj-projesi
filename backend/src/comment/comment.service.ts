@@ -50,7 +50,7 @@ export class CommentService {
 
     const { data: profiles, error: profilesError } = await client
       .from('profiles')
-      .select('id, name')
+      .select('*')
       .in('id', userIds);
 
     if (profilesError) {

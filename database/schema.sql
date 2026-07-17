@@ -109,3 +109,14 @@
 -- -----------------------------------------------------------------------------
 -- Bucket adı: uploads
 -- Object path örneği: {workspaceId}/{taskId}/{timestamp}-{filename}
+
+-- -----------------------------------------------------------------------------
+-- 8) PROFILES — Kayıt sırasında Ad / Soyad alanları
+--    (Projede Prisma yok; Supabase `profiles` tablosu kullanıcı profili olarak
+--     kullanılıyor. Mevcut sütunlar: id, email, full_name, avatar_url)
+-- -----------------------------------------------------------------------------
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS first_name TEXT;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_name TEXT;
+--
+-- Supabase SQL Editor'de yukarıdaki iki satırı çalıştırın.
+-- AuthService.register: first_name, last_name, full_name ve email yazar.

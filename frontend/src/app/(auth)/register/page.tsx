@@ -41,6 +41,8 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     try {
       await apiClient.post("/auth/register", {
+        firstName: values.firstName,
+        lastName: values.lastName,
         email: values.email,
         password: values.password,
       });
