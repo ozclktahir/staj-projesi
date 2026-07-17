@@ -1,5 +1,7 @@
-import { FolderKanban, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+"use client";
+
+import { FolderKanban } from "lucide-react";
+import { CreateProjectModal } from "@/components/dashboard/create-project-modal";
 import {
   Card,
   CardContent,
@@ -44,10 +46,7 @@ export function DashboardHome({ userName, projects }: DashboardHomeProps) {
               Aktif çalışma alanların ve projelerin
             </p>
           </div>
-          <Button className="rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90">
-            <Plus className="size-4" />
-            Yeni Proje
-          </Button>
+          <CreateProjectModal triggerLabel="Yeni Proje" />
         </div>
 
         {hasProjects ? (
@@ -94,10 +93,7 @@ export function DashboardHome({ userName, projects }: DashboardHomeProps) {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center pb-8">
-              <Button className="rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90">
-                <Plus className="size-4" />
-                İlk Projeyi Oluştur
-              </Button>
+              <CreateProjectModal triggerLabel="İlk Projeyi Oluştur" />
             </CardContent>
           </Card>
         )}

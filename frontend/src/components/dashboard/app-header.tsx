@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, UserRound } from "lucide-react";
+import { CreateProjectModal } from "@/components/dashboard/create-project-modal";
 import { Button } from "@/components/ui/button";
 
 type AppHeaderProps = {
@@ -18,6 +19,11 @@ export function AppHeader({ userName = "Kullanıcı" }: AppHeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        <CreateProjectModal
+          triggerLabel="Yeni Proje"
+          triggerClassName="hidden rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90 sm:inline-flex"
+        />
+
         <Button
           type="button"
           variant="ghost"
