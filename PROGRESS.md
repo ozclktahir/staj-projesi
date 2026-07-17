@@ -65,6 +65,7 @@
     - [x] Projects tablosu oluşturuldu ve Dashboard'da listelendi.
     - [x] Projects tablosu şema düzeltmesi (ALTER TABLE) uygulandı.
     - [x] Yeni Proje Oluşturma Modalı tamamlandı.
+    - [x] Faz 5: Proje Oluşturma Modalı eklendi.
   - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
   - [ ] Task (Görev) yönetimi ve detay ekranları
 - [ ] **Faz 8: Mobil Uygulama Geliştirme (Flutter)**

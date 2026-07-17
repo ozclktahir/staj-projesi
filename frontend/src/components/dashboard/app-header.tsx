@@ -1,7 +1,7 @@
 "use client";
 
 import { Bell, UserRound } from "lucide-react";
-import { CreateProjectModal } from "@/components/dashboard/create-project-modal";
+import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { Button } from "@/components/ui/button";
 
 type AppHeaderProps = {

@@ -1,7 +1,7 @@
 "use client";
 
 import { FolderKanban } from "lucide-react";
-import { CreateProjectModal } from "@/components/dashboard/create-project-modal";
+import { CreateProjectModal } from "@/components/CreateProjectModal";
 import {
   Card,
   CardContent,
