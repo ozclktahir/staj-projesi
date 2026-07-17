@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import apiClient from "@/lib/api-client";
+import { persistAuthSession } from "@/lib/auth-session";
 import {
   loginSchema,
   type LoginFormValues,
@@ -46,7 +47,7 @@ export default function LoginPage() {
       }>("/auth/login", values);
 
       if (data.access_token) {
-        localStorage.setItem("access_token", data.access_token);
+        persistAuthSession(data.access_token, data.user);
       }
 
       toast.success("Giriş başarılı");
