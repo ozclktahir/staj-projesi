@@ -68,6 +68,7 @@
     - [x] Faz 5: Proje Oluşturma Modalı eklendi.
     - [x] Faz 5: Proje oluşturma Auth hatası düzeltildi.
     - [x] Faz 5: Server Action Auth ve Cookie senkronizasyonu düzeltildi.
+    - [x] Faz 5: Workspace tablosu RLS (owner_id) hatası giderildi.
   - [ ] **Faz 6: Proje Detay Sayfası ve Görev Yönetimi**
     - [x] Proje detay rotası (`/project/[id]`) ve Dashboard kart navigasyonu eklendi.
   - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri

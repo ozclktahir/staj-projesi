@@ -1,6 +1,5 @@
 "use server";
 
-import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -52,6 +51,7 @@ async function resolveWorkspaceId(
     .insert({
       name: "Kişisel Çalışma Alanı",
       description: "Otomatik oluşturulan kişisel alan",
+      owner_id: userId,
     })
     .select("id")
     .single();
@@ -84,7 +84,6 @@ export async function createProject(
   try {
     const cookieStore = await cookies();
 
-    // 1) Terminalde gelen tüm cookie'leri gör
     console.log(
       "Gelen Cookie'ler:",
       cookieStore.getAll().map((c) => ({
@@ -102,87 +101,36 @@ export async function createProject(
     const description = input.description?.trim() || null;
     const { url, anonKey } = getSupabaseEnv();
 
-    // 2) Token çıkarma (manuel)
     const accessToken =
       cookieStore.get("sb_access_token")?.value ||
       cookieStore.get("access_token")?.value ||
       null;
-    const refreshToken =
-      cookieStore.get("sb_refresh_token")?.value ||
-      cookieStore.get("refresh_token")?.value ||
-      "";
 
-    console.log("[createProject] Token durumu:", {
-      hasAccessToken: Boolean(accessToken),
-      hasRefreshToken: Boolean(refreshToken),
-      accessTokenLength: accessToken?.length ?? 0,
-    });
+    if (!accessToken) {
+      return {
+        success: false,
+        error: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
+      };
+    }
 
-    const supabase = createServerClient(url, anonKey, {
-      cookies: {
-        get: (cookieName: string) => cookieStore.get(cookieName)?.value,
-        set: (cookieName: string, value: string, options?: Record<string, unknown>) => {
-          try {
-            cookieStore.set(cookieName, value, options);
-          } catch {
-            // ignore
-          }
-        },
-        remove: (cookieName: string, options?: Record<string, unknown>) => {
-          try {
-            cookieStore.set(cookieName, "", { ...options, maxAge: 0 });
-          } catch {
-            // ignore
-          }
-        },
+    const supabase = createClient(url, anonKey, {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
       },
     });
 
-    // 3) Manuel oturum açma (fallback)
-    if (accessToken) {
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken || "",
-      });
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(accessToken);
 
-      if (sessionError) {
-        console.warn(
-          "[createProject] setSession uyarısı:",
-          sessionError.message,
-          "→ getUser(jwt) fallback deneniyor",
-        );
-      }
-    } else {
-      console.error("[createProject] access/sb_access_token cookie yok");
-    }
-
-    let user = null as Awaited<
-      ReturnType<typeof supabase.auth.getUser>
-    >["data"]["user"];
-
-    if (accessToken) {
-      const { data, error } = await supabase.auth.getUser(accessToken);
-      user = data.user;
-      if (error || !user) {
-        console.error(
-          "[createProject] getUser(jwt) null:",
-          error?.message ?? "user null",
-        );
-      }
-    } else {
-      const { data, error } = await supabase.auth.getUser();
-      user = data.user;
-      if (error || !user) {
-        console.error(
-          "[createProject] getUser() null:",
-          error?.message ?? "user null",
-        );
-      }
-    }
-
-    if (!user) {
+    if (userError || !user) {
       console.error(
-        "[createProject] Kullanıcı bulunamadı (null user). Cookie/token senkronunu kontrol et.",
+        "[createProject] Kullanıcı bulunamadı:",
+        userError?.message ?? "user null",
       );
       return {
         success: false,
@@ -192,20 +140,8 @@ export async function createProject(
 
     console.info("[createProject] Authenticated user:", user.id);
 
-    // RLS için Authorization header'lı istemci (auth.uid() / JWT)
-    const authedClient = accessToken
-      ? createClient(url, anonKey, {
-          global: { headers: { Authorization: `Bearer ${accessToken}` } },
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-          },
-        })
-      : supabase;
-
     const { workspaceId, error: workspaceError } = await resolveWorkspaceId(
-      authedClient,
+      supabase,
       user.id,
     );
 
@@ -221,26 +157,28 @@ export async function createProject(
       description,
       workspace_id: workspaceId,
       created_by: user.id,
-      user_id: user.id,
+      owner_id: user.id,
     };
 
-    let { error: insertError } = await authedClient
+    let { error: insertError } = await supabase
       .from("projects")
       .insert(payload)
       .select("id")
       .single();
 
-    // Şema: user_id yoksa created_by ile dene
-    if (insertError?.message?.includes("user_id")) {
-      const withoutUserId = {
+    if (
+      insertError?.message?.includes("owner_id") ||
+      insertError?.message?.includes("user_id")
+    ) {
+      const withoutOwnerId = {
         name: payload.name,
         description: payload.description,
         workspace_id: payload.workspace_id,
         created_by: payload.created_by,
       };
-      ({ error: insertError } = await authedClient
+      ({ error: insertError } = await supabase
         .from("projects")
-        .insert(withoutUserId)
+        .insert(withoutOwnerId)
         .select("id")
         .single());
     }
@@ -265,5 +203,4 @@ export async function createProject(
   }
 }
 
-/** Geriye dönük uyumluluk */
 export const createProjectAction = createProject;
