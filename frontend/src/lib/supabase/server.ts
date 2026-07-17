@@ -109,3 +109,51 @@ export async function getCurrentUserProjects(): Promise<{
     projects: (data as DashboardProject[] | null) ?? [],
   };
 }
+
+export async function getProjectById(
+  projectId: string,
+): Promise<DashboardProject | null> {
+  if (!projectId?.trim()) {
+    return null;
+  }
+
+  const { supabase, accessToken } = await createSupabaseServerClient();
+
+  if (!accessToken) {
+    return null;
+  }
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser(accessToken);
+
+  if (userError || !user) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, name, description, created_at, created_by, user_id")
+    .eq("id", projectId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  const ownedByUser =
+    data.created_by === user.id || data.user_id === user.id;
+
+  if (!ownedByUser) {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    created_at: data.created_at,
+  };
+}

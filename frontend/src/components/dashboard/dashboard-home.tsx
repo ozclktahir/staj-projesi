@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FolderKanban } from "lucide-react";
 import { CreateProjectModal } from "@/components/CreateProjectModal";
 import {
@@ -52,31 +53,36 @@ export function DashboardHome({ userName, projects }: DashboardHomeProps) {
         {hasProjects ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
-              <Card
+              <Link
                 key={project.id}
-                className="rounded-[var(--radius)] border-border bg-card transition-colors hover:border-primary/40"
+                href={`/project/${project.id}`}
+                className="block rounded-[var(--radius)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <CardHeader className="space-y-3">
-                  <div className="flex size-10 items-center justify-center rounded-[var(--radius)] bg-primary/15 text-primary">
-                    <FolderKanban className="size-5" />
-                  </div>
-                  <CardTitle className="text-lg text-foreground">
-                    {project.name}
-                  </CardTitle>
-                  <CardDescription>
-                    {project.description?.trim()
-                      ? project.description
-                      : "Açıklama eklenmemiş"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">
-                    {project.created_at
-                      ? new Date(project.created_at).toLocaleDateString("tr-TR")
-                      : "Tarih yok"}
-                  </p>
-                </CardContent>
-              </Card>
+                <Card className="h-full rounded-[var(--radius)] border-border bg-card transition-colors hover:border-primary/40">
+                  <CardHeader className="space-y-3">
+                    <div className="flex size-10 items-center justify-center rounded-[var(--radius)] bg-primary/15 text-primary">
+                      <FolderKanban className="size-5" />
+                    </div>
+                    <CardTitle className="text-lg text-foreground">
+                      {project.name}
+                    </CardTitle>
+                    <CardDescription>
+                      {project.description?.trim()
+                        ? project.description
+                        : "Açıklama eklenmemiş"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground">
+                      {project.created_at
+                        ? new Date(project.created_at).toLocaleDateString(
+                            "tr-TR",
+                          )
+                        : "Tarih yok"}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
         ) : (
