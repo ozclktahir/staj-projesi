@@ -25,11 +25,31 @@ import { InvitationModule } from './invitation/invitation.module';
     ConfigModule.forRoot({ isGlobal: true }),
     CacheModule.registerAsync({
       isGlobal: true,
-      useFactory: async () => ({
-        store: await redisStore({
-          url: process.env.REDIS_URL || 'redis://redis:6379',
-        }),
-      }),
+      useFactory: async () => {
+        const url =
+          process.env.REDIS_URL ||
+          (process.env.REDIS_HOST
+            ? `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}`
+            : 'redis://127.0.0.1:6379');
+
+        try {
+          const store = await redisStore({
+            url,
+            socket: {
+              connectTimeout: 2000,
+              reconnectStrategy: false,
+            },
+          });
+          return { store };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          console.warn(
+            `Redis unavailable (${url}): ${message}. Falling back to in-memory cache.`,
+          );
+          return { ttl: 60_000 };
+        }
+      },
     }),
     SupabaseModule,
     AuthModule,

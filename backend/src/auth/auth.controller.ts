@@ -52,7 +52,13 @@ export class AuthController {
     description: 'Authorization başlığı eksik veya geçersiz.',
   })
   logout(@Headers('authorization') authorization?: string) {
-    const token = authorization?.replace('Bearer ', '').trim();
+    const header = Array.isArray(authorization)
+      ? authorization[0]
+      : authorization;
+    const token =
+      typeof header === 'string'
+        ? header.replace(/^Bearer\s+/i, '').trim()
+        : '';
 
     if (!token) {
       throw new UnauthorizedException(

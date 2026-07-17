@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import {
   readStoredUser,
   resolveUserDisplayName,
+  syncAuthCookiesFromStorage,
 } from "@/lib/auth-session";
 
 export default function DashboardLayout({
@@ -16,6 +17,7 @@ export default function DashboardLayout({
   const [userName, setUserName] = useState("Kullanıcı");
 
   useEffect(() => {
+    syncAuthCookiesFromStorage();
     setUserName(resolveUserDisplayName(readStoredUser()));
   }, []);
 

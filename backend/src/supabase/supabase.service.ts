@@ -6,12 +6,18 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 export class SupabaseService implements OnModuleInit {
   private readonly logger = new Logger(SupabaseService.name);
   private client: SupabaseClient | null = null;
+  private adminClient: SupabaseClient | null = null;
+  private supabaseUrl: string | null = null;
+  private supabaseAnonKey: string | null = null;
 
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
     const supabaseKey = this.configService.get<string>('SUPABASE_KEY');
+    const serviceRoleKey = this.configService.get<string>(
+      'SUPABASE_SERVICE_ROLE_KEY',
+    );
 
     if (!supabaseUrl || !supabaseKey) {
       this.logger.warn(
@@ -20,8 +26,21 @@ export class SupabaseService implements OnModuleInit {
       return;
     }
 
+    this.supabaseUrl = supabaseUrl;
+    this.supabaseAnonKey = supabaseKey;
     this.client = createClient(supabaseUrl, supabaseKey);
     this.logger.log('Supabase istemcisi başarıyla başlatıldı.');
+
+    if (serviceRoleKey) {
+      this.adminClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      this.logger.log('Supabase admin (service role) istemcisi başlatıldı.');
+    } else {
+      this.logger.warn(
+        'SUPABASE_SERVICE_ROLE_KEY tanımlı değil. profiles yazımları RLS nedeniyle başarısız olabilir.',
+      );
+    }
   }
 
   getClient(): SupabaseClient {
@@ -31,6 +50,25 @@ export class SupabaseService implements OnModuleInit {
       );
     }
     return this.client;
+  }
+
+  /** RLS’yi bypass eder; yalnızca sunucu tarafı güvenli işlemler için. */
+  getAdminClient(): SupabaseClient | null {
+    return this.adminClient;
+  }
+
+  /** Yeni kullanıcının JWT’si ile RLS’ye uygun istemci üretir. */
+  createUserClient(accessToken: string): SupabaseClient {
+    if (!this.supabaseUrl || !this.supabaseAnonKey) {
+      throw new Error('Supabase istemcisi başlatılmamış.');
+    }
+
+    return createClient(this.supabaseUrl, this.supabaseAnonKey, {
+      global: {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
   }
 
   /**

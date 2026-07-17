@@ -61,6 +61,9 @@
   - [x] Auth (Giriş/Kayıt) sayfalarının UI tasarımı, form validasyonları (Zod + React Hook Form) ve API entegrasyonu tamamlandı.
   - [ ] **Faz 4: Dashboard ve Core Arayüzü**
     - [x] Dashboard layout'u, sidebar ve header tasarımı tamamlandı.
+  - [ ] **Faz 5: Proje Yönetimi ve CRUD**
+    - [x] Projects tablosu oluşturuldu ve Dashboard'da listelendi.
+    - [x] Projects tablosu şema düzeltmesi (ALTER TABLE) uygulandı.
   - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
   - [ ] Task (Görev) yönetimi ve detay ekranları
 - [ ] **Faz 8: Mobil Uygulama Geliştirme (Flutter)**

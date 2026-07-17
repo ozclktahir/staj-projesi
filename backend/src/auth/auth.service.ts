@@ -1,14 +1,18 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import type { Session, User } from '@supabase/supabase-js';
 import { SupabaseService } from '../supabase/supabase.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(private readonly supabaseService: SupabaseService) {}
 
   async register(dto: RegisterDto) {
@@ -35,37 +39,75 @@ export class AuthService {
       throw new BadRequestException('Kullanıcı oluşturulamadı.');
     }
 
-    // Supabase `profiles` tablosu (Prisma User modeli yerine)
-    const profilePayload = {
-      id: data.user.id,
+    await this.persistProfile(data.user, data.session, dto, fullName);
+
+    return data.user;
+  }
+
+  /**
+   * Ad/soyadı profiles tablosuna yazar.
+   * Öncelik: service role → kullanıcı oturumu → anon (RLS başarısız olabilir).
+   * first_name/last_name sütunları yoksa full_name ile devam eder.
+   */
+  private async persistProfile(
+    user: User,
+    session: Session | null,
+    dto: RegisterDto,
+    fullName: string,
+  ) {
+    const fullPayload = {
+      id: user.id,
       email: dto.email,
       first_name: dto.firstName,
       last_name: dto.lastName,
       full_name: fullName,
     };
+    const fallbackPayload = {
+      id: user.id,
+      email: dto.email,
+      full_name: fullName,
+    };
 
-    let { error: profileError } = await client
-      .from('profiles')
-      .upsert(profilePayload);
+    const writeClients = [
+      this.supabaseService.getAdminClient(),
+      session?.access_token
+        ? this.supabaseService.createUserClient(session.access_token)
+        : null,
+      this.supabaseService.getClient(),
+    ].filter(Boolean);
 
-    // first_name / last_name henüz migrate edilmemişse full_name ile devam et
-    if (
-      profileError &&
-      (profileError.message.includes('first_name') ||
-        profileError.message.includes('last_name'))
-    ) {
-      ({ error: profileError } = await client.from('profiles').upsert({
-        id: data.user.id,
-        email: dto.email,
-        full_name: fullName,
-      }));
+    let lastError: string | null = null;
+
+    for (const writeClient of writeClients) {
+      let { error: profileError } = await writeClient!
+        .from('profiles')
+        .upsert(fullPayload);
+
+      if (
+        profileError &&
+        (profileError.message.includes('first_name') ||
+          profileError.message.includes('last_name') ||
+          profileError.code === 'PGRST204')
+      ) {
+        ({ error: profileError } = await writeClient!
+          .from('profiles')
+          .upsert(fallbackPayload));
+      }
+
+      if (!profileError) {
+        return;
+      }
+
+      lastError = profileError.message;
     }
 
-    if (profileError) {
-      throw new BadRequestException(profileError.message);
-    }
-
-    return data.user;
+    // Auth kaydı ve user_metadata başarılı; profiles RLS/şema sorunu kaydı bozmasın
+    this.logger.warn(
+      `profiles kaydı tamamlanamadı (user=${user.id}): ${lastError}. ` +
+        `Ad/soyad auth user_metadata içinde saklandı. ` +
+        `database/migrations/add_user_names.sql dosyasını Supabase SQL Editor'de çalıştırın ` +
+        `ve mümkünse SUPABASE_SERVICE_ROLE_KEY ekleyin.`,
+    );
   }
 
   async login(dto: LoginDto) {

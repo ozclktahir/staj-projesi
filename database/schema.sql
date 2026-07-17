@@ -25,6 +25,7 @@
 -- 2) PROJECTS — Soft delete
 -- -----------------------------------------------------------------------------
 -- ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+-- ALTER TABLE projects ADD COLUMN IF NOT EXISTS user_id UUID;
 
 -- -----------------------------------------------------------------------------
 -- 3) WORKSPACE_INVITATIONS — Davet durumu
@@ -112,11 +113,9 @@
 
 -- -----------------------------------------------------------------------------
 -- 8) PROFILES — Kayıt sırasında Ad / Soyad alanları
---    (Projede Prisma yok; Supabase `profiles` tablosu kullanıcı profili olarak
---     kullanılıyor. Mevcut sütunlar: id, email, full_name, avatar_url)
+--    Mevcut sütunlar: id, email, full_name, avatar_url
+--    Migration: database/migrations/add_user_names.sql
+--    (sütunlar + handle_new_user trigger + RLS politikaları)
 -- -----------------------------------------------------------------------------
 -- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS first_name TEXT;
 -- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_name TEXT;
---
--- Supabase SQL Editor'de yukarıdaki iki satırı çalıştırın.
--- AuthService.register: first_name, last_name, full_name ve email yazar.
