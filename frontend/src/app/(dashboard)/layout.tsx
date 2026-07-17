@@ -17,8 +17,9 @@ export default function DashboardLayout({
   const [userName, setUserName] = useState("Kullanıcı");
 
   useEffect(() => {
-    syncAuthCookiesFromStorage();
-    setUserName(resolveUserDisplayName(readStoredUser()));
+    void syncAuthCookiesFromStorage().then(() => {
+      setUserName(resolveUserDisplayName(readStoredUser()));
+    });
   }, []);
 
   return (

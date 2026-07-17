@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/server";
 
 export type CreateProjectInput = {
   name: string;
@@ -72,26 +72,16 @@ export async function createProjectAction(
   }
 
   const description = input.description?.trim() || null;
-  const { supabase, accessToken } = await createSupabaseServerClient();
+  const auth = await getAuthenticatedUser();
 
-  if (!accessToken) {
-    return {
-      success: false,
-      error: "Oturum bulunamadı. Lütfen tekrar giriş yapın.",
-    };
-  }
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser(accessToken);
-
-  if (userError || !user) {
+  if (!auth) {
     return {
       success: false,
       error: "Kullanıcı doğrulanamadı. Lütfen tekrar giriş yapın.",
     };
   }
+
+  const { supabase, user } = auth;
 
   const { workspaceId, error: workspaceError } = await resolveWorkspaceId(
     supabase,
@@ -105,6 +95,7 @@ export async function createProjectAction(
     };
   }
 
+  // user_id / created_by: RLS auth.uid() ile uyumlu olsun diye oturumdaki kullanıcı
   const payload = {
     name,
     description,

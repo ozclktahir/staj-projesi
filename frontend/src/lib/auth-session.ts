@@ -1,3 +1,5 @@
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+
 export type StoredAuthUser = {
   email?: string;
   user_metadata?: {
@@ -9,6 +11,7 @@ export type StoredAuthUser = {
 
 const AUTH_COOKIE = "auth_session";
 const ACCESS_TOKEN_COOKIE = "sb_access_token";
+const REFRESH_TOKEN_COOKIE = "sb_refresh_token";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 export function resolveUserDisplayName(
@@ -73,42 +76,66 @@ export function readAccessToken(): string | null {
   }
 }
 
-function setSessionCookie() {
+function setProxySessionCookie() {
   document.cookie = `${AUTH_COOKIE}=1; path=/; max-age=${SESSION_MAX_AGE_SECONDS}; SameSite=Lax`;
 }
 
-function setAccessTokenCookie(accessToken: string) {
-  // Server Component fetch için JWT cookie (encodeURIComponent ile güvenli)
-  document.cookie = `${ACCESS_TOKEN_COOKIE}=${encodeURIComponent(accessToken)}; path=/; max-age=${SESSION_MAX_AGE_SECONDS}; SameSite=Lax`;
+function setTokenCookies(accessToken: string, refreshToken?: string | null) {
+  // JWT'yi encode etmeden yaz (Next cookie decode ile çift bozulmayı önle)
+  document.cookie = `${ACCESS_TOKEN_COOKIE}=${accessToken}; path=/; max-age=${SESSION_MAX_AGE_SECONDS}; SameSite=Lax`;
+  if (refreshToken) {
+    document.cookie = `${REFRESH_TOKEN_COOKIE}=${refreshToken}; path=/; max-age=${SESSION_MAX_AGE_SECONDS}; SameSite=Lax`;
+  }
 }
 
-function clearAccessTokenCookie() {
+function clearTokenCookies() {
   document.cookie = `${ACCESS_TOKEN_COOKIE}=; path=/; max-age=0; SameSite=Lax; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+  document.cookie = `${REFRESH_TOKEN_COOKIE}=; path=/; max-age=0; SameSite=Lax; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
   document.cookie =
     "access_token=; path=/; max-age=0; SameSite=Lax; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 }
 
-export function persistAuthSession(accessToken: string, user?: unknown) {
+export async function persistAuthSession(
+  accessToken: string,
+  user?: unknown,
+  refreshToken?: string | null,
+) {
   if (!accessToken || typeof accessToken !== "string") {
     return;
   }
 
   try {
     localStorage.setItem("access_token", accessToken);
-    setSessionCookie();
-    setAccessTokenCookie(accessToken);
-
+    if (refreshToken) {
+      localStorage.setItem("refresh_token", refreshToken);
+    }
     if (user) {
       localStorage.setItem("user", JSON.stringify(user));
+    }
+
+    setProxySessionCookie();
+    setTokenCookies(accessToken, refreshToken);
+
+    // @supabase/ssr cookie'lerini de yaz (RLS / getUser için asıl kaynak)
+    if (refreshToken) {
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (error) {
+        console.warn("Supabase setSession başarısız:", error.message);
+      }
     }
   } catch {
     // Storage / cookie yazılamazsa sessizce devam et
   }
 }
 
-export function clearAuthSession() {
+export async function clearAuthSession() {
   try {
     localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
   } catch {
     // ignore
@@ -116,26 +143,39 @@ export function clearAuthSession() {
 
   try {
     document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0; SameSite=Lax; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-    clearAccessTokenCookie();
+    clearTokenCookies();
+    const supabase = createSupabaseBrowserClient();
+    await supabase.auth.signOut({ scope: "local" });
   } catch {
     // ignore
   }
 }
 
-/** localStorage token varsa session + access token cookie'lerini senkronlar. */
-export function syncAuthCookiesFromStorage() {
+/** localStorage token varsa cookie + supabase session senkronlar. */
+export async function syncAuthCookiesFromStorage() {
   if (typeof window === "undefined") {
     return;
   }
 
   try {
-    const token = localStorage.getItem("access_token");
-    if (token && token.trim() !== "") {
-      setSessionCookie();
-      setAccessTokenCookie(token);
-    } else {
+    const accessToken = localStorage.getItem("access_token");
+    const refreshToken = localStorage.getItem("refresh_token");
+
+    if (!accessToken || accessToken.trim() === "") {
       document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0; SameSite=Lax; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-      clearAccessTokenCookie();
+      clearTokenCookies();
+      return;
+    }
+
+    setProxySessionCookie();
+    setTokenCookies(accessToken, refreshToken);
+
+    if (refreshToken) {
+      const supabase = createSupabaseBrowserClient();
+      await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
     }
   } catch {
     // ignore

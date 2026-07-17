@@ -43,15 +43,21 @@ export default function LoginPage() {
     try {
       const { data } = await apiClient.post<{
         access_token?: string;
+        refresh_token?: string;
         user?: unknown;
       }>("/auth/login", values);
 
       if (data.access_token) {
-        persistAuthSession(data.access_token, data.user);
+        await persistAuthSession(
+          data.access_token,
+          data.user,
+          data.refresh_token,
+        );
       }
 
       toast.success("Giriş başarılı");
       router.push("/");
+      router.refresh();
     } catch (error) {
       const message = isAxiosError(error)
         ? (error.response?.data?.message ?? "E-posta veya şifre hatalı")

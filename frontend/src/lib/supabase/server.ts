@@ -1,10 +1,12 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { DashboardProject } from "@/lib/supabase/types";
 
 export type { DashboardProject } from "@/lib/supabase/types";
 
 const ACCESS_TOKEN_COOKIE = "sb_access_token";
+const REFRESH_TOKEN_COOKIE = "sb_refresh_token";
 
 function getSupabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -19,20 +21,65 @@ function getSupabaseEnv() {
   return { url, anonKey };
 }
 
-export async function createSupabaseServerClient(): Promise<{
-  supabase: SupabaseClient;
-  accessToken: string | null;
-}> {
+function readCookieValue(
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+  name: string,
+): string | null {
+  try {
+    const raw = cookieStore.get(name)?.value;
+    if (!raw || raw.trim() === "") {
+      return null;
+    }
+    // Next.js cookie değerlerini zaten decode eder; çift decode bozabilir
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cookie tabanlı Supabase sunucu istemcisi (@supabase/ssr).
+ * RLS için auth.uid() bu client üzerinden çalışır.
+ */
+export async function createSupabaseServerClient(): Promise<SupabaseClient> {
   const { url, anonKey } = getSupabaseEnv();
   const cookieStore = await cookies();
 
-  let accessToken: string | null = null;
-  try {
-    const raw = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
-    accessToken = raw && raw.trim() !== "" ? decodeURIComponent(raw) : null;
-  } catch {
-    accessToken = null;
-  }
+  return createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // Server Component içinde set başarısız olabilir; yok say
+        }
+      },
+    },
+  });
+}
+
+/**
+ * Manuel JWT cookie'lerinden (sb_access_token) fallback istemci.
+ * Eski oturumlar / Nest login sonrası geçiş için.
+ */
+export async function createSupabaseServerClientFromAccessToken(): Promise<{
+  supabase: SupabaseClient;
+  accessToken: string | null;
+  refreshToken: string | null;
+}> {
+  const { url, anonKey } = getSupabaseEnv();
+  const cookieStore = await cookies();
+  const accessToken = readCookieValue(cookieStore, ACCESS_TOKEN_COOKIE);
+  const refreshToken = readCookieValue(cookieStore, REFRESH_TOKEN_COOKIE);
 
   const supabase = createClient(url, anonKey, {
     global: accessToken
@@ -45,28 +92,54 @@ export async function createSupabaseServerClient(): Promise<{
     },
   });
 
-  return { supabase, accessToken };
+  if (accessToken && refreshToken) {
+    await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+  }
+
+  return { supabase, accessToken, refreshToken };
 }
 
-export async function getCurrentUserProjects(): Promise<{
-  userName: string;
-  projects: DashboardProject[];
-}> {
-  const { supabase, accessToken } = await createSupabaseServerClient();
+export async function getAuthenticatedUser(): Promise<{
+  supabase: SupabaseClient;
+  user: User;
+} | null> {
+  // 1) @supabase/ssr cookie session
+  const ssrClient = await createSupabaseServerClient();
+  const {
+    data: { user: ssrUser },
+    error: ssrError,
+  } = await ssrClient.auth.getUser();
+
+  if (!ssrError && ssrUser) {
+    return { supabase: ssrClient, user: ssrUser };
+  }
+
+  // 2) Fallback: Nest login JWT cookie
+  const {
+    supabase: tokenClient,
+    accessToken,
+  } = await createSupabaseServerClientFromAccessToken();
 
   if (!accessToken) {
-    return { userName: "Kullanıcı", projects: [] };
+    return null;
   }
 
   const {
     data: { user },
-    error: userError,
-  } = await supabase.auth.getUser(accessToken);
+    error,
+  } = await tokenClient.auth.getUser(accessToken);
 
-  if (userError || !user) {
-    return { userName: "Kullanıcı", projects: [] };
+  if (error || !user) {
+    return null;
   }
 
+  return { supabase: tokenClient, user };
+}
+
+function resolveUserName(user: User): string {
   const meta = user.user_metadata as
     | {
         first_name?: string;
@@ -77,11 +150,21 @@ export async function getCurrentUserProjects(): Promise<{
 
   const fullName = meta?.full_name?.trim();
   const combined = `${meta?.first_name ?? ""} ${meta?.last_name ?? ""}`.trim();
-  const userName =
-    fullName ||
-    combined ||
-    user.email?.split("@")[0] ||
-    "Kullanıcı";
+  return fullName || combined || user.email?.split("@")[0] || "Kullanıcı";
+}
+
+export async function getCurrentUserProjects(): Promise<{
+  userName: string;
+  projects: DashboardProject[];
+}> {
+  const auth = await getAuthenticatedUser();
+
+  if (!auth) {
+    return { userName: "Kullanıcı", projects: [] };
+  }
+
+  const { supabase, user } = auth;
+  const userName = resolveUserName(user);
 
   const { data, error } = await supabase
     .from("projects")
@@ -117,20 +200,12 @@ export async function getProjectById(
     return null;
   }
 
-  const { supabase, accessToken } = await createSupabaseServerClient();
-
-  if (!accessToken) {
+  const auth = await getAuthenticatedUser();
+  if (!auth) {
     return null;
   }
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser(accessToken);
-
-  if (userError || !user) {
-    return null;
-  }
+  const { supabase, user } = auth;
 
   let { data, error } = await supabase
     .from("projects")
