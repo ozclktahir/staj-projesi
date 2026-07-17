@@ -7,7 +7,7 @@ export class LoginDto {
     description: 'Kullanıcının e-posta adresi',
   })
   @IsEmail()
-  email: string;
+  email!: string;
 
   @ApiProperty({
     example: 'sifre123',
@@ -16,5 +16,5 @@ export class LoginDto {
   })
   @IsString()
   @MinLength(6)
-  password: string;
+  password!: string;
 }

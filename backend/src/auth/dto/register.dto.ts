@@ -8,7 +8,7 @@ export class RegisterDto {
   })
   @IsString()
   @IsNotEmpty()
-  firstName: string;
+  firstName!: string;
 
   @ApiProperty({
     example: 'Yılmaz',
@@ -16,14 +16,14 @@ export class RegisterDto {
   })
   @IsString()
   @IsNotEmpty()
-  lastName: string;
+  lastName!: string;
 
   @ApiProperty({
     example: 'user@example.com',
     description: 'Kullanıcının e-posta adresi',
   })
   @IsEmail()
-  email: string;
+  email!: string;
 
   @ApiProperty({
     example: 'sifre123',
@@ -32,5 +32,5 @@ export class RegisterDto {
   })
   @IsString()
   @MinLength(6)
-  password: string;
+  password!: string;
 }
