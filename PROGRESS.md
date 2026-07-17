@@ -69,6 +69,8 @@
     - [x] Faz 5: Proje oluşturma Auth hatası düzeltildi.
     - [x] Faz 5: Server Action Auth ve Cookie senkronizasyonu düzeltildi.
     - [x] Faz 5: Workspace tablosu RLS (owner_id) hatası giderildi.
+    - [x] Workspaces ve workspace_members tabloları için Supabase RLS (Row Level Security) politikaları (owner_id üzerinden) düzenlendi.
+    - [ ] GÜNLÜK DURAKLAMA: Proje (workspace) oluşturma formundan veri gönderildiğinde 'An unexpected response was received from the server' hatası alınıyor. Yarın server action (createProject) içerisindeki try/catch bloğu, dönen error objesi ve cookie yapısı detaylıca incelenip çözülecek.
   - [ ] **Faz 6: Proje Detay Sayfası ve Görev Yönetimi**
     - [x] Proje detay rotası (`/project/[id]`) ve Dashboard kart navigasyonu eklendi.
   - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
