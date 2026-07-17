@@ -132,19 +132,29 @@ export async function getProjectById(
     return null;
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("projects")
     .select("id, name, description, created_at, created_by, user_id")
     .eq("id", projectId)
     .is("deleted_at", null)
     .maybeSingle();
 
+  if (error?.message?.includes("user_id")) {
+    ({ data, error } = await supabase
+      .from("projects")
+      .select("id, name, description, created_at, created_by")
+      .eq("id", projectId)
+      .is("deleted_at", null)
+      .maybeSingle());
+  }
+
   if (error || !data) {
     return null;
   }
 
   const ownedByUser =
-    data.created_by === user.id || data.user_id === user.id;
+    data.created_by === user.id ||
+    ("user_id" in data && data.user_id === user.id);
 
   if (!ownedByUser) {
     return null;

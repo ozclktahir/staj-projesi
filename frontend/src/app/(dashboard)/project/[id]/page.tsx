@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ListTodo } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -27,36 +26,31 @@ export default async function ProjectDetailPage({
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-3">
-          <Button
-            asChild
-            variant="ghost"
-            className="h-auto rounded-[var(--radius)] px-0 text-muted-foreground hover:bg-transparent hover:text-primary"
-          >
-            <Link href="/">
-              <ArrowLeft className="size-4" />
-              Projelere dön
-            </Link>
-          </Button>
+      <div className="space-y-3">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+        >
+          <ArrowLeft className="size-4" />
+          Projelere dön
+        </Link>
 
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Proje detayı</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-              {project.name}
-            </h1>
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              {project.description?.trim()
-                ? project.description
-                : "Bu proje için henüz bir açıklama eklenmemiş."}
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">Proje detayı</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+            {project.name}
+          </h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            {project.description?.trim()
+              ? project.description
+              : "Bu proje için henüz bir açıklama eklenmemiş."}
+          </p>
+          {project.created_at ? (
+            <p className="text-xs text-muted-foreground">
+              Oluşturulma:{" "}
+              {new Date(project.created_at).toLocaleDateString("tr-TR")}
             </p>
-            {project.created_at ? (
-              <p className="text-xs text-muted-foreground">
-                Oluşturulma:{" "}
-                {new Date(project.created_at).toLocaleDateString("tr-TR")}
-              </p>
-            ) : null}
-          </div>
+          ) : null}
         </div>
       </div>
 
