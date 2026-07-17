@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
-import { createProjectAction } from "@/app/(dashboard)/actions";
+import { createProject } from "@/app/actions/create-project";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -47,7 +47,7 @@ export function CreateProjectModal({
     setIsSubmitting(true);
 
     try {
-      const result = await createProjectAction({ name, description });
+      const result = await createProject({ name, description });
 
       if (!result.success) {
         toast.error(result.error);

@@ -21,29 +21,9 @@ function getSupabaseEnv() {
   return { url, anonKey };
 }
 
-function readCookieValue(
-  cookieStore: Awaited<ReturnType<typeof cookies>>,
-  name: string,
-): string | null {
-  try {
-    const raw = cookieStore.get(name)?.value;
-    if (!raw || raw.trim() === "") {
-      return null;
-    }
-    // Next.js cookie değerlerini zaten decode eder; çift decode bozabilir
-    try {
-      return decodeURIComponent(raw);
-    } catch {
-      return raw;
-    }
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Cookie tabanlı Supabase sunucu istemcisi (@supabase/ssr).
- * RLS için auth.uid() bu client üzerinden çalışır.
+ * Cookie tabanlı Supabase sunucu istemcisi.
+ * get/set + getAll/setAll birlikte map'lenir.
  */
 export async function createSupabaseServerClient(): Promise<SupabaseClient> {
   const { url, anonKey } = getSupabaseEnv();
@@ -51,92 +31,86 @@ export async function createSupabaseServerClient(): Promise<SupabaseClient> {
 
   return createServerClient(url, anonKey, {
     cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
+      get: (name: string) => cookieStore.get(name)?.value,
+      set: (name: string, value: string, options?: Record<string, unknown>) => {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
+          cookieStore.set(name, value, options);
         } catch {
-          // Server Component içinde set başarısız olabilir; yok say
+          // ignore
+        }
+      },
+      remove: (name: string, options?: Record<string, unknown>) => {
+        try {
+          cookieStore.set(name, "", { ...options, maxAge: 0 });
+        } catch {
+          // ignore
         }
       },
     },
   });
 }
-
-/**
- * Manuel JWT cookie'lerinden (sb_access_token) fallback istemci.
- * Eski oturumlar / Nest login sonrası geçiş için.
- */
-export async function createSupabaseServerClientFromAccessToken(): Promise<{
-  supabase: SupabaseClient;
-  accessToken: string | null;
-  refreshToken: string | null;
-}> {
-  const { url, anonKey } = getSupabaseEnv();
-  const cookieStore = await cookies();
-  const accessToken = readCookieValue(cookieStore, ACCESS_TOKEN_COOKIE);
-  const refreshToken = readCookieValue(cookieStore, REFRESH_TOKEN_COOKIE);
-
-  const supabase = createClient(url, anonKey, {
-    global: accessToken
-      ? { headers: { Authorization: `Bearer ${accessToken}` } }
-      : undefined,
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
-
-  if (accessToken && refreshToken) {
-    await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
-  }
-
-  return { supabase, accessToken, refreshToken };
-}
-
 export async function getAuthenticatedUser(): Promise<{
   supabase: SupabaseClient;
   user: User;
 } | null> {
-  // 1) @supabase/ssr cookie session
-  const ssrClient = await createSupabaseServerClient();
-  const {
-    data: { user: ssrUser },
-    error: ssrError,
-  } = await ssrClient.auth.getUser();
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value ?? null;
+  const refreshToken = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value ?? null;
 
-  if (!ssrError && ssrUser) {
-    return { supabase: ssrClient, user: ssrUser };
-  }
+  const supabase = await createSupabaseServerClient();
 
-  // 2) Fallback: Nest login JWT cookie
-  const {
-    supabase: tokenClient,
-    accessToken,
-  } = await createSupabaseServerClientFromAccessToken();
-
-  if (!accessToken) {
-    return null;
+  if (accessToken && refreshToken) {
+    const { error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error) {
+      console.error("[getAuthenticatedUser] setSession:", error.message);
+    }
   }
 
   const {
-    data: { user },
-    error,
-  } = await tokenClient.auth.getUser(accessToken);
+    data: { user: sessionUser },
+    error: sessionError,
+  } = await supabase.auth.getUser();
 
-  if (error || !user) {
-    return null;
+  if (!sessionError && sessionUser) {
+    return { supabase, user: sessionUser };
   }
 
-  return { supabase: tokenClient, user };
+  if (accessToken) {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(accessToken);
+
+    if (!error && user) {
+      // RLS insert'leri için Authorization header'lı client
+      const { url, anonKey } = getSupabaseEnv();
+      const authed = createClient(url, anonKey, {
+        global: { headers: { Authorization: `Bearer ${accessToken}` } },
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      });
+      return { supabase: authed, user };
+    }
+
+    console.error(
+      "[getAuthenticatedUser] getUser(jwt) failed:",
+      error?.message ?? "user null",
+    );
+  } else {
+    console.error("[getAuthenticatedUser] No sb_access_token cookie");
+  }
+
+  if (sessionError) {
+    console.error("[getAuthenticatedUser] getUser():", sessionError.message);
+  }
+
+  return null;
 }
 
 function resolveUserName(user: User): string {
