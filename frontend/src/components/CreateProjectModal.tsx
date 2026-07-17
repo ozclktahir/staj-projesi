@@ -58,8 +58,12 @@ export function CreateProjectModal({
       resetForm();
       setOpen(false);
       router.refresh();
-    } catch {
-      toast.error("Proje oluşturulurken bir hata oluştu.");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Proje oluşturulurken bir hata oluştu.";
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
