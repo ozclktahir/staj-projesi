@@ -1,6 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { isAxiosError } from "axios";
+import { toast } from "sonner";
 import { AuthSplitShell } from "@/components/auth/auth-split-shell";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,8 +19,51 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import apiClient from "@/lib/api-client";
+import {
+  loginSchema,
+  type LoginFormValues,
+} from "@/lib/validations/auth";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+  });
+
+  const onSubmit = async (values: LoginFormValues) => {
+    setIsSubmitting(true);
+    try {
+      const { data } = await apiClient.post<{
+        access_token?: string;
+        user?: unknown;
+      }>("/auth/login", values);
+
+      if (data.access_token) {
+        localStorage.setItem("access_token", data.access_token);
+      }
+
+      toast.success("Giriş başarılı");
+      router.push("/");
+    } catch (error) {
+      const message = isAxiosError(error)
+        ? (error.response?.data?.message ?? "E-posta veya şifre hatalı")
+        : "E-posta veya şifre hatalı";
+
+      toast.error(
+        Array.isArray(message) ? message.join(", ") : String(message),
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <AuthSplitShell>
       <Card className="rounded-[var(--radius)] border border-neutral-800 shadow-xl">
@@ -27,23 +76,21 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-            }}
-          >
+          <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
-                name="email"
                 type="email"
                 autoComplete="email"
                 placeholder="ornek@email.com"
-                required
                 className="rounded-[var(--radius)]"
+                aria-invalid={Boolean(errors.email)}
+                {...register("email")}
               />
+              {errors.email ? (
+                <p className="text-sm text-red-500">{errors.email.message}</p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
@@ -57,19 +104,25 @@ export default function LoginPage() {
               </div>
               <Input
                 id="password"
-                name="password"
                 type="password"
                 autoComplete="current-password"
                 placeholder="••••••••"
-                required
                 className="rounded-[var(--radius)]"
+                aria-invalid={Boolean(errors.password)}
+                {...register("password")}
               />
+              {errors.password ? (
+                <p className="text-sm text-red-500">
+                  {errors.password.message}
+                </p>
+              ) : null}
             </div>
             <Button
               type="submit"
+              disabled={isSubmitting}
               className="w-full rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              Giriş Yap
+              {isSubmitting ? "Giriş yapılıyor..." : "Giriş Yap"}
             </Button>
           </form>
         </CardContent>
