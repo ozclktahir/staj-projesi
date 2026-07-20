@@ -10,22 +10,20 @@ export default function MyTasksPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       <div>
-        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-          My Tasks
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+        <p className="text-sm text-muted-foreground">My Tasks</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           Görevlerim
         </h1>
       </div>
-      <Card className="rounded-lg border border-dashed border-slate-200 bg-white">
+      <Card className="rounded-[var(--radius)] border-dashed border-border bg-card/60">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex size-11 items-center justify-center rounded-md bg-slate-100 text-slate-600">
-            <CheckSquare className="size-5" />
+          <div className="mb-2 flex size-12 items-center justify-center rounded-[var(--radius)] bg-primary/15 text-primary">
+            <CheckSquare className="size-6" />
           </div>
-          <CardTitle className="text-lg text-slate-900">
+          <CardTitle className="text-lg text-foreground">
             Kişisel görev görünümü
           </CardTitle>
-          <CardDescription className="max-w-md text-slate-500">
+          <CardDescription className="max-w-md">
             Atandığın görevler burada toplanacak. Şimdilik proje board’undan
             görev ekleyebilirsin.
           </CardDescription>

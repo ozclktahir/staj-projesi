@@ -16,42 +16,25 @@
 
 ## 2. Renk Paleti
 
-### Zemin & yüzey
-| Token | Tailwind / kullanım |
-|--------|---------------------|
-| App background | `bg-slate-50` |
-| Surface / card | `bg-white` |
-| Subtle surface | `bg-slate-100` |
-| Hover surface | `bg-slate-100/80` |
-| Border | `border-slate-200` |
-| Strong border | `border-slate-300` |
-| Text primary | `text-slate-900` |
-| Text secondary | `text-slate-500` |
-| Text muted | `text-slate-400` |
-
-### Aksan (ürün)
-- Primary aksan: turuncu (`primary` / `hsl(24 100% 50%)`) — CTA ve aktif nav.
-- Focus ring: primary veya `ring-slate-400`.
+### Marka (aktif tema)
+- **Turuncu–siyah** ürün teması korunur (`--primary: 24 100% 50%`, koyu zemin).
+- Dashboard shell: `bg-background` / `bg-card` / `border-border` / `text-primary`.
 
 ### Öncelik (Priority)
-| Seviye | Görsel | Tailwind ipucu |
-|--------|--------|----------------|
-| Critical | 🟣 | `bg-violet-100 text-violet-700` |
-| High | 🔴 | `bg-red-100 text-red-700` |
-| Medium | 🟡 | `bg-amber-100 text-amber-800` |
-| Low | 🟢 | `bg-emerald-100 text-emerald-700` |
-
-> Not: Veritabanı öncelikleri şu an `LOW / MEDIUM / HIGH`. Critical UI’da High üstü aksan olarak rezerv tutulur; HIGH → kırmızı, MEDIUM → amber, LOW → yeşil.
+| Seviye | Görsel | Kullanım |
+|--------|--------|----------|
+| Critical | 🟣 | Rezerv (ileride) |
+| High | 🔴 | `text-red-500` |
+| Medium | 🟡 / turuncu | `text-primary` |
+| Low | 🟢 | muted |
 
 ### Durum (Status)
-| Durum | Görsel | Tailwind ipucu |
-|-------|--------|----------------|
-| To Do | ⚪ | `bg-slate-100 text-slate-600` |
-| In Progress | 🔵 | `bg-sky-100 text-sky-700` |
-| Review | 🟠 | `bg-orange-100 text-orange-700` |
-| Done | 🟢 | `bg-emerald-100 text-emerald-700` |
-
-> Veritabanı durumları: `TODO`, `IN_PROGRESS`, `DONE`. Review kolonu ileride eklenebilir.
+| Durum | Görsel |
+|-------|--------|
+| To Do | ⚪ muted |
+| In Progress | 🔵 / primary border |
+| Review | 🟠 rezerv |
+| Done | 🟢 emerald |
 
 ---
 

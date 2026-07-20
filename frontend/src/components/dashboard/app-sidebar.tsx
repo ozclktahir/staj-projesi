@@ -23,20 +23,20 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
-      <div className="flex h-14 items-center gap-2.5 border-b border-slate-200 px-4">
-        <span className="flex size-7 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-card">
+      <div className="flex h-16 items-center gap-2 border-b border-border px-5">
+        <span className="flex size-8 items-center justify-center rounded-[var(--radius)] bg-primary text-sm font-bold text-primary-foreground">
           İY
         </span>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold tracking-tight text-slate-900">
+          <p className="truncate text-sm font-semibold tracking-tight text-foreground">
             İş Yönetim
           </p>
-          <p className="truncate text-[11px] text-slate-400">Workspace</p>
+          <p className="truncate text-xs text-muted-foreground">Dashboard</p>
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5 p-2">
+      <nav className="flex flex-1 flex-col gap-1 p-3">
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive =
             href === "/"
@@ -48,16 +48,16 @@ export function AppSidebar() {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-slate-100 text-slate-900"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               <Icon
                 className={cn(
                   "size-4 shrink-0",
-                  isActive ? "text-primary" : "text-slate-400",
+                  isActive ? "text-primary" : "text-muted-foreground",
                 )}
               />
               {label}
@@ -66,8 +66,10 @@ export function AppSidebar() {
         })}
       </nav>
 
-      <div className="border-t border-slate-200 p-3">
-        <p className="text-[11px] text-slate-400">Linear × Notion UI</p>
+      <div className="border-t border-border p-4">
+        <p className="text-xs text-muted-foreground">
+          Turuncu–siyah tema aktif
+        </p>
       </div>
     </aside>
   );

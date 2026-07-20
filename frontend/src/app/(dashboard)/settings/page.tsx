@@ -10,22 +10,20 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       <div>
-        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-          Settings
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+        <p className="text-sm text-muted-foreground">Settings</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           Ayarlar
         </h1>
       </div>
-      <Card className="rounded-lg border border-dashed border-slate-200 bg-white">
+      <Card className="rounded-[var(--radius)] border-dashed border-border bg-card/60">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex size-11 items-center justify-center rounded-md bg-slate-100 text-slate-600">
-            <Settings className="size-5" />
+          <div className="mb-2 flex size-12 items-center justify-center rounded-[var(--radius)] bg-primary/15 text-primary">
+            <Settings className="size-6" />
           </div>
-          <CardTitle className="text-lg text-slate-900">
+          <CardTitle className="text-lg text-foreground">
             Hesap ve tercih ayarları
           </CardTitle>
-          <CardDescription className="max-w-md text-slate-500">
+          <CardDescription className="max-w-md">
             Profil, bildirim ve tema tercihleri burada yönetilecek.
           </CardDescription>
         </CardHeader>
