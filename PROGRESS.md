@@ -77,8 +77,10 @@
   - [x] **Faz 6: Proje Detay Sayfası ve Görev Yönetimi**
     - [x] Proje detay rotası (`/project/[id]`) ve Dashboard kart navigasyonu eklendi.
     - [x] Task listeleme (TODO / IN_PROGRESS / DONE kolonları) ve Yeni Görev Ekle modalı eklendi.
-  - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
+  - [x] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
+    - (20 Temmuz 2026) Workspace switcher (Sidebar) ve Create Workspace Modal eklendi, backend entegrasyonu tamamlandı.
   - [x] Task (Görev) yönetimi ve detay ekranları
+    - (20 Temmuz 2026) Task Detail Sheet (Slide-over) bileşeni geliştirildi, Kanban kartlarına tıklandığında sağ taraftan açılan panel entegre edildi.
 - [ ] **Faz 8: Mobil Uygulama Geliştirme (Flutter)**
   - [ ] Flutter proje kurulumu ve mimari yapılandırma (Web fazı tamamlandıktan sonra başlanacak)
   - [ ] Mobil için Auth, Workspace ve Task ekranlarının geliştirilmesi

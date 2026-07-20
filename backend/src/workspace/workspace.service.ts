@@ -12,7 +12,11 @@ export class WorkspaceService {
 
     const { data: workspace, error: workspaceError } = await client
       .from('workspaces')
-      .insert({ name: dto.name, description: dto.description ?? null })
+      .insert({
+        name: dto.name,
+        description: dto.description ?? null,
+        owner_id: userId,
+      })
       .select()
       .single();
 
