@@ -64,9 +64,14 @@ export function Sidebar() {
                     : (activeWorkspace?.name ?? "Workspace seç")}
                 </p>
                 <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  {activeWorkspace?.role
-                    ? `Rol: ${activeWorkspace.role}`
-                    : "Çalışma alanı"}
+                  {[
+                    activeWorkspace?.role
+                      ? `Rol: ${activeWorkspace.role}`
+                      : null,
+                    activeWorkspace?.owner_id ? "owner_id ✓" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "Çalışma alanı"}
                 </p>
               </div>
               <ChevronsUpDown className="size-4 shrink-0 text-slate-400" />
@@ -106,6 +111,11 @@ export function Sidebar() {
                     <span className="min-w-0 flex-1 truncate">
                       {workspace.name}
                     </span>
+                    {workspace.role ? (
+                      <span className="text-[10px] text-slate-400">
+                        {workspace.role}
+                      </span>
+                    ) : null}
                     {isActive ? (
                       <Check className="size-4 shrink-0 text-primary" />
                     ) : null}

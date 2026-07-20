@@ -1,10 +1,19 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
@@ -12,6 +21,13 @@ import { WorkspaceRoleGuard } from '../auth/guards/workspace-role.guard';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { WorkspaceService } from './workspace.service';
+
+function extractBearerToken(request: Request): string {
+  const raw = request.headers?.authorization;
+  const header = Array.isArray(raw) ? raw[0] : raw;
+  if (!header || typeof header !== 'string') return '';
+  return header.replace(/^Bearer\s+/i, '').trim();
+}
 
 @ApiTags('Workspace')
 @ApiBearerAuth()
@@ -28,8 +44,16 @@ export class WorkspaceController {
       'Çalışma alanı oluşturuldu; oluşturan kullanıcı otomatik olarak Admin rolüyle eklendi.',
   })
   @ApiResponse({ status: 401, description: 'Kimlik doğrulama başarısız.' })
-  create(@GetUser() user: any, @Body() dto: CreateWorkspaceDto) {
-    return this.workspaceService.create(user.id, dto);
+  create(
+    @Req() request: Request,
+    @GetUser() user: { id: string },
+    @Body() dto: CreateWorkspaceDto,
+  ) {
+    return this.workspaceService.create(
+      user.id,
+      dto,
+      extractBearerToken(request),
+    );
   }
 
   @Get()
@@ -38,8 +62,8 @@ export class WorkspaceController {
   })
   @ApiResponse({ status: 200, description: 'Çalışma alanları listelendi.' })
   @ApiResponse({ status: 401, description: 'Kimlik doğrulama başarısız.' })
-  findAll(@GetUser() user: any) {
-    return this.workspaceService.findAll(user.id);
+  findAll(@Req() request: Request, @GetUser() user: { id: string }) {
+    return this.workspaceService.findAll(user.id, extractBearerToken(request));
   }
 
   @Post(':id/invite')
@@ -56,7 +80,7 @@ export class WorkspaceController {
   @ApiResponse({ status: 401, description: 'Kimlik doğrulama başarısız.' })
   invite(
     @Param('id') id: string,
-    @GetUser() user: any,
+    @GetUser() user: { id: string },
     @Body() dto: InviteMemberDto,
   ) {
     return this.workspaceService.invite(id, user.id, dto);

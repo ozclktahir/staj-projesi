@@ -1,5 +1,6 @@
 "use server";
 
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/auth-session";
 
@@ -7,8 +8,10 @@ export type WorkspaceListItem = {
   id: string;
   name: string;
   description?: string | null;
+  owner_id?: string | null;
   role?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type GetWorkspacesResult =
@@ -24,11 +27,11 @@ export type CreateWorkspaceResult =
   | { success: true; workspace: WorkspaceListItem }
   | { success: false; error: string };
 
-function getApiBaseUrl() {
-  return (
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-    "http://localhost:3000"
-  );
+function getSupabaseEnv() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return null;
+  return { url, anonKey };
 }
 
 function toPlainErrorMessage(error: unknown): string {
@@ -38,11 +41,52 @@ function toPlainErrorMessage(error: unknown): string {
   if (typeof error === "string" && error.trim()) {
     return error;
   }
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
   try {
     return JSON.stringify(error);
   } catch {
     return "Beklenmeyen bir hata oluştu.";
   }
+}
+
+function createUserScopedClient(
+  url: string,
+  anonKey: string,
+  accessToken: string,
+): SupabaseClient {
+  return createClient(url, anonKey, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
+function mapWorkspaceRow(
+  row: Record<string, unknown>,
+  role?: string | null,
+): WorkspaceListItem | null {
+  if (typeof row.id !== "string" || typeof row.name !== "string") {
+    return null;
+  }
+  return {
+    id: row.id,
+    name: row.name,
+    description: typeof row.description === "string" ? row.description : null,
+    owner_id: typeof row.owner_id === "string" ? row.owner_id : null,
+    role: role ?? null,
+    created_at: typeof row.created_at === "string" ? row.created_at : null,
+    updated_at: typeof row.updated_at === "string" ? row.updated_at : null,
+  };
 }
 
 async function getAccessToken(): Promise<string | null> {
@@ -56,6 +100,15 @@ async function getAccessToken(): Promise<string | null> {
 
 export async function getWorkspaces(): Promise<GetWorkspacesResult> {
   try {
+    const env = getSupabaseEnv();
+    if (!env) {
+      return {
+        success: false,
+        error:
+          "NEXT_PUBLIC_SUPABASE_URL veya NEXT_PUBLIC_SUPABASE_ANON_KEY tanımlı değil.",
+      };
+    }
+
     const token = await getAccessToken();
     if (!token) {
       return {
@@ -64,47 +117,48 @@ export async function getWorkspaces(): Promise<GetWorkspacesResult> {
       };
     }
 
-    const response = await fetch(`${getApiBaseUrl()}/workspace`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
-    });
+    const supabase = createUserScopedClient(env.url, env.anonKey, token);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token);
 
-    if (!response.ok) {
-      const body = await response.text();
+    if (userError || !user?.id) {
       return {
         success: false,
-        error: body || `Workspace listesi alınamadı (${response.status}).`,
+        error: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
       };
     }
 
-    const data = (await response.json()) as unknown;
-    const list = Array.isArray(data) ? data : [];
+    const { data, error } = await supabase
+      .from("workspace_members")
+      .select(
+        "role, workspaces(id, name, description, owner_id, created_at, updated_at)",
+      )
+      .eq("user_id", user.id);
 
-    const workspaces: WorkspaceListItem[] = list
-      .map((item) => {
-        if (!item || typeof item !== "object") return null;
-        const row = item as Record<string, unknown>;
-        if (typeof row.id !== "string" || typeof row.name !== "string") {
-          return null;
-        }
-        return {
-          id: row.id,
-          name: row.name,
-          description:
-            typeof row.description === "string" ? row.description : null,
-          role: typeof row.role === "string" ? row.role : null,
-          created_at:
-            typeof row.created_at === "string" ? row.created_at : null,
-        };
-      })
-      .filter((item): item is WorkspaceListItem => item !== null);
+    if (error) {
+      console.error("[getWorkspaces]", error);
+      return { success: false, error: toPlainErrorMessage(error) };
+    }
+
+    const workspaces: WorkspaceListItem[] = [];
+    for (const member of data ?? []) {
+      const row = member as {
+        role?: string | null;
+        workspaces?: Record<string, unknown> | Record<string, unknown>[] | null;
+      };
+      const wsRaw = Array.isArray(row.workspaces)
+        ? row.workspaces[0]
+        : row.workspaces;
+      if (!wsRaw || typeof wsRaw !== "object") continue;
+      const mapped = mapWorkspaceRow(wsRaw, row.role ?? null);
+      if (mapped) workspaces.push(mapped);
+    }
 
     return { success: true, workspaces };
   } catch (error) {
+    console.error("[getWorkspaces] catch:", toPlainErrorMessage(error));
     return { success: false, error: toPlainErrorMessage(error) };
   }
 }
@@ -118,6 +172,16 @@ export async function createWorkspace(
       return { success: false, error: "Workspace adı zorunludur." };
     }
 
+    const description = input.description?.trim() || null;
+    const env = getSupabaseEnv();
+    if (!env) {
+      return {
+        success: false,
+        error:
+          "NEXT_PUBLIC_SUPABASE_URL veya NEXT_PUBLIC_SUPABASE_ANON_KEY tanımlı değil.",
+      };
+    }
+
     const token = await getAccessToken();
     if (!token) {
       return {
@@ -126,51 +190,95 @@ export async function createWorkspace(
       };
     }
 
-    const response = await fetch(`${getApiBaseUrl()}/workspace`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name,
-        description: input.description?.trim() || undefined,
-      }),
-      cache: "no-store",
-    });
+    const supabase = createUserScopedClient(env.url, env.anonKey, token);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token);
 
-    if (!response.ok) {
-      let message = `Workspace oluşturulamadı (${response.status}).`;
-      try {
-        const body = (await response.json()) as { message?: string | string[] };
-        if (typeof body.message === "string") {
-          message = body.message;
-        } else if (Array.isArray(body.message)) {
-          message = body.message.join(", ");
-        }
-      } catch {
-        // ignore parse errors
-      }
-      return { success: false, error: message };
+    if (userError || !user?.id) {
+      return {
+        success: false,
+        error: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
+      };
     }
 
-    const data = (await response.json()) as Record<string, unknown>;
-    if (typeof data.id !== "string" || typeof data.name !== "string") {
+    // RLS: authenticated kullanıcı yalnızca kendi ID’si ile INSERT edebilir
+    const authUid = user.id;
+    const payload = {
+      name,
+      description,
+      owner_id: authUid,
+    };
+
+    if (payload.owner_id !== authUid) {
+      return {
+        success: false,
+        error: "owner_id, auth.uid() ile eşleşmiyor.",
+      };
+    }
+
+    console.info("[createWorkspace] insert payload", {
+      name: payload.name,
+      owner_id: payload.owner_id,
+    });
+
+    const { data: workspace, error: workspaceError } = await supabase
+      .from("workspaces")
+      .insert(payload)
+      .select("id, name, description, owner_id, created_at, updated_at")
+      .single();
+
+    if (workspaceError || !workspace) {
+      console.error("[createWorkspace] workspaces insert:", workspaceError);
+      return {
+        success: false,
+        error: toPlainErrorMessage(
+          workspaceError ?? "Workspace oluşturulamadı.",
+        ),
+      };
+    }
+
+    const memberPayload = {
+      workspace_id: workspace.id as string,
+      user_id: authUid,
+      role: "Admin",
+    };
+
+    const { error: memberError } = await supabase
+      .from("workspace_members")
+      .insert(memberPayload);
+
+    if (memberError) {
+      const msg = toPlainErrorMessage(memberError).toLowerCase();
+      const alreadyMember =
+        msg.includes("duplicate") ||
+        msg.includes("unique") ||
+        (typeof memberError === "object" &&
+          memberError !== null &&
+          "code" in memberError &&
+          (memberError as { code?: string }).code === "23505");
+
+      if (!alreadyMember) {
+        console.error(
+          "[createWorkspace] workspace_members insert:",
+          memberError,
+        );
+        return { success: false, error: toPlainErrorMessage(memberError) };
+      }
+    }
+
+    const mapped = mapWorkspaceRow(
+      workspace as Record<string, unknown>,
+      "Admin",
+    );
+    if (!mapped) {
       return { success: false, error: "Geçersiz workspace yanıtı." };
     }
 
-    return {
-      success: true,
-      workspace: {
-        id: data.id,
-        name: data.name,
-        description:
-          typeof data.description === "string" ? data.description : null,
-        created_at:
-          typeof data.created_at === "string" ? data.created_at : null,
-      },
-    };
+    return { success: true, workspace: mapped };
   } catch (error) {
+    console.error("[createWorkspace] catch:", toPlainErrorMessage(error));
     return { success: false, error: toPlainErrorMessage(error) };
   }
 }

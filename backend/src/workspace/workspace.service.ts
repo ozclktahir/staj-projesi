@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
@@ -7,17 +11,26 @@ import { InviteMemberDto } from './dto/invite-member.dto';
 export class WorkspaceService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  async create(userId: string, dto: CreateWorkspaceDto) {
-    const client = this.supabaseService.getClient();
+  /**
+   * RLS uyumlu create: kullanıcı JWT’si ile istemci + owner_id = auth.uid().
+   */
+  async create(userId: string, dto: CreateWorkspaceDto, accessToken: string) {
+    if (!accessToken?.trim()) {
+      throw new UnauthorizedException('Bearer token gerekli.');
+    }
+
+    const client = this.supabaseService.createUserClient(accessToken);
+
+    const payload = {
+      name: dto.name,
+      description: dto.description ?? null,
+      owner_id: userId,
+    };
 
     const { data: workspace, error: workspaceError } = await client
       .from('workspaces')
-      .insert({
-        name: dto.name,
-        description: dto.description ?? null,
-        owner_id: userId,
-      })
-      .select()
+      .insert(payload)
+      .select('id, name, description, owner_id, created_at, updated_at')
       .single();
 
     if (workspaceError) {
@@ -33,28 +46,46 @@ export class WorkspaceService {
       });
 
     if (memberError) {
-      throw new BadRequestException(memberError.message);
+      const msg = memberError.message?.toLowerCase() ?? '';
+      const alreadyMember =
+        msg.includes('duplicate') ||
+        msg.includes('unique') ||
+        memberError.code === '23505';
+      if (!alreadyMember) {
+        throw new BadRequestException(memberError.message);
+      }
     }
 
-    return workspace;
+    return { ...workspace, role: 'Admin' };
   }
 
-  async findAll(userId: string) {
-    const client = this.supabaseService.getClient();
+  async findAll(userId: string, accessToken: string) {
+    if (!accessToken?.trim()) {
+      throw new UnauthorizedException('Bearer token gerekli.');
+    }
+
+    const client = this.supabaseService.createUserClient(accessToken);
 
     const { data, error } = await client
       .from('workspace_members')
-      .select('role, workspaces(*)')
+      .select(
+        'role, workspaces(id, name, description, owner_id, created_at, updated_at)',
+      )
       .eq('user_id', userId);
 
     if (error) {
       throw new BadRequestException(error.message);
     }
 
-    return (data ?? []).map((member: any) => ({
-      ...member.workspaces,
-      role: member.role,
-    }));
+    return (data ?? []).map((member: any) => {
+      const ws = Array.isArray(member.workspaces)
+        ? member.workspaces[0]
+        : member.workspaces;
+      return {
+        ...(ws ?? {}),
+        role: member.role,
+      };
+    });
   }
 
   async invite(workspaceId: string, inviterId: string, dto: InviteMemberDto) {
