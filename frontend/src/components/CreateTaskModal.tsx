@@ -31,10 +31,10 @@ type CreateTaskModalProps = {
 };
 
 const fieldClassName =
-  "flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50";
+  "flex h-9 w-full rounded-lg border border-border bg-background px-3 py-1 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50";
 
 const textareaClassName =
-  "flex w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50";
+  "flex w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50";
 
 export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
   const router = useRouter();
@@ -105,19 +105,17 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="rounded-lg border border-slate-200 bg-white sm:max-w-md">
+      <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-slate-900">Yeni Görev</DialogTitle>
-          <DialogDescription className="text-slate-500">
+          <DialogTitle className="text-foreground">Yeni Görev</DialogTitle>
+          <DialogDescription>
             Başlık zorunludur. Durum ve öncelik varsayılan değerlerle gelir.
           </DialogDescription>
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="space-y-2">
-            <Label htmlFor="task-title" className="text-slate-700">
-              Başlık
-            </Label>
+            <Label htmlFor="task-title">Başlık</Label>
             <Input
               id="task-title"
               value={title}
@@ -130,9 +128,7 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="task-description" className="text-slate-700">
-              Açıklama
-            </Label>
+            <Label htmlFor="task-description">Açıklama</Label>
             <textarea
               id="task-description"
               value={description}
@@ -146,9 +142,7 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="task-status" className="text-slate-700">
-                Durum
-              </Label>
+              <Label htmlFor="task-status">Durum</Label>
               <select
                 id="task-status"
                 value={status}
@@ -167,9 +161,7 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="task-priority" className="text-slate-700">
-                Öncelik
-              </Label>
+              <Label htmlFor="task-priority">Öncelik</Label>
               <select
                 id="task-priority"
                 value={priority}
@@ -192,7 +184,7 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
             <Button
               type="button"
               variant="outline"
-              className="rounded-lg border-slate-200 text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border-border"
               disabled={isSubmitting}
               onClick={() => setOpen(false)}
             >

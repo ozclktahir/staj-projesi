@@ -16,9 +16,11 @@
 
 ## 2. Renk Paleti
 
-### Marka (aktif tema)
-- **Turuncu–siyah** ürün teması korunur (`--primary: 24 100% 50%`, koyu zemin).
-- Dashboard shell: `bg-background` / `bg-card` / `border-border` / `text-primary`.
+### Marka (aktif tema — global)
+- **Siyah–turuncu** tüm uygulamada zorunlu: `--background: 0 0% 4%`, `--primary: 24 100% 50%`.
+- Light/system teması kapalı; `forcedTheme="dark"`.
+- Shell & yüzeyler: `bg-background` / `bg-card` / `border-border` / `text-primary`.
+- Slate / `bg-white` hardcode kullanılmaz; semantik token’lar tercih edilir.
 
 ### Öncelik (Priority)
 | Seviye | Görsel | Kullanım |

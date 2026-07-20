@@ -281,6 +281,7 @@
 - Kanban görev kartları `DESIGN.md` Linear–Notion estetiğine alındı (`border-slate-200`, `rounded-lg`, `bg-white`, CSS grid).
 - tasks tablosu için RLS politikaları, proje sahipliği ve workspace üyeliği kontrolleriyle (user_id bazlı) yeniden düzenlendi.
 - `createTask` payload: zorunlu `project_id` + `created_by`/`user_id` = `auth.uid()`; sütun yoksa kademeli fallback.
+- Kanban kart tıklanınca Shadcn `Sheet` slide-over (`task-detail-sheet`) açılır; `getTaskDetails(taskId)` ile detay çekilir (başlık, status/priority, düzenlenebilir description, checklist iskeleti, yorum alanı).
 
 ### [20 Temmuz 2026] - Faz 5: projects RLS INSERT + createProject payload
 - projects tablosunda karşılaşılan RLS (Row Level Security) INSERT policy ihlali Supabase üzerinden çözüldü (`created_by = auth.uid()`).
