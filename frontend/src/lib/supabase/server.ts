@@ -2,12 +2,17 @@ import { createClient, type SupabaseClient, type User } from "@supabase/supabase
 import { cookies } from "next/headers";
 import type {
   DashboardProject,
+  DashboardTaskStats,
   ProjectTask,
   TaskPriority,
   TaskStatus,
 } from "@/lib/supabase/types";
 
-export type { DashboardProject, ProjectTask } from "@/lib/supabase/types";
+export type {
+  DashboardProject,
+  DashboardTaskStats,
+  ProjectTask,
+} from "@/lib/supabase/types";
 
 const ACCESS_TOKEN_COOKIE = "sb_access_token";
 const REFRESH_TOKEN_COOKIE = "sb_refresh_token";
@@ -155,6 +160,52 @@ export async function getCurrentUserProjects(): Promise<{
   } catch (error) {
     console.error("[getCurrentUserProjects]", error);
     return { userName: "Kullanıcı", projects: [] };
+  }
+}
+
+export async function getDashboardTaskStats(
+  projectIds: string[],
+): Promise<DashboardTaskStats> {
+  const empty = { total: 0, inProgress: 0, done: 0 };
+  try {
+    if (!projectIds.length) {
+      return empty;
+    }
+
+    const auth = await getAuthenticatedUser();
+    if (!auth) {
+      return empty;
+    }
+
+    let { data, error } = await auth.supabase
+      .from("tasks")
+      .select("id, status, project_id")
+      .in("project_id", projectIds)
+      .is("deleted_at", null);
+
+    if (error?.message?.includes("deleted_at")) {
+      ({ data, error } = await auth.supabase
+        .from("tasks")
+        .select("id, status, project_id")
+        .in("project_id", projectIds));
+    }
+
+    if (error || !data) {
+      console.error("[getDashboardTaskStats]", error?.message);
+      return empty;
+    }
+
+    let inProgress = 0;
+    let done = 0;
+    for (const row of data) {
+      if (row.status === "IN_PROGRESS") inProgress += 1;
+      if (row.status === "DONE") done += 1;
+    }
+
+    return { total: data.length, inProgress, done };
+  } catch (error) {
+    console.error("[getDashboardTaskStats]", error);
+    return empty;
   }
 }
 

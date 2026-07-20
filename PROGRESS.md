@@ -287,3 +287,9 @@
 - Şema çıkımı: `workspace_id` + `created_by` (asıl), opsiyonel `user_id`.
 - SQL: `database/migrations/fix_projects_rls.sql` — `is_workspace_member()` (SECURITY DEFINER) + `WITH CHECK (created_by = auth.uid() AND is_workspace_member(workspace_id))`.
 - Payload: `workspace_id`, `created_by`, `user_id` birlikte gönderilir; sütun yoksa kademeli fallback uygulanır.
+
+### [20 Temmuz 2026] - Design System: Linear × Notion UI
+- `DESIGN.md` eklendi: slate palet, öncelik/durum renkleri, tipografi, layout ve sidebar navigasyon standartları.
+- Dashboard shell `bg-slate-50` + beyaz sidebar/header; özet kartlar (Toplam / Devam Eden / Tamamlanan).
+- Kanban: geniş flex sütunlar, kart `shadow-sm → shadow-md` hover; görev tıklanınca sağ slide-over (`TaskDetailSheet`: Checklist / Comments / Attachments iskeleti).
+- Sidebar: Dashboard, Projects, My Tasks, Favorites, Settings (Lucide ikonları).

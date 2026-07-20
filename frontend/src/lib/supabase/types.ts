@@ -1,3 +1,9 @@
+export type DashboardTaskStats = {
+  total: number;
+  inProgress: number;
+  done: number;
+};
+
 export type DashboardProject = {
   id: string;
   name: string;

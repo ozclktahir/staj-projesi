@@ -23,7 +23,7 @@ export default function DashboardLayout({
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen bg-slate-50 text-slate-900">
       <AppSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader userName={userName} />
