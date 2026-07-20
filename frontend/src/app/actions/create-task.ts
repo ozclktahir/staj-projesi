@@ -103,15 +103,15 @@ export async function createTask(
     const { supabase, user } = auth;
     const authUid = user.id;
 
+    // projects sahiplik sütunu: user_id (owner_id değil)
     let { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, workspace_id, created_by, owner_id, user_id")
+      .select("id, workspace_id, created_by, user_id")
       .eq("id", projectId)
       .is("deleted_at", null)
       .maybeSingle();
 
     if (
-      projectError?.message?.includes("owner_id") ||
       projectError?.message?.includes("user_id") ||
       projectError?.message?.includes("deleted_at")
     ) {
@@ -132,9 +132,8 @@ export async function createTask(
     }
 
     const ownsProject =
-      project.created_by === authUid ||
-      ("owner_id" in project && project.owner_id === authUid) ||
-      ("user_id" in project && project.user_id === authUid);
+      ("user_id" in project && project.user_id === authUid) ||
+      project.created_by === authUid;
 
     if (!ownsProject) {
       return {

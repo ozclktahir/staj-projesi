@@ -224,10 +224,11 @@ export async function getProjectById(
 
     const { supabase, user } = auth;
 
+    // projects sahiplik sütunu: user_id (owner_id değil)
     let { data, error } = await supabase
       .from("projects")
       .select(
-        "id, name, description, created_at, created_by, user_id, owner_id, workspace_id",
+        "id, name, description, created_at, created_by, user_id, workspace_id",
       )
       .eq("id", projectId)
       .is("deleted_at", null)
@@ -235,14 +236,13 @@ export async function getProjectById(
 
     if (
       error?.message?.includes("user_id") ||
-      error?.message?.includes("owner_id") ||
-      error?.message?.includes("workspace_id")
+      error?.message?.includes("workspace_id") ||
+      error?.message?.includes("deleted_at")
     ) {
       ({ data, error } = await supabase
         .from("projects")
-        .select("id, name, description, created_at, created_by, workspace_id")
+        .select("id, name, description, created_at, created_by, user_id, workspace_id")
         .eq("id", projectId)
-        .is("deleted_at", null)
         .maybeSingle());
     }
 
@@ -251,9 +251,8 @@ export async function getProjectById(
     }
 
     const ownedByUser =
-      data.created_by === user.id ||
       ("user_id" in data && data.user_id === user.id) ||
-      ("owner_id" in data && data.owner_id === user.id);
+      data.created_by === user.id;
 
     if (!ownedByUser) {
       return null;

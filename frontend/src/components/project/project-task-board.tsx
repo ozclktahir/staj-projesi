@@ -5,7 +5,6 @@ import { ListTodo } from "lucide-react";
 import { TaskDetailSheet } from "@/components/project/task-detail-sheet";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -24,19 +23,19 @@ type ProjectTaskBoardProps = {
 };
 
 const columnAccent: Record<TaskStatus, string> = {
-  TODO: "border-t-muted-foreground/40",
-  IN_PROGRESS: "border-t-primary",
+  TODO: "border-t-slate-300",
+  IN_PROGRESS: "border-t-sky-500",
   DONE: "border-t-emerald-500",
 };
 
 function priorityClass(priority: ProjectTask["priority"]): string {
   switch (priority) {
     case "HIGH":
-      return "text-red-500";
+      return "bg-red-100 text-red-700";
     case "LOW":
-      return "text-muted-foreground";
+      return "bg-emerald-100 text-emerald-700";
     default:
-      return "text-primary";
+      return "bg-amber-100 text-amber-800";
   }
 }
 
@@ -45,15 +44,15 @@ export function ProjectTaskBoard({ tasks }: ProjectTaskBoardProps) {
 
   if (tasks.length === 0) {
     return (
-      <Card className="rounded-[var(--radius)] border-dashed border-border bg-card/60">
+      <Card className="rounded-lg border-dashed border-slate-200 bg-white">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex size-12 items-center justify-center rounded-[var(--radius)] bg-primary/15 text-primary">
+          <div className="mb-2 flex size-12 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
             <ListTodo className="size-6" />
           </div>
-          <CardTitle className="text-lg text-foreground">
+          <CardTitle className="text-lg text-slate-900">
             Henüz görev yok
           </CardTitle>
-          <CardDescription className="max-w-md">
+          <CardDescription className="max-w-md text-slate-500">
             Bu projeye ilk görevini eklemek için &quot;Yeni Görev Ekle&quot;
             butonunu kullan.
           </CardDescription>
@@ -64,7 +63,7 @@ export function ProjectTaskBoard({ tasks }: ProjectTaskBoardProps) {
 
   return (
     <>
-      <div className="flex gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-3 lg:overflow-visible">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {TASK_STATUSES.map((status) => {
           const columnTasks = tasks.filter((task) => task.status === status);
 
@@ -72,22 +71,22 @@ export function ProjectTaskBoard({ tasks }: ProjectTaskBoardProps) {
             <section
               key={status}
               className={cn(
-                "flex min-w-[260px] flex-1 flex-col rounded-[var(--radius)] border border-border border-t-4 bg-card/40 p-3",
+                "flex min-h-[280px] flex-col rounded-lg border border-slate-200 border-t-4 bg-slate-100/70 p-3",
                 columnAccent[status],
               )}
             >
               <div className="mb-3 flex items-center justify-between gap-2 px-1">
-                <h3 className="text-sm font-semibold text-foreground">
+                <h3 className="text-sm font-semibold text-slate-900">
                   {TASK_STATUS_LABELS[status]}
                 </h3>
-                <span className="text-xs text-muted-foreground">
+                <span className="rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-500 shadow-sm">
                   {columnTasks.length}
                 </span>
               </div>
 
               <div className="flex flex-1 flex-col gap-3">
                 {columnTasks.length === 0 ? (
-                  <p className="px-1 py-6 text-center text-xs text-muted-foreground">
+                  <p className="px-1 py-8 text-center text-xs text-slate-400">
                     Bu kolonda görev yok
                   </p>
                 ) : (
@@ -96,20 +95,20 @@ export function ProjectTaskBoard({ tasks }: ProjectTaskBoardProps) {
                       key={task.id}
                       type="button"
                       onClick={() => setSelected(task)}
-                      className="rounded-[var(--radius)] border border-border bg-card p-4 text-left shadow-sm transition-shadow hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition-shadow duration-150 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                     >
-                      <p className="text-base font-medium leading-snug text-foreground">
+                      <p className="text-sm font-semibold leading-snug text-slate-900">
                         {task.title}
                       </p>
                       {task.description?.trim() ? (
-                        <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+                        <p className="mt-2 line-clamp-3 text-sm text-slate-600">
                           {task.description}
                         </p>
                       ) : null}
                       <div className="mt-3 flex items-center justify-between gap-2">
                         <span
                           className={cn(
-                            "text-xs font-medium",
+                            "rounded-md px-2 py-0.5 text-xs font-medium",
                             priorityClass(task.priority),
                           )}
                         >
@@ -117,7 +116,7 @@ export function ProjectTaskBoard({ tasks }: ProjectTaskBoardProps) {
                             TASK_PRIORITY_LABELS.MEDIUM}
                         </span>
                         {task.created_at ? (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-slate-400">
                             {new Date(task.created_at).toLocaleDateString(
                               "tr-TR",
                             )}

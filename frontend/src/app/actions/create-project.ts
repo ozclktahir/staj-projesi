@@ -241,9 +241,8 @@ export async function createProject(
       };
     }
 
-    // Şema: projects.workspace_id + projects.created_by (standart)
-    // Opsiyonel: user_id / owner_id — RLS WITH CHECK (created_by = auth.uid()
-    //   AND is_workspace_member(workspace_id)) ile uyumlu payload.
+    // Şema: projects sahiplik sütunu = user_id (owner_id değil).
+    // RLS: created_by = auth.uid() AND is_workspace_member(workspace_id)
     const basePayload = {
       name,
       description,
@@ -252,10 +251,10 @@ export async function createProject(
       user_id: authUid,
     };
 
-    if (basePayload.created_by !== authUid) {
+    if (basePayload.user_id !== authUid || basePayload.created_by !== authUid) {
       return {
         success: false,
-        error: "created_by, auth.uid() ile eşleşmiyor.",
+        error: "user_id / created_by, auth.uid() ile eşleşmiyor.",
       };
     }
 
@@ -272,26 +271,7 @@ export async function createProject(
       .select("id")
       .single();
 
-    // 2) user_id yoksa: yalnızca created_by (RLS’nin beklediği alan)
-    if (
-      insertError &&
-      (toPlainErrorMessage(insertError).includes("user_id") ||
-        toPlainErrorMessage(insertError).includes("owner_id"))
-    ) {
-      const createdByOnly = {
-        name: basePayload.name,
-        description: basePayload.description,
-        workspace_id: basePayload.workspace_id,
-        created_by: authUid,
-      };
-      ({ error: insertError } = await supabase
-        .from("projects")
-        .insert(createdByOnly)
-        .select("id")
-        .single());
-    }
-
-    // 3) created_by yoksa (eski şema): user_id dene
+    // 2) created_by sütunu yoksa: yalnızca user_id (sahiplik)
     if (
       insertError &&
       toPlainErrorMessage(insertError).includes("created_by")
@@ -305,6 +285,24 @@ export async function createProject(
       ({ error: insertError } = await supabase
         .from("projects")
         .insert(userIdOnly)
+        .select("id")
+        .single());
+    }
+
+    // 3) user_id sütunu yoksa (nadir): created_by ile dene
+    if (
+      insertError &&
+      toPlainErrorMessage(insertError).includes("user_id")
+    ) {
+      const createdByOnly = {
+        name: basePayload.name,
+        description: basePayload.description,
+        workspace_id: basePayload.workspace_id,
+        created_by: authUid,
+      };
+      ({ error: insertError } = await supabase
+        .from("projects")
+        .insert(createdByOnly)
         .select("id")
         .single());
     }

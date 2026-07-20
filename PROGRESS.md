@@ -277,6 +277,8 @@
 - Shadcn Card ile TODO / IN_PROGRESS / DONE kolon yapısı (`ProjectTaskBoard`) eklendi; boş durumda bilgilendirici empty state gösteriliyor.
 - `CreateTaskModal`: title (zorunlu), description, status, priority alanlarıyla Dialog formu; gönderimde `createTask` Server Action çağrılıyor.
 - `createTask`: cookie JWT → `getUser()` doğrulaması; `project_id` + `workspace_id` + `created_by` ile insert; hatalarda düz `{ success: false, error }` dönüşü; başarıda `revalidatePath(/project/[id])`.
+- RLS politikası, projects tablosundaki `user_id` sütunu ile uyumlu olacak şekilde yeniden düzenlendi ve Server Action payloadları güncellendi.
+- Kanban görev kartları `DESIGN.md` Linear–Notion estetiğine alındı (`border-slate-200`, `rounded-lg`, `bg-white`, CSS grid).
 
 ### [20 Temmuz 2026] - Faz 5: projects RLS INSERT + createProject payload
 - projects tablosunda karşılaşılan RLS (Row Level Security) INSERT policy ihlali Supabase üzerinden çözüldü (`created_by = auth.uid()`).
