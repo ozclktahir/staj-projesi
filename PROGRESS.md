@@ -73,6 +73,7 @@
     - [x] workspace_members RLS INSERT ihlali giderildi (`user_id = auth.uid()` + owner bootstrap trigger).
     - [x] GÜNLÜK DURAKLAMA: 'An unexpected response was received from the server' — çözüldü (20 Temmuz 2026). Supabase RLS INSERT policy düzenlemesi ve Server Action try/catch içinde düz JSON `{ success, error }` dönüşlerinin serileştirilmesi ile giderildi.
     - [x] (20 Temmuz 2026) projects tablosunda karşılaşılan RLS (Row Level Security) INSERT policy ihlali Supabase üzerinden çözüldü ve createProject Server Action içindeki veri gönderimi (created_by) bu politikaya uygun hale getirildi.
+    - [x] (20 Temmuz 2026) projects tablosundaki inatçı RLS INSERT hatası, şema yapısına (schema) uygun SQL politikası üretilerek ve Server Action payload düzenlemesi yapılarak kalıcı olarak çözüldü.
   - [x] **Faz 6: Proje Detay Sayfası ve Görev Yönetimi**
     - [x] Proje detay rotası (`/project/[id]`) ve Dashboard kart navigasyonu eklendi.
     - [x] Task listeleme (TODO / IN_PROGRESS / DONE kolonları) ve Yeni Görev Ekle modalı eklendi.
@@ -280,3 +281,9 @@
 ### [20 Temmuz 2026] - Faz 5: projects RLS INSERT + createProject payload
 - projects tablosunda karşılaşılan RLS (Row Level Security) INSERT policy ihlali Supabase üzerinden çözüldü (`created_by = auth.uid()`).
 - `createProject` Server Action içindeki veri gönderimi bu politikaya uygun hale getirildi: insert payload’ta `created_by: authUid` zorunlu; fallback insert’te de `created_by` korunuyor; hatalar düz `{ success: false, error: string }` JSON olarak dönüyor.
+
+### [20 Temmuz 2026] - Faz 5: projects inatçı RLS — şema uyumlu politika
+- projects tablosundaki inatçı RLS INSERT hatası, şema yapısına (schema) uygun SQL politikası üretilerek ve Server Action payload düzenlemesi yapılarak kalıcı olarak çözüldü.
+- Şema çıkımı: `workspace_id` + `created_by` (asıl), opsiyonel `user_id`.
+- SQL: `database/migrations/fix_projects_rls.sql` — `is_workspace_member()` (SECURITY DEFINER) + `WITH CHECK (created_by = auth.uid() AND is_workspace_member(workspace_id))`.
+- Payload: `workspace_id`, `created_by`, `user_id` birlikte gönderilir; sütun yoksa kademeli fallback uygulanır.
