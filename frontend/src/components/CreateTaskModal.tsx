@@ -30,8 +30,11 @@ type CreateTaskModalProps = {
   projectId: string;
 };
 
-const selectClassName =
-  "border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-[var(--radius)] border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50";
+const fieldClassName =
+  "flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50";
+
+const textareaClassName =
+  "flex w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
   const router = useRouter();
@@ -95,37 +98,41 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
       <DialogTrigger asChild>
         <Button
           type="button"
-          className="rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90"
+          className="rounded-lg bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
         >
           <Plus className="size-4" />
           Yeni Görev Ekle
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="rounded-[var(--radius)] border-border bg-card sm:max-w-md">
+      <DialogContent className="rounded-lg border border-slate-200 bg-white sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Yeni Görev</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-slate-900">Yeni Görev</DialogTitle>
+          <DialogDescription className="text-slate-500">
             Başlık zorunludur. Durum ve öncelik varsayılan değerlerle gelir.
           </DialogDescription>
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="space-y-2">
-            <Label htmlFor="task-title">Başlık</Label>
+            <Label htmlFor="task-title" className="text-slate-700">
+              Başlık
+            </Label>
             <Input
               id="task-title"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Örn: API entegrasyonunu tamamla"
               required
-              className="rounded-[var(--radius)]"
+              className={fieldClassName}
               disabled={isSubmitting}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="task-description">Açıklama</Label>
+            <Label htmlFor="task-description" className="text-slate-700">
+              Açıklama
+            </Label>
             <textarea
               id="task-description"
               value={description}
@@ -133,13 +140,15 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
               placeholder="İsteğe bağlı açıklama"
               rows={3}
               disabled={isSubmitting}
-              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-[var(--radius)] border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className={textareaClassName}
             />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="task-status">Durum</Label>
+              <Label htmlFor="task-status" className="text-slate-700">
+                Durum
+              </Label>
               <select
                 id="task-status"
                 value={status}
@@ -147,7 +156,7 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
                   setStatus(event.target.value as TaskStatus)
                 }
                 disabled={isSubmitting}
-                className={selectClassName}
+                className={fieldClassName}
               >
                 {TASK_STATUSES.map((value) => (
                   <option key={value} value={value}>
@@ -158,7 +167,9 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="task-priority">Öncelik</Label>
+              <Label htmlFor="task-priority" className="text-slate-700">
+                Öncelik
+              </Label>
               <select
                 id="task-priority"
                 value={priority}
@@ -166,7 +177,7 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
                   setPriority(event.target.value as TaskPriority)
                 }
                 disabled={isSubmitting}
-                className={selectClassName}
+                className={fieldClassName}
               >
                 {TASK_PRIORITIES.map((value) => (
                   <option key={value} value={value}>
@@ -181,7 +192,7 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
             <Button
               type="button"
               variant="outline"
-              className="rounded-[var(--radius)]"
+              className="rounded-lg border-slate-200 text-slate-700 hover:bg-slate-50"
               disabled={isSubmitting}
               onClick={() => setOpen(false)}
             >
@@ -190,7 +201,7 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
             <Button
               type="submit"
               disabled={isSubmitting || !title.trim()}
-              className="rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90"
+              className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {isSubmitting ? "Oluşturuluyor..." : "Oluştur"}
             </Button>

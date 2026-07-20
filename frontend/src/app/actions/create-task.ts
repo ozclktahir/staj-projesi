@@ -74,11 +74,13 @@ export async function createTask(
   let projectIdForRevalidate = "";
 
   try {
+    // project_id zorunlu — RLS INSERT politikası projects.user_id +
+    // workspace_members ilişkisine bağlıdır.
     const projectId = input.projectId?.trim() ?? "";
     const title = input.title?.trim() ?? "";
 
     if (!projectId) {
-      return { success: false, error: "Proje kimliği zorunludur." };
+      return { success: false, error: "Proje kimliği (project_id) zorunludur." };
     }
     if (!title) {
       return { success: false, error: "Görev başlığı zorunludur." };
@@ -103,7 +105,6 @@ export async function createTask(
     const { supabase, user } = auth;
     const authUid = user.id;
 
-    // projects sahiplik sütunu: user_id (owner_id değil)
     let { data: project, error: projectError } = await supabase
       .from("projects")
       .select("id, workspace_id, created_by, user_id")
@@ -131,17 +132,6 @@ export async function createTask(
       };
     }
 
-    const ownsProject =
-      ("user_id" in project && project.user_id === authUid) ||
-      project.created_by === authUid;
-
-    if (!ownsProject) {
-      return {
-        success: false,
-        error: "Bu projeye görev ekleme yetkiniz yok.",
-      };
-    }
-
     const workspaceId =
       typeof project.workspace_id === "string" ? project.workspace_id : null;
 
@@ -152,7 +142,37 @@ export async function createTask(
       };
     }
 
-    const payload = {
+    // RLS ile uyumlu: proje sahibi veya workspace üyesi
+    const ownsProject =
+      ("user_id" in project && project.user_id === authUid) ||
+      project.created_by === authUid;
+
+    const { data: membership, error: membershipError } = await supabase
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", authUid)
+      .maybeSingle();
+
+    if (membershipError) {
+      console.warn(
+        "[createTask] workspace_members check:",
+        toPlainErrorMessage(membershipError),
+      );
+    }
+
+    const isWorkspaceMember = Boolean(membership?.workspace_id);
+
+    if (!ownsProject && !isWorkspaceMember) {
+      return {
+        success: false,
+        error: "Bu projeye görev ekleme yetkiniz yok.",
+      };
+    }
+
+    // Zorunlu: project_id
+    // created_by / user_id varsa auth.uid() ile doldurulur (RLS WITH CHECK)
+    const basePayload = {
       title,
       description,
       status,
@@ -160,21 +180,79 @@ export async function createTask(
       project_id: projectId,
       workspace_id: workspaceId,
       created_by: authUid,
+      user_id: authUid,
     };
 
+    if (!basePayload.project_id) {
+      return { success: false, error: "Proje kimliği (project_id) zorunludur." };
+    }
+    if (
+      basePayload.created_by !== authUid ||
+      basePayload.user_id !== authUid
+    ) {
+      return {
+        success: false,
+        error: "created_by / user_id, auth.uid() ile eşleşmiyor.",
+      };
+    }
+
     console.info("[createTask] insert", {
-      project_id: payload.project_id,
-      workspace_id: payload.workspace_id,
-      created_by: payload.created_by,
-      status: payload.status,
-      priority: payload.priority,
+      project_id: basePayload.project_id,
+      workspace_id: basePayload.workspace_id,
+      created_by: basePayload.created_by,
+      user_id: basePayload.user_id,
+      status: basePayload.status,
+      priority: basePayload.priority,
     });
 
-    const { error: insertError } = await supabase
+    // 1) Tam payload (project_id + created_by + user_id)
+    let { error: insertError } = await supabase
       .from("tasks")
-      .insert(payload)
+      .insert(basePayload)
       .select("id")
       .single();
+
+    // 2) user_id sütunu yoksa: created_by ile dene
+    if (
+      insertError &&
+      toPlainErrorMessage(insertError).includes("user_id")
+    ) {
+      const withoutUserId = {
+        title: basePayload.title,
+        description: basePayload.description,
+        status: basePayload.status,
+        priority: basePayload.priority,
+        project_id: basePayload.project_id,
+        workspace_id: basePayload.workspace_id,
+        created_by: authUid,
+      };
+      ({ error: insertError } = await supabase
+        .from("tasks")
+        .insert(withoutUserId)
+        .select("id")
+        .single());
+    }
+
+    // 3) created_by sütunu yoksa: user_id ile dene
+    if (
+      insertError &&
+      toPlainErrorMessage(insertError).includes("created_by")
+    ) {
+      const withoutCreatedBy = {
+        title: basePayload.title,
+        description: basePayload.description,
+        status: basePayload.status,
+        priority: basePayload.priority,
+        project_id: basePayload.project_id,
+        workspace_id: basePayload.workspace_id,
+        user_id: authUid,
+      };
+      ({ error: insertError } = await supabase
+        .from("tasks")
+        .insert(withoutCreatedBy)
+        .select("id")
+        .single());
+    }
 
     if (insertError) {
       console.error("[createTask] insert:", insertError);
