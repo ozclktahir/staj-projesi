@@ -241,7 +241,15 @@ export async function createProject(
       };
     }
 
-    const payload = {
+    // RLS: projects INSERT → WITH CHECK (created_by = auth.uid())
+    // created_by alanı zorunlu; aksi halde politika kaydı reddeder.
+    const payload: {
+      name: string;
+      description: string | null;
+      workspace_id: string;
+      created_by: string;
+      owner_id?: string;
+    } = {
       name,
       description,
       workspace_id: workspaceId,
@@ -249,26 +257,40 @@ export async function createProject(
       owner_id: authUid,
     };
 
+    if (payload.created_by !== authUid) {
+      return {
+        success: false,
+        error: "created_by, auth.uid() ile eşleşmiyor.",
+      };
+    }
+
+    console.info("[createProject] projects insert payload", {
+      workspace_id: payload.workspace_id,
+      created_by: payload.created_by,
+      has_owner_id: Boolean(payload.owner_id),
+    });
+
     let { error: insertError } = await supabase
       .from("projects")
       .insert(payload)
       .select("id")
       .single();
 
+    // owner_id / user_id sütunu yoksa: created_by korunarak tekrar dene (RLS için kritik alan)
     if (
       insertError &&
       (toPlainErrorMessage(insertError).includes("owner_id") ||
         toPlainErrorMessage(insertError).includes("user_id"))
     ) {
-      const withoutOwnerId = {
+      const rlsSafePayload = {
         name: payload.name,
         description: payload.description,
         workspace_id: payload.workspace_id,
-        created_by: payload.created_by,
+        created_by: authUid,
       };
       ({ error: insertError } = await supabase
         .from("projects")
-        .insert(withoutOwnerId)
+        .insert(rlsSafePayload)
         .select("id")
         .single());
     }

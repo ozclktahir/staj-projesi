@@ -72,6 +72,7 @@
     - [x] Workspaces ve workspace_members tabloları için Supabase RLS (Row Level Security) politikaları (owner_id üzerinden) düzenlendi.
     - [x] workspace_members RLS INSERT ihlali giderildi (`user_id = auth.uid()` + owner bootstrap trigger).
     - [x] GÜNLÜK DURAKLAMA: 'An unexpected response was received from the server' — çözüldü (20 Temmuz 2026). Supabase RLS INSERT policy düzenlemesi ve Server Action try/catch içinde düz JSON `{ success, error }` dönüşlerinin serileştirilmesi ile giderildi.
+    - [x] (20 Temmuz 2026) projects tablosunda karşılaşılan RLS (Row Level Security) INSERT policy ihlali Supabase üzerinden çözüldü ve createProject Server Action içindeki veri gönderimi (created_by) bu politikaya uygun hale getirildi.
   - [x] **Faz 6: Proje Detay Sayfası ve Görev Yönetimi**
     - [x] Proje detay rotası (`/project/[id]`) ve Dashboard kart navigasyonu eklendi.
     - [x] Task listeleme (TODO / IN_PROGRESS / DONE kolonları) ve Yeni Görev Ekle modalı eklendi.
@@ -275,3 +276,7 @@
 - Shadcn Card ile TODO / IN_PROGRESS / DONE kolon yapısı (`ProjectTaskBoard`) eklendi; boş durumda bilgilendirici empty state gösteriliyor.
 - `CreateTaskModal`: title (zorunlu), description, status, priority alanlarıyla Dialog formu; gönderimde `createTask` Server Action çağrılıyor.
 - `createTask`: cookie JWT → `getUser()` doğrulaması; `project_id` + `workspace_id` + `created_by` ile insert; hatalarda düz `{ success: false, error }` dönüşü; başarıda `revalidatePath(/project/[id])`.
+
+### [20 Temmuz 2026] - Faz 5: projects RLS INSERT + createProject payload
+- projects tablosunda karşılaşılan RLS (Row Level Security) INSERT policy ihlali Supabase üzerinden çözüldü (`created_by = auth.uid()`).
+- `createProject` Server Action içindeki veri gönderimi bu politikaya uygun hale getirildi: insert payload’ta `created_by: authUid` zorunlu; fallback insert’te de `created_by` korunuyor; hatalar düz `{ success: false, error: string }` JSON olarak dönüyor.
