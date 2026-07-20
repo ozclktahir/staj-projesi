@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import apiClient from "@/lib/api-client";
 import {
+  formatAuthApiError,
   registerSchema,
   type RegisterFormValues,
 } from "@/lib/validations/auth";
@@ -41,9 +42,9 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     try {
       await apiClient.post("/auth/register", {
-        firstName: values.firstName,
-        lastName: values.lastName,
-        email: values.email,
+        firstName: values.firstName.trim(),
+        lastName: values.lastName.trim(),
+        email: values.email.trim().toLowerCase(),
         password: values.password,
       });
 
@@ -54,9 +55,7 @@ export default function RegisterPage() {
         ? (error.response?.data?.message ?? "Kayıt işlemi başarısız oldu")
         : "Kayıt işlemi başarısız oldu";
 
-      toast.error(
-        Array.isArray(message) ? message.join(", ") : String(message),
-      );
+      toast.error(formatAuthApiError(message, "Kayıt işlemi başarısız oldu"));
     } finally {
       setIsSubmitting(false);
     }

@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
@@ -45,7 +51,7 @@ export class SupabaseService implements OnModuleInit {
 
   getClient(): SupabaseClient {
     if (!this.client) {
-      throw new Error(
+      throw new ServiceUnavailableException(
         'Supabase istemcisi başlatılmamış. SUPABASE_URL ve SUPABASE_KEY ortam değişkenlerini kontrol edin.',
       );
     }
@@ -60,7 +66,9 @@ export class SupabaseService implements OnModuleInit {
   /** Yeni kullanıcının JWT’si ile RLS’ye uygun istemci üretir. */
   createUserClient(accessToken: string): SupabaseClient {
     if (!this.supabaseUrl || !this.supabaseAnonKey) {
-      throw new Error('Supabase istemcisi başlatılmamış.');
+      throw new ServiceUnavailableException(
+        'Supabase istemcisi başlatılmamış.',
+      );
     }
 
     return createClient(this.supabaseUrl, this.supabaseAnonKey, {

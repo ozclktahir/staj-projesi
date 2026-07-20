@@ -1,14 +1,33 @@
 "use client";
 
-import { Bell, UserRound } from "lucide-react";
+import { useState } from "react";
+import { Bell, LogOut, UserRound } from "lucide-react";
+import { toast } from "sonner";
 import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { Button } from "@/components/ui/button";
+import { clearAuthSession } from "@/lib/auth-session";
 
 type AppHeaderProps = {
   userName?: string;
 };
 
 export function AppHeader({ userName = "Kullanıcı" }: AppHeaderProps) {
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await clearAuthSession();
+      toast.success("Çıkış yapıldı");
+      // Hard navigate: proxy/cookie kalıntısıyla dashboard'a geri düşmeyi önler
+      window.location.assign("/login");
+    } catch {
+      toast.error("Çıkış yapılamadı. Tekrar deneyin.");
+      setIsLoggingOut(false);
+    }
+  }
+
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur">
       <div>
@@ -46,6 +65,21 @@ export function AppHeader({ userName = "Kullanıcı" }: AppHeaderProps) {
             <p className="text-xs text-muted-foreground">Profil</p>
           </div>
         </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className="rounded-[var(--radius)] gap-1.5"
+          aria-label="Çıkış yap"
+        >
+          <LogOut className="size-4" />
+          <span className="hidden sm:inline">
+            {isLoggingOut ? "Çıkılıyor…" : "Çıkış"}
+          </span>
+        </Button>
       </div>
     </header>
   );

@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
@@ -6,7 +7,10 @@ export class LoginDto {
     example: 'user@example.com',
     description: 'Kullanıcının e-posta adresi',
   })
-  @IsEmail()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
+  @IsEmail({}, { message: 'Geçerli bir e-posta adresi girin' })
   email!: string;
 
   @ApiProperty({
@@ -15,6 +19,6 @@ export class LoginDto {
     minLength: 6,
   })
   @IsString()
-  @MinLength(6)
+  @MinLength(6, { message: 'Şifre en az 6 karakter olmalıdır' })
   password!: string;
 }

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const publicRoutes = ["/login", "/register"];
+const publicRoutes = ["/login", "/register", "/clear-session"];
 const AUTH_COOKIE = "auth_session";
+const ACCESS_TOKEN_COOKIE = "sb_access_token";
 
-function readAuthSession(request: NextRequest): string | null {
+function readCookie(request: NextRequest, name: string): string | null {
   try {
-    const value = request.cookies.get(AUTH_COOKIE)?.value;
+    const value = request.cookies.get(name)?.value;
     if (!value || value.trim() === "") {
       return null;
     }
@@ -16,18 +17,48 @@ function readAuthSession(request: NextRequest): string | null {
   }
 }
 
+function clearAuthCookies(response: NextResponse) {
+  const expired = { path: "/", maxAge: 0 };
+  for (const name of [
+    AUTH_COOKIE,
+    ACCESS_TOKEN_COOKIE,
+    "sb_refresh_token",
+    "access_token",
+    "refresh_token",
+  ]) {
+    try {
+      response.cookies.set(name, "", expired);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function hasSession(request: NextRequest): boolean {
+  const flag = readCookie(request, AUTH_COOKIE);
+  const token =
+    readCookie(request, ACCESS_TOKEN_COOKIE) ||
+    readCookie(request, "access_token");
+  return Boolean(flag && token);
+}
+
 export function proxy(request: NextRequest) {
   try {
     const { pathname } = request.nextUrl;
-    const session = readAuthSession(request);
     const isPublicRoute = publicRoutes.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`),
     );
+    const session = hasSession(request);
 
     if (!session && !isPublicRoute) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("from", pathname);
-      return NextResponse.redirect(loginUrl);
+      const res = NextResponse.redirect(loginUrl);
+      // Bayrak kalıntısı varsa temizle
+      if (readCookie(request, AUTH_COOKIE)) {
+        clearAuthCookies(res);
+      }
+      return res;
     }
 
     if (session && isPublicRoute) {
@@ -35,10 +66,15 @@ export function proxy(request: NextRequest) {
     }
 
     return NextResponse.next();
-  } catch {
-    // Cookie parse / edge hatalarında uygulamayı düşürme; login'e yönlendir
-    const loginUrl = new URL("/login", request.url);
-    return NextResponse.redirect(loginUrl);
+  } catch (error) {
+    console.error("[proxy] unexpected:", error);
+    try {
+      const res = NextResponse.redirect(new URL("/login", request.url));
+      clearAuthCookies(res);
+      return res;
+    } catch {
+      return NextResponse.next();
+    }
   }
 }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,11 +22,11 @@ import apiClient from "@/lib/api-client";
 import { persistAuthSession } from "@/lib/auth-session";
 import {
   loginSchema,
+  formatAuthApiError,
   type LoginFormValues,
 } from "@/lib/validations/auth";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -45,27 +44,32 @@ export default function LoginPage() {
         access_token?: string;
         refresh_token?: string;
         user?: unknown;
-      }>("/auth/login", values);
+      }>("/auth/login", {
+        email: values.email.trim().toLowerCase(),
+        password: values.password,
+      });
 
-      if (data.access_token) {
-        await persistAuthSession(
-          data.access_token,
-          data.user,
-          data.refresh_token,
-        );
+      if (!data.access_token) {
+        toast.error("Giriş başarısız: access_token alınamadı.");
+        return;
       }
 
+      await persistAuthSession(
+        data.access_token,
+        data.user,
+        data.refresh_token,
+      );
+
       toast.success("Giriş başarılı");
-      router.push("/");
-      router.refresh();
+      // Hard navigate: eski/expired cookie + RSC cache kaynaklı Internal Server Error'ı önler
+      window.location.assign("/");
+      return;
     } catch (error) {
       const message = isAxiosError(error)
         ? (error.response?.data?.message ?? "E-posta veya şifre hatalı")
         : "E-posta veya şifre hatalı";
 
-      toast.error(
-        Array.isArray(message) ? message.join(", ") : String(message),
-      );
+      toast.error(formatAuthApiError(message, "E-posta veya şifre hatalı"));
     } finally {
       setIsSubmitting(false);
     }

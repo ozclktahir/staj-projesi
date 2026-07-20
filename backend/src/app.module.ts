@@ -22,7 +22,11 @@ import { InvitationModule } from './invitation/invitation.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      // backend/.env yoksa kök .env (staj projesi/.env) yüklensin
+      envFilePath: ['.env', '../.env'],
+    }),
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => {

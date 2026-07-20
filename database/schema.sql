@@ -119,3 +119,9 @@
 -- -----------------------------------------------------------------------------
 -- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS first_name TEXT;
 -- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_name TEXT;
+
+-- -----------------------------------------------------------------------------
+-- 9) WORKSPACE RLS — workspace_members INSERT (20 Temmuz 2026)
+--    Migration: database/migrations/fix_workspace_members_rls.sql
+--    WITH CHECK (user_id = auth.uid()) + owner bootstrap trigger
+-- -----------------------------------------------------------------------------

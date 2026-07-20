@@ -70,7 +70,8 @@
     - [x] Faz 5: Server Action Auth ve Cookie senkronizasyonu düzeltildi.
     - [x] Faz 5: Workspace tablosu RLS (owner_id) hatası giderildi.
     - [x] Workspaces ve workspace_members tabloları için Supabase RLS (Row Level Security) politikaları (owner_id üzerinden) düzenlendi.
-    - [ ] GÜNLÜK DURAKLAMA: Proje (workspace) oluşturma formundan veri gönderildiğinde 'An unexpected response was received from the server' hatası alınıyor. Yarın server action (createProject) içerisindeki try/catch bloğu, dönen error objesi ve cookie yapısı detaylıca incelenip çözülecek.
+    - [x] workspace_members RLS INSERT ihlali giderildi (`user_id = auth.uid()` + owner bootstrap trigger).
+    - [x] GÜNLÜK DURAKLAMA kapatıldı: createProject Server Action + RLS politika SQL’i güncellendi (20 Temmuz 2026).
   - [ ] **Faz 6: Proje Detay Sayfası ve Görev Yönetimi**
     - [x] Proje detay rotası (`/project/[id]`) ve Dashboard kart navigasyonu eklendi.
   - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
@@ -260,3 +261,15 @@
 - Next.js App Router frontend kuruldu; `dev` script `3001` portuna alındı; Axios `api-client` + JWT Bearer interceptor eklendi.
 - Shadcn/UI (New York / Slate), turuncu–siyah tema (`--primary: 24 100% 50%`, `--radius: 0.5rem`) ve `next-themes` ile aydınlık/karanlık mod altyapısı tamamlandı.
 - Login/Register sayfaları Split Screen mimarisiyle tasarlandı (`(auth)/login`, `(auth)/register`); Shadcn Card/Input/Label/Button kullanıldı (UI-only).
+
+### [20 Temmuz 2026] - Faz 5/7: workspace_members RLS INSERT İhlali Çözümü
+- **Sorun:** Proje (workspace) oluştururken `new row violates row-level security policy for table "workspace_members"` hatası alındı. Workspace satırı `owner_id` ile oluşabiliyor; ancak oluşturanın kendini `workspace_members` tablosuna Admin olarak eklemesi RLS tarafından engelleniyordu.
+- **Kök neden:** `workspace_members` üzerinde oturum açmış kullanıcının `user_id = auth.uid()` ile INSERT yapmasına izin veren politikanın eksik/yanlış olması; ayrıca “önce üye ol, sonra ekle” tarzı politikaların bootstrap (ilk üyelik) senaryosunda chicken-egg üretmesi.
+- **Kod doğrulaması:** `frontend/src/app/actions/create-project.ts` içinde `supabase.auth.getUser(accessToken)` ile alınan `user.id`, `workspace_members.insert({ user_id: user.id, ... })` alanına birebir yazılıyor. İstemci **anon key + Bearer JWT** kullanıyor; createProject akışında **service role key karıştırılmıyor** (RLS bilinçli olarak aktif).
+- **Veritabanı çözümü:** `database/migrations/fix_workspace_members_rls.sql` eklendi:
+  1. `CREATE POLICY ... FOR INSERT ... WITH CHECK (user_id = auth.uid())`
+  2. SELECT/UPDATE politikaları (kendi üyelikleri + workspace sahibi yönetimi)
+  3. `workspaces` INSERT/SELECT için `owner_id = auth.uid()` politikaları
+  4. `SECURITY DEFINER` trigger: workspace insert sonrası owner’ı otomatik `Admin` üye yazar (`ON CONFLICT DO NOTHING`)
+- **Zorunlu manuel adım:** SQL dosyasının Supabase SQL Editor’de çalıştırılması gerekir; aksi halde RLS hatası devam eder.
+- **Server Action:** Üyelik insert’i `user_id === user.id` log’u ile doğrulanıyor; duplicate (trigger kaynaklı) durumunda başarı sayılıyor; diğer RLS hatalarında SQL migration dosyasına yönlendiren mesaj dönülüyor.

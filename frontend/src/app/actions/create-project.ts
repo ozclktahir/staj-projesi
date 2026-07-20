@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
@@ -26,11 +26,28 @@ function getSupabaseEnv() {
   return { url, anonKey };
 }
 
+/**
+ * Anon key + kullanıcı JWT (Bearer). Service role burada KULLANILMAZ;
+ * RLS politikaları auth.uid() üzerinden uygulanır.
+ */
+function createUserScopedClient(accessToken: string): SupabaseClient {
+  const { url, anonKey } = getSupabaseEnv();
+  return createClient(url, anonKey, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
 async function resolveWorkspaceId(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
-  userId: string,
+  supabase: SupabaseClient,
+  user: User,
 ): Promise<{ workspaceId: string | null; error?: string }> {
+  const userId = user.id;
+
   const { data: members, error: membersError } = await supabase
     .from("workspace_members")
     .select("workspace_id")
@@ -63,16 +80,40 @@ async function resolveWorkspaceId(
     };
   }
 
+  // Trigger (handle_new_workspace_owner_membership) genelde bu satırı ekler.
+  // Yoksa veya race varsa: user_id === auth.uid() ile manuel INSERT.
+  const memberPayload = {
+    workspace_id: workspace.id,
+    user_id: userId, // RLS: WITH CHECK (user_id = auth.uid())
+    role: "Admin",
+  };
+
+  console.info("[createProject] workspace_members insert", {
+    workspace_id: memberPayload.workspace_id,
+    user_id: memberPayload.user_id,
+    auth_uid_match: memberPayload.user_id === user.id,
+  });
+
   const { error: memberError } = await supabase
     .from("workspace_members")
-    .insert({
-      workspace_id: workspace.id,
-      user_id: userId,
-      role: "Admin",
-    });
+    .insert(memberPayload);
 
   if (memberError) {
-    return { workspaceId: null, error: memberError.message };
+    const msg = memberError.message.toLowerCase();
+    const alreadyMember =
+      msg.includes("duplicate") ||
+      msg.includes("unique") ||
+      memberError.code === "23505";
+
+    if (!alreadyMember) {
+      console.error("[createProject] workspace_members RLS/insert:", memberError);
+      return {
+        workspaceId: null,
+        error:
+          memberError.message +
+          " — Supabase SQL Editor'de database/migrations/fix_workspace_members_rls.sql dosyasını çalıştırın.",
+      };
+    }
   }
 
   return { workspaceId: workspace.id as string };
@@ -99,7 +140,6 @@ export async function createProject(
     }
 
     const description = input.description?.trim() || null;
-    const { url, anonKey } = getSupabaseEnv();
 
     const accessToken =
       cookieStore.get("sb_access_token")?.value ||
@@ -113,21 +153,15 @@ export async function createProject(
       };
     }
 
-    const supabase = createClient(url, anonKey, {
-      global: { headers: { Authorization: `Bearer ${accessToken}` } },
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    });
+    // Yalnızca anon + JWT — service role karıştırılmaz
+    const supabase = createUserScopedClient(accessToken);
 
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser(accessToken);
 
-    if (userError || !user) {
+    if (userError || !user?.id) {
       console.error(
         "[createProject] Kullanıcı bulunamadı:",
         userError?.message ?? "user null",
@@ -138,11 +172,11 @@ export async function createProject(
       };
     }
 
-    console.info("[createProject] Authenticated user:", user.id);
+    console.info("[createProject] Authenticated user (auth.uid):", user.id);
 
     const { workspaceId, error: workspaceError } = await resolveWorkspaceId(
       supabase,
-      user.id,
+      user,
     );
 
     if (!workspaceId) {
