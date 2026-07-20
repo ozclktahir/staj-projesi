@@ -130,22 +130,40 @@ export async function getCurrentUserProjects(): Promise<{
 
     const { supabase, user } = auth;
     const userName = resolveUserName(user);
+    const cookieStore = await cookies();
+    const activeWorkspaceId =
+      cookieStore.get("active_workspace_id")?.value?.trim() || null;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("projects")
-      .select("id, name, description, created_at")
+      .select(
+        "id, name, description, created_at, updated_at, workspace_id, user_id, created_by",
+      )
       .or(`created_by.eq.${user.id},user_id.eq.${user.id}`)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
+    if (activeWorkspaceId) {
+      query = query.eq("workspace_id", activeWorkspaceId);
+    }
+
+    const { data, error } = await query;
+
     if (error) {
       console.error("[getCurrentUserProjects] query:", error.message);
-      const fallback = await supabase
+      // updated_at / workspace_id yoksa sade select
+      let fallbackQuery = supabase
         .from("projects")
-        .select("id, name, description, created_at")
+        .select("id, name, description, created_at, workspace_id")
         .eq("created_by", user.id)
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
+
+      if (activeWorkspaceId) {
+        fallbackQuery = fallbackQuery.eq("workspace_id", activeWorkspaceId);
+      }
+
+      const fallback = await fallbackQuery;
 
       return {
         userName,

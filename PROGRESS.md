@@ -80,6 +80,7 @@
   - [x] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
     - (20 Temmuz 2026) Workspace switcher (Sidebar) ve Create Workspace Modal eklendi, backend entegrasyonu tamamlandı.
     - (20 Temmuz 2026) Workspaces tablosu için RLS INSERT politikası ve Server Action payload düzenlemesi yapıldı.
+    - (20 Temmuz 2026) Workspaces şema hatası (updated_at) giderildi ve Backend-Frontend veri akışı (sync) kontrolü yapıldı.
   - [x] Task (Görev) yönetimi ve detay ekranları
     - (20 Temmuz 2026) Task Detail Sheet (Slide-over) bileşeni geliştirildi, Kanban kartlarına tıklandığında sağ taraftan açılan panel entegre edildi.
 - [ ] **Faz 8: Mobil Uygulama Geliştirme (Flutter)**

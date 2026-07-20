@@ -4,12 +4,30 @@ export type DashboardTaskStats = {
   done: number;
 };
 
+/** workspaces tablosu — şema ile senkron */
+export type Workspace = {
+  id: string;
+  name: string;
+  description: string | null;
+  owner_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+/** Üyelik rolü ile zenginleştirilmiş workspace (liste / switcher) */
+export type WorkspaceListItem = Workspace & {
+  role?: string | null;
+};
+
 export type DashboardProject = {
   id: string;
   name: string;
   description: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
   workspace_id?: string | null;
+  user_id?: string | null;
+  created_by?: string | null;
 };
 
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE";
@@ -24,6 +42,7 @@ export type ProjectTask = {
   project_id: string | null;
   workspace_id: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
   created_by?: string | null;
 };
 

@@ -19,7 +19,15 @@ import { writeActiveWorkspaceId } from "@/hooks/use-workspaces";
 type CreateWorkspaceModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated?: (workspaceId: string) => void;
+  onCreated?: (workspace: {
+    id: string;
+    name: string;
+    description: string | null;
+    owner_id: string | null;
+    role?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+  }) => void;
 };
 
 export function CreateWorkspaceModal({
@@ -51,8 +59,8 @@ export function CreateWorkspaceModal({
       toast.success("Workspace oluşturuldu");
       resetForm();
       onOpenChange(false);
-      onCreated?.(result.workspace.id);
-      window.location.reload();
+      // State tetikleme: parent upsertWorkspace + refresh
+      onCreated?.(result.workspace);
     } catch (error) {
       toast.error(
         error instanceof Error

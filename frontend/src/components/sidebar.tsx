@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Check,
   CheckSquare,
@@ -35,6 +35,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const {
     workspaces,
     activeWorkspace,
@@ -42,6 +43,7 @@ export function Sidebar() {
     loading,
     selectWorkspace,
     refresh,
+    upsertWorkspace,
   } = useWorkspaces();
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -96,7 +98,7 @@ export function Sidebar() {
                     onSelect={() => {
                       selectWorkspace(workspace.id);
                       if (workspace.id !== activeWorkspaceId) {
-                        window.location.reload();
+                        router.refresh();
                       }
                     }}
                     className={cn(
@@ -178,8 +180,11 @@ export function Sidebar() {
       <CreateWorkspaceModal
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreated={() => {
-          void refresh();
+        onCreated={(workspace) => {
+          upsertWorkspace(workspace);
+          void refresh().then(() => {
+            router.refresh();
+          });
         }}
       />
     </aside>

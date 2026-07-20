@@ -79,21 +79,32 @@ function createUserScopedClient(
 async function resolveWorkspaceId(
   supabase: SupabaseClient,
   authUserId: string,
+  preferredWorkspaceId?: string | null,
 ): Promise<{ workspaceId: string | null; error?: string }> {
-  // auth.uid() ile birebir aynı olmalı (getUser().id)
   const userId = authUserId;
 
   const { data: members, error: membersError } = await supabase
     .from("workspace_members")
     .select("workspace_id")
-    .eq("user_id", userId)
-    .limit(1);
+    .eq("user_id", userId);
 
   if (membersError) {
     return { workspaceId: null, error: toPlainErrorMessage(membersError) };
   }
 
-  const existingId = members?.[0]?.workspace_id as string | undefined;
+  const memberIds = (members ?? [])
+    .map((row) => row.workspace_id as string | undefined)
+    .filter((id): id is string => Boolean(id));
+
+  // Aktif workspace cookie/localStorage tercihini kullan
+  if (
+    preferredWorkspaceId &&
+    memberIds.includes(preferredWorkspaceId)
+  ) {
+    return { workspaceId: preferredWorkspaceId };
+  }
+
+  const existingId = memberIds[0];
   if (existingId) {
     return { workspaceId: existingId };
   }
@@ -229,9 +240,13 @@ export async function createProject(
     const authUid = user.id;
     console.info("[createProject] auth.uid():", authUid);
 
+    const preferredWorkspaceId =
+      cookieStore.get("active_workspace_id")?.value?.trim() || null;
+
     const { workspaceId, error: workspaceError } = await resolveWorkspaceId(
       supabase,
       authUid,
+      preferredWorkspaceId,
     );
 
     if (!workspaceId) {

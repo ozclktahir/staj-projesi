@@ -3,16 +3,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/auth-session";
+import type { WorkspaceListItem } from "@/lib/supabase/types";
 
-export type WorkspaceListItem = {
-  id: string;
-  name: string;
-  description?: string | null;
-  owner_id?: string | null;
-  role?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
+export type { WorkspaceListItem } from "@/lib/supabase/types";
 
 export type GetWorkspacesResult =
   | { success: true; workspaces: WorkspaceListItem[] }
@@ -71,21 +64,32 @@ function createUserScopedClient(
   });
 }
 
-function mapWorkspaceRow(
+/** Backend/Supabase satırını düz WorkspaceListItem'a çevirir (wrapper yok). */
+export function mapWorkspaceRow(
   row: Record<string, unknown>,
   role?: string | null,
 ): WorkspaceListItem | null {
-  if (typeof row.id !== "string" || typeof row.name !== "string") {
+  // Nest bazen { data: {...} } sarmalayabilir — aç
+  const source =
+    row.data && typeof row.data === "object" && !Array.isArray(row.data)
+      ? (row.data as Record<string, unknown>)
+      : row;
+
+  if (typeof source.id !== "string" || typeof source.name !== "string") {
     return null;
   }
+
   return {
-    id: row.id,
-    name: row.name,
-    description: typeof row.description === "string" ? row.description : null,
-    owner_id: typeof row.owner_id === "string" ? row.owner_id : null,
-    role: role ?? null,
-    created_at: typeof row.created_at === "string" ? row.created_at : null,
-    updated_at: typeof row.updated_at === "string" ? row.updated_at : null,
+    id: source.id,
+    name: source.name,
+    description:
+      typeof source.description === "string" ? source.description : null,
+    owner_id: typeof source.owner_id === "string" ? source.owner_id : null,
+    role: role ?? (typeof source.role === "string" ? source.role : null),
+    created_at:
+      typeof source.created_at === "string" ? source.created_at : null,
+    updated_at:
+      typeof source.updated_at === "string" ? source.updated_at : null,
   };
 }
 
@@ -138,29 +142,55 @@ export async function getWorkspaces(): Promise<GetWorkspacesResult> {
       .eq("user_id", user.id);
 
     if (error) {
+      // updated_at henüz yoksa eski select ile dene
+      if (toPlainErrorMessage(error).includes("updated_at")) {
+        const fallback = await supabase
+          .from("workspace_members")
+          .select(
+            "role, workspaces(id, name, description, owner_id, created_at)",
+          )
+          .eq("user_id", user.id);
+
+        if (fallback.error) {
+          return {
+            success: false,
+            error: toPlainErrorMessage(fallback.error),
+          };
+        }
+
+        const workspaces = normalizeMemberRows(fallback.data);
+        return { success: true, workspaces };
+      }
+
       console.error("[getWorkspaces]", error);
       return { success: false, error: toPlainErrorMessage(error) };
     }
 
-    const workspaces: WorkspaceListItem[] = [];
-    for (const member of data ?? []) {
-      const row = member as {
-        role?: string | null;
-        workspaces?: Record<string, unknown> | Record<string, unknown>[] | null;
-      };
-      const wsRaw = Array.isArray(row.workspaces)
-        ? row.workspaces[0]
-        : row.workspaces;
-      if (!wsRaw || typeof wsRaw !== "object") continue;
-      const mapped = mapWorkspaceRow(wsRaw, row.role ?? null);
-      if (mapped) workspaces.push(mapped);
-    }
-
-    return { success: true, workspaces };
+    return { success: true, workspaces: normalizeMemberRows(data) };
   } catch (error) {
     console.error("[getWorkspaces] catch:", toPlainErrorMessage(error));
     return { success: false, error: toPlainErrorMessage(error) };
   }
+}
+
+function normalizeMemberRows(data: unknown): WorkspaceListItem[] {
+  if (!Array.isArray(data)) return [];
+
+  const workspaces: WorkspaceListItem[] = [];
+  for (const member of data) {
+    if (!member || typeof member !== "object") continue;
+    const row = member as {
+      role?: string | null;
+      workspaces?: Record<string, unknown> | Record<string, unknown>[] | null;
+    };
+    const wsRaw = Array.isArray(row.workspaces)
+      ? row.workspaces[0]
+      : row.workspaces;
+    if (!wsRaw || typeof wsRaw !== "object") continue;
+    const mapped = mapWorkspaceRow(wsRaw, row.role ?? null);
+    if (mapped) workspaces.push(mapped);
+  }
+  return workspaces;
 }
 
 export async function createWorkspace(
@@ -203,7 +233,6 @@ export async function createWorkspace(
       };
     }
 
-    // RLS: authenticated kullanıcı yalnızca kendi ID’si ile INSERT edebilir
     const authUid = user.id;
     const payload = {
       name,
@@ -223,11 +252,22 @@ export async function createWorkspace(
       owner_id: payload.owner_id,
     });
 
-    const { data: workspace, error: workspaceError } = await supabase
+    let { data: workspace, error: workspaceError } = await supabase
       .from("workspaces")
       .insert(payload)
       .select("id, name, description, owner_id, created_at, updated_at")
       .single();
+
+    if (
+      workspaceError &&
+      toPlainErrorMessage(workspaceError).includes("updated_at")
+    ) {
+      ({ data: workspace, error: workspaceError } = await supabase
+        .from("workspaces")
+        .insert(payload)
+        .select("id, name, description, owner_id, created_at")
+        .single());
+    }
 
     if (workspaceError || !workspace) {
       console.error("[createWorkspace] workspaces insert:", workspaceError);
@@ -239,15 +279,13 @@ export async function createWorkspace(
       };
     }
 
-    const memberPayload = {
-      workspace_id: workspace.id as string,
-      user_id: authUid,
-      role: "Admin",
-    };
-
     const { error: memberError } = await supabase
       .from("workspace_members")
-      .insert(memberPayload);
+      .insert({
+        workspace_id: workspace.id as string,
+        user_id: authUid,
+        role: "Admin",
+      });
 
     if (memberError) {
       const msg = toPlainErrorMessage(memberError).toLowerCase();
@@ -276,6 +314,7 @@ export async function createWorkspace(
       return { success: false, error: "Geçersiz workspace yanıtı." };
     }
 
+    // Düz JSON — frontend state'i doğrudan tetikleyebilir
     return { success: true, workspace: mapped };
   } catch (error) {
     console.error("[createWorkspace] catch:", toPlainErrorMessage(error));

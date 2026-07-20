@@ -193,6 +193,7 @@ export async function clearAuthSession() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
+    localStorage.removeItem("active_workspace_id");
   } catch {
     // ignore
   }
@@ -200,6 +201,7 @@ export async function clearAuthSession() {
   try {
     clearSupabaseSsrCookies();
     clearNamedCookie(AUTH_COOKIE);
+    clearNamedCookie("active_workspace_id");
     clearTokenCookies();
   } catch {
     // ignore
