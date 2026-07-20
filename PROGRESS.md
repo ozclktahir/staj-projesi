@@ -72,10 +72,11 @@
     - [x] Workspaces ve workspace_members tabloları için Supabase RLS (Row Level Security) politikaları (owner_id üzerinden) düzenlendi.
     - [x] workspace_members RLS INSERT ihlali giderildi (`user_id = auth.uid()` + owner bootstrap trigger).
     - [x] GÜNLÜK DURAKLAMA: 'An unexpected response was received from the server' — çözüldü (20 Temmuz 2026). Supabase RLS INSERT policy düzenlemesi ve Server Action try/catch içinde düz JSON `{ success, error }` dönüşlerinin serileştirilmesi ile giderildi.
-  - [ ] **Faz 6: Proje Detay Sayfası ve Görev Yönetimi**
+  - [x] **Faz 6: Proje Detay Sayfası ve Görev Yönetimi**
     - [x] Proje detay rotası (`/project/[id]`) ve Dashboard kart navigasyonu eklendi.
+    - [x] Task listeleme (TODO / IN_PROGRESS / DONE kolonları) ve Yeni Görev Ekle modalı eklendi.
   - [ ] Workspace (Çalışma Alanı) listeleme ve oluşturma arayüzleri
-  - [ ] Task (Görev) yönetimi ve detay ekranları
+  - [x] Task (Görev) yönetimi ve detay ekranları
 - [ ] **Faz 8: Mobil Uygulama Geliştirme (Flutter)**
   - [ ] Flutter proje kurulumu ve mimari yapılandırma (Web fazı tamamlandıktan sonra başlanacak)
   - [ ] Mobil için Auth, Workspace ve Task ekranlarının geliştirilmesi
@@ -268,3 +269,9 @@
 - **Kod doğrulaması:** `frontend/src/app/actions/create-project.ts` içinde `supabase.auth.getUser(accessToken)` ile alınan `user.id` (`auth.uid()`), `workspace_members.insert({ user_id: authUid, ... })` alanına birebir yazılıyor. İstemci **anon key + Bearer JWT** kullanıyor; createProject akışında **service role key karıştırılmıyor** (RLS bilinçli olarak aktif).
 - **Veritabanı çözümü:** `database/migrations/fix_workspace_members_rls.sql` Supabase SQL Editor’de uygulandı (`WITH CHECK (user_id = auth.uid())` + owner bootstrap trigger).
 - **Server Action serileştirme:** Catch bloğu ham Supabase/Error objesi fırlatmak yerine her zaman düz `{ success: false, error: string }` JSON döner; `NEXT_REDIRECT` yeniden fırlatılır; `revalidatePath` başarı yolunda try dışında çağrılır. Böylece “An unexpected response was received from the server” engellenir.
+
+### [20 Temmuz 2026] - Faz 6: Proje Detay Sayfası ve Görev Yönetimi
+- `/project/[id]` Server Component’te `getProjectTasks(projectId)` ile Supabase `tasks` tablosundan ilgili projenin görevleri çekildi.
+- Shadcn Card ile TODO / IN_PROGRESS / DONE kolon yapısı (`ProjectTaskBoard`) eklendi; boş durumda bilgilendirici empty state gösteriliyor.
+- `CreateTaskModal`: title (zorunlu), description, status, priority alanlarıyla Dialog formu; gönderimde `createTask` Server Action çağrılıyor.
+- `createTask`: cookie JWT → `getUser()` doğrulaması; `project_id` + `workspace_id` + `created_by` ile insert; hatalarda düz `{ success: false, error }` dönüşü; başarıda `revalidatePath(/project/[id])`.

@@ -1,8 +1,13 @@
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import type { DashboardProject } from "@/lib/supabase/types";
+import type {
+  DashboardProject,
+  ProjectTask,
+  TaskPriority,
+  TaskStatus,
+} from "@/lib/supabase/types";
 
-export type { DashboardProject } from "@/lib/supabase/types";
+export type { DashboardProject, ProjectTask } from "@/lib/supabase/types";
 
 const ACCESS_TOKEN_COOKIE = "sb_access_token";
 const REFRESH_TOKEN_COOKIE = "sb_refresh_token";
@@ -170,15 +175,21 @@ export async function getProjectById(
 
     let { data, error } = await supabase
       .from("projects")
-      .select("id, name, description, created_at, created_by, user_id")
+      .select(
+        "id, name, description, created_at, created_by, user_id, owner_id, workspace_id",
+      )
       .eq("id", projectId)
       .is("deleted_at", null)
       .maybeSingle();
 
-    if (error?.message?.includes("user_id")) {
+    if (
+      error?.message?.includes("user_id") ||
+      error?.message?.includes("owner_id") ||
+      error?.message?.includes("workspace_id")
+    ) {
       ({ data, error } = await supabase
         .from("projects")
-        .select("id, name, description, created_at, created_by")
+        .select("id, name, description, created_at, created_by, workspace_id")
         .eq("id", projectId)
         .is("deleted_at", null)
         .maybeSingle());
@@ -190,7 +201,8 @@ export async function getProjectById(
 
     const ownedByUser =
       data.created_by === user.id ||
-      ("user_id" in data && data.user_id === user.id);
+      ("user_id" in data && data.user_id === user.id) ||
+      ("owner_id" in data && data.owner_id === user.id);
 
     if (!ownedByUser) {
       return null;
@@ -201,10 +213,84 @@ export async function getProjectById(
       name: data.name,
       description: data.description,
       created_at: data.created_at,
+      workspace_id:
+        "workspace_id" in data
+          ? ((data.workspace_id as string | null) ?? null)
+          : null,
     };
   } catch (error) {
     console.error("[getProjectById]", error);
     return null;
+  }
+}
+
+function normalizeTaskStatus(value: unknown): TaskStatus {
+  if (value === "IN_PROGRESS" || value === "DONE" || value === "TODO") {
+    return value;
+  }
+  return "TODO";
+}
+
+function normalizeTaskPriority(value: unknown): TaskPriority {
+  if (value === "LOW" || value === "HIGH" || value === "MEDIUM") {
+    return value;
+  }
+  return "MEDIUM";
+}
+
+export async function getProjectTasks(
+  projectId: string,
+): Promise<ProjectTask[]> {
+  try {
+    if (!projectId?.trim()) {
+      return [];
+    }
+
+    const auth = await getAuthenticatedUser();
+    if (!auth) {
+      return [];
+    }
+
+    const { supabase } = auth;
+
+    let { data, error } = await supabase
+      .from("tasks")
+      .select(
+        "id, title, description, status, priority, project_id, workspace_id, created_at, created_by",
+      )
+      .eq("project_id", projectId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error?.message?.includes("deleted_at")) {
+      ({ data, error } = await supabase
+        .from("tasks")
+        .select(
+          "id, title, description, status, priority, project_id, workspace_id, created_at, created_by",
+        )
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false }));
+    }
+
+    if (error) {
+      console.error("[getProjectTasks]", error.message);
+      return [];
+    }
+
+    return (data ?? []).map((row) => ({
+      id: row.id as string,
+      title: (row.title as string) ?? "Adsız görev",
+      description: (row.description as string | null) ?? null,
+      status: normalizeTaskStatus(row.status),
+      priority: normalizeTaskPriority(row.priority),
+      project_id: (row.project_id as string | null) ?? null,
+      workspace_id: (row.workspace_id as string | null) ?? null,
+      created_at: (row.created_at as string | null) ?? null,
+      created_by: (row.created_by as string | null) ?? null,
+    }));
+  } catch (error) {
+    console.error("[getProjectTasks]", error);
+    return [];
   }
 }
 

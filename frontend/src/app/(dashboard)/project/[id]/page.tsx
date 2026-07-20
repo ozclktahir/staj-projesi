@@ -1,14 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ListTodo } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { getProjectById } from "@/lib/supabase/server";
+import { ArrowLeft } from "lucide-react";
+import { CreateTaskModal } from "@/components/CreateTaskModal";
+import { ProjectTaskBoard } from "@/components/project/project-task-board";
+import { getProjectById, getProjectTasks } from "@/lib/supabase/server";
 
 type ProjectDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -23,6 +18,8 @@ export default async function ProjectDetailPage({
   if (!project) {
     notFound();
   }
+
+  const tasks = await getProjectTasks(project.id);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
@@ -55,30 +52,20 @@ export default async function ProjectDetailPage({
       </div>
 
       <section className="space-y-4">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">
-            Görevler
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Bu projeye ait görevler burada listelenecek.
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight text-foreground">
+              Görevler
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Bu projeye ait görevler TODO / Devam ediyor / Tamamlandı
+              kolonlarında listelenir.
+            </p>
+          </div>
+          <CreateTaskModal projectId={project.id} />
         </div>
 
-        <Card className="rounded-[var(--radius)] border-dashed border-border bg-card/60">
-          <CardHeader className="items-center text-center">
-            <div className="mb-2 flex size-12 items-center justify-center rounded-[var(--radius)] bg-primary/15 text-primary">
-              <ListTodo className="size-6" />
-            </div>
-            <CardTitle className="text-lg text-foreground">
-              Henüz görev yok
-            </CardTitle>
-            <CardDescription className="max-w-md">
-              Görev yönetimi bir sonraki adımda eklenecek. Şimdilik bu alan
-              proje görevleri için hazır bekliyor.
-            </CardDescription>
-          </CardHeader>
-          <CardContent />
-        </Card>
+        <ProjectTaskBoard tasks={tasks} />
       </section>
     </div>
   );
