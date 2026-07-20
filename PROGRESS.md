@@ -35,7 +35,7 @@
   - [x] CORS Yapılandırması
   - [x] Helmet ile HTTP Güvenlik Başlıkları
   - [x] Healthcheck Modülü
-- [ ] **Faz 6: İleri Düzey Kurumsal Özellikler**
+- [x] **Faz 6: İleri Düzey Kurumsal Özellikler**
   - [x] Görev Geliştirmeleri (Atanan Kişi, Son Teslim Tarihi, Alt Görevler)
   - [x] Kullanıcı Profili (Avatar, Tema)
   - [x] Gerçek Dosya Yükleme (Supabase Storage Entegrasyonu)
@@ -53,6 +53,8 @@
   - [x] Admin Yetki Korumaları (Kendini Silme & Son Admin Kontrolü)
   - [x] Çöp Kutusundan Görev Kurtarma (Soft Delete Restore)
   - [x] Veritabanı SQL Şema Değişikliklerinin Dokümante Edilmesi
+  - [x] RLS (Row Level Security) politikaları — workspaces / workspace_members / projects / tasks
+  - [x] Tasarım sistemi (DESIGN.md) ve Linear × Notion + siyah–turuncu UI uyumu
 - [ ] **Faz 7: Web Frontend Geliştirme (Next.js)**
   - [x] Next.js 14+ (App Router) ve Tailwind CSS kurulumu (Altyapı ve Axios entegrasyonu tamamlandı)
   - [x] Turuncu-Siyah tema tasarımı, renk ve stil (border-radius) ayarları tamamlandı
@@ -268,6 +270,14 @@
 - Next.js App Router frontend kuruldu; `dev` script `3001` portuna alındı; Axios `api-client` + JWT Bearer interceptor eklendi.
 - Shadcn/UI (New York / Slate), turuncu–siyah tema (`--primary: 24 100% 50%`, `--radius: 0.5rem`) ve `next-themes` ile aydınlık/karanlık mod altyapısı tamamlandı.
 - Login/Register sayfaları Split Screen mimarisiyle tasarlandı (`(auth)/login`, `(auth)/register`); Shadcn Card/Input/Label/Button kullanıldı (UI-only).
+
+### [20 Temmuz 2026] - Günlük Özet: RLS, Workspace Yönetimi ve Task Detail UI
+- RLS hatalarının giderilmesi, Workspace yönetim arayüzü ve Task Detail UI geliştirmeleri tamamlandı.
+- **RLS:** `workspace_members`, `projects`, `tasks` ve `workspaces` için INSERT/SELECT politikaları SQL migration’larla hizalandı; Server Action payload’larında `owner_id` / `user_id` / `created_by` = `auth.uid()` garantilendi; hatalar düz `{ success, error }` JSON olarak dönüyor.
+- **Workspace UI:** Sidebar workspace switcher (DropdownMenu), Create Workspace Modal, `getWorkspaces` / `createWorkspace`, aktif workspace cookie senkronu ve backend–frontend veri akışı düzeltmeleri.
+- **Task Detail UI:** Kanban kart tıklanınca Shadcn Sheet slide-over; `getTaskDetails(taskId)`; başlık, status/priority, description, checklist iskeleti ve yorum alanı.
+- **Şema/Sync:** `workspaces.updated_at` tiplere işlendi; proje listesi aktif workspace’e göre filtreleniyor.
+- **Tasarım:** `DESIGN.md` + global siyah–turuncu tema; Kanban ve dashboard Linear–Notion düzeni.
 
 ### [20 Temmuz 2026] - Faz 5/7: workspace_members RLS INSERT İhlali Çözümü
 - **Sorun:** Proje (workspace) oluştururken `new row violates row-level security policy for table "workspace_members"` hatası alındı. Workspace satırı `owner_id` ile oluşabiliyor; ancak oluşturanın kendini `workspace_members` tablosuna Admin olarak eklemesi RLS tarafından engelleniyordu.
