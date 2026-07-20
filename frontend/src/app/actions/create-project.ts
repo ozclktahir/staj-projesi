@@ -9,6 +9,7 @@ export type CreateProjectInput = {
   description?: string;
 };
 
+/** Client'a her zaman düz, serileştirilebilir JSON dönülür. */
 export type CreateProjectResult =
   | { success: true }
   | { success: false; error: string };
@@ -18,20 +19,53 @@ function getSupabaseEnv() {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
-    throw new Error(
-      "NEXT_PUBLIC_SUPABASE_URL veya NEXT_PUBLIC_SUPABASE_ANON_KEY tanımlı değil.",
-    );
+    return null;
   }
 
   return { url, anonKey };
+}
+
+function toPlainErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "Proje oluşturulurken beklenmeyen bir hata oluştu.";
+  }
+}
+
+function isNextRedirectError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    typeof (error as { digest?: unknown }).digest === "string" &&
+    String((error as { digest: string }).digest).startsWith("NEXT_REDIRECT")
+  );
 }
 
 /**
  * Anon key + kullanıcı JWT (Bearer). Service role burada KULLANILMAZ;
  * RLS politikaları auth.uid() üzerinden uygulanır.
  */
-function createUserScopedClient(accessToken: string): SupabaseClient {
-  const { url, anonKey } = getSupabaseEnv();
+function createUserScopedClient(
+  url: string,
+  anonKey: string,
+  accessToken: string,
+): SupabaseClient {
   return createClient(url, anonKey, {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: {
@@ -44,9 +78,10 @@ function createUserScopedClient(accessToken: string): SupabaseClient {
 
 async function resolveWorkspaceId(
   supabase: SupabaseClient,
-  user: User,
+  authUserId: string,
 ): Promise<{ workspaceId: string | null; error?: string }> {
-  const userId = user.id;
+  // auth.uid() ile birebir aynı olmalı (getUser().id)
+  const userId = authUserId;
 
   const { data: members, error: membersError } = await supabase
     .from("workspace_members")
@@ -55,7 +90,7 @@ async function resolveWorkspaceId(
     .limit(1);
 
   if (membersError) {
-    return { workspaceId: null, error: membersError.message };
+    return { workspaceId: null, error: toPlainErrorMessage(membersError) };
   }
 
   const existingId = members?.[0]?.workspace_id as string | undefined;
@@ -76,22 +111,30 @@ async function resolveWorkspaceId(
   if (workspaceError || !workspace?.id) {
     return {
       workspaceId: null,
-      error: workspaceError?.message ?? "Çalışma alanı oluşturulamadı.",
+      error: toPlainErrorMessage(
+        workspaceError ?? "Çalışma alanı oluşturulamadı.",
+      ),
     };
   }
 
-  // Trigger (handle_new_workspace_owner_membership) genelde bu satırı ekler.
-  // Yoksa veya race varsa: user_id === auth.uid() ile manuel INSERT.
+  // Trigger yoksa: user_id === auth.uid() ile manuel INSERT
   const memberPayload = {
-    workspace_id: workspace.id,
-    user_id: userId, // RLS: WITH CHECK (user_id = auth.uid())
+    workspace_id: workspace.id as string,
+    user_id: userId,
     role: "Admin",
   };
+
+  if (memberPayload.user_id !== authUserId) {
+    return {
+      workspaceId: null,
+      error: "workspace_members user_id, auth.uid() ile eşleşmiyor.",
+    };
+  }
 
   console.info("[createProject] workspace_members insert", {
     workspace_id: memberPayload.workspace_id,
     user_id: memberPayload.user_id,
-    auth_uid_match: memberPayload.user_id === user.id,
+    auth_uid: authUserId,
   });
 
   const { error: memberError } = await supabase
@@ -99,19 +142,20 @@ async function resolveWorkspaceId(
     .insert(memberPayload);
 
   if (memberError) {
-    const msg = memberError.message.toLowerCase();
+    const msg = toPlainErrorMessage(memberError).toLowerCase();
     const alreadyMember =
       msg.includes("duplicate") ||
       msg.includes("unique") ||
-      memberError.code === "23505";
+      (typeof memberError === "object" &&
+        memberError !== null &&
+        "code" in memberError &&
+        (memberError as { code?: string }).code === "23505");
 
     if (!alreadyMember) {
-      console.error("[createProject] workspace_members RLS/insert:", memberError);
+      console.error("[createProject] workspace_members insert:", memberError);
       return {
         workspaceId: null,
-        error:
-          memberError.message +
-          " — Supabase SQL Editor'de database/migrations/fix_workspace_members_rls.sql dosyasını çalıştırın.",
+        error: toPlainErrorMessage(memberError),
       };
     }
   }
@@ -122,6 +166,8 @@ async function resolveWorkspaceId(
 export async function createProject(
   input: CreateProjectInput,
 ): Promise<CreateProjectResult> {
+  let shouldRevalidate = false;
+
   try {
     const cookieStore = await cookies();
 
@@ -140,6 +186,14 @@ export async function createProject(
     }
 
     const description = input.description?.trim() || null;
+    const env = getSupabaseEnv();
+    if (!env) {
+      return {
+        success: false,
+        error:
+          "NEXT_PUBLIC_SUPABASE_URL veya NEXT_PUBLIC_SUPABASE_ANON_KEY tanımlı değil.",
+      };
+    }
 
     const accessToken =
       cookieStore.get("sb_access_token")?.value ||
@@ -153,8 +207,7 @@ export async function createProject(
       };
     }
 
-    // Yalnızca anon + JWT — service role karıştırılmaz
-    const supabase = createUserScopedClient(accessToken);
+    const supabase = createUserScopedClient(env.url, env.anonKey, accessToken);
 
     const {
       data: { user },
@@ -163,8 +216,8 @@ export async function createProject(
 
     if (userError || !user?.id) {
       console.error(
-        "[createProject] Kullanıcı bulunamadı:",
-        userError?.message ?? "user null",
+        "[createProject] getUser failed:",
+        userError ? toPlainErrorMessage(userError) : "user null",
       );
       return {
         success: false,
@@ -172,11 +225,13 @@ export async function createProject(
       };
     }
 
-    console.info("[createProject] Authenticated user (auth.uid):", user.id);
+    // Tek kaynak: JWT'den doğrulanmış auth.uid()
+    const authUid = user.id;
+    console.info("[createProject] auth.uid():", authUid);
 
     const { workspaceId, error: workspaceError } = await resolveWorkspaceId(
       supabase,
-      user,
+      authUid,
     );
 
     if (!workspaceId) {
@@ -190,8 +245,8 @@ export async function createProject(
       name,
       description,
       workspace_id: workspaceId,
-      created_by: user.id,
-      owner_id: user.id,
+      created_by: authUid,
+      owner_id: authUid,
     };
 
     let { error: insertError } = await supabase
@@ -201,8 +256,9 @@ export async function createProject(
       .single();
 
     if (
-      insertError?.message?.includes("owner_id") ||
-      insertError?.message?.includes("user_id")
+      insertError &&
+      (toPlainErrorMessage(insertError).includes("owner_id") ||
+        toPlainErrorMessage(insertError).includes("user_id"))
     ) {
       const withoutOwnerId = {
         name: payload.name,
@@ -218,23 +274,43 @@ export async function createProject(
     }
 
     if (insertError) {
-      console.error("[createProject] insert/RLS/şema hatası:", insertError);
+      console.error("[createProject] projects insert:", insertError);
       return {
         success: false,
-        error: insertError.message || "Proje kaydedilirken bir hata oluştu.",
+        error: toPlainErrorMessage(insertError),
       };
     }
 
-    revalidatePath("/");
-    return { success: true };
+    shouldRevalidate = true;
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Proje oluşturulurken beklenmeyen bir hata oluştu.";
-    console.error("[createProject] catch:", error);
-    return { success: false, error: message };
+    // redirect()/NEXT_REDIRECT asla yutulmamalı
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+    console.error("[createProject] catch:", toPlainErrorMessage(error));
+    return { success: false, error: toPlainErrorMessage(error) };
   }
+
+  // revalidatePath try dışında: beklenmeyen cache hataları sonucu bozmasın
+  if (shouldRevalidate) {
+    try {
+      revalidatePath("/");
+    } catch (error) {
+      if (isNextRedirectError(error)) {
+        throw error;
+      }
+      console.warn(
+        "[createProject] revalidatePath uyarısı:",
+        toPlainErrorMessage(error),
+      );
+    }
+    return { success: true };
+  }
+
+  return {
+    success: false,
+    error: "Proje oluşturulurken beklenmeyen bir hata oluştu.",
+  };
 }
 
 export const createProjectAction = createProject;
