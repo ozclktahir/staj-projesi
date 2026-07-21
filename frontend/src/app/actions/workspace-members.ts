@@ -1,6 +1,7 @@
 "use server";
 
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { formatMemberOptionLabel } from "@/lib/member-labels";
 import {
   resolveWorkspaceRole,
   type WorkspaceMemberOption,
@@ -9,22 +10,6 @@ import {
 export type GetWorkspaceMembersResult =
   | { success: true; members: WorkspaceMemberOption[]; isAdmin: boolean }
   | { success: false; error: string; members: []; isAdmin: false };
-
-function displayName(
-  profile: Record<string, unknown> | null | undefined,
-  email: string | null,
-  fallback: string,
-): string {
-  if (profile) {
-    const name =
-      (typeof profile.full_name === "string" && profile.full_name) ||
-      (typeof profile.name === "string" && profile.name) ||
-      (typeof profile.username === "string" && profile.username);
-    if (name) return name;
-  }
-  if (email) return email.split("@")[0] ?? email;
-  return fallback;
-}
 
 export async function getWorkspaceMembers(
   workspaceId: string | null | undefined,
@@ -73,7 +58,7 @@ export async function getWorkspaceMembers(
         success: false,
         error: error.message,
         members: [],
-        isAdmin: roleCtx.isAdmin,
+        isAdmin: false,
       };
     }
 
@@ -89,16 +74,39 @@ export async function getWorkspaceMembers(
 
     const profileById = new Map<string, Record<string, unknown>>();
     if (userIds.length > 0) {
-      const { data: profiles } = await supabase
+      const { data: profiles, error: profileError } = await supabase
         .from("profiles")
-        .select("*")
+        .select(
+          "id, full_name, email, avatar_url, first_name, last_name, name, username",
+        )
         .in("id", userIds);
-      for (const p of profiles ?? []) {
-        if (p && typeof p === "object" && "id" in p) {
-          profileById.set(
-            String((p as { id: string }).id),
-            p as Record<string, unknown>,
-          );
+
+      // Bazı şemalarda display_name / first_name yok — * ile düş
+      if (profileError) {
+        console.warn(
+          "[getWorkspaceMembers] profile select fallback:",
+          profileError.message,
+        );
+        const { data: fallbackProfiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, avatar_url")
+          .in("id", userIds);
+        for (const p of fallbackProfiles ?? []) {
+          if (p && typeof p === "object" && "id" in p) {
+            profileById.set(
+              String((p as { id: string }).id),
+              p as Record<string, unknown>,
+            );
+          }
+        }
+      } else {
+        for (const p of profiles ?? []) {
+          if (p && typeof p === "object" && "id" in p) {
+            profileById.set(
+              String((p as { id: string }).id),
+              p as Record<string, unknown>,
+            );
+          }
         }
       }
     }
@@ -109,11 +117,24 @@ export async function getWorkspaceMembers(
       const email =
         (profile && typeof profile.email === "string" && profile.email) ||
         (uid === user.id ? (user.email ?? null) : null);
+      const fullName =
+        (profile &&
+          typeof profile.full_name === "string" &&
+          profile.full_name.trim()) ||
+        null;
+      const avatarUrl =
+        (profile &&
+          typeof profile.avatar_url === "string" &&
+          profile.avatar_url) ||
+        null;
+
       return {
         id: uid,
         email,
         role: (row.role as string | null) ?? null,
-        displayName: displayName(profile, email, "Üye"),
+        fullName,
+        avatarUrl,
+        displayName: formatMemberOptionLabel(profile, email),
       };
     });
 

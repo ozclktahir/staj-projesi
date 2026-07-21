@@ -296,6 +296,10 @@
 - Kullanıcı engelleme akışı kaldırılarak dinamik Workspace Onboarding (İlk Workspace Oluşturma) ekranı eklendi.
 - Roller workspace bazlı duruma getirildi (Kullanıcı kendi workspace'inde Admin, davet edildiğinde Member).
 - Kanban kartındaki Atanan Kişi (Assignee) rozeti kartın sağ üst köşesine taşındı.
+- "Atanan Kişi" dropdown seçeneğinde jenerik "Üye" ifadesi kaldırıldı; kullanıcıların Ad Soyad ve e-posta bilgileri görüntülenecek şekilde düzenlendi.
+- Giriş yapan kullanıcının Admin olduğu varsayılan Workspace'e otomatik yönlendirilmesi sağlandı.
+- Yeni kayıt olan kullanıcının oturum durumu (session/context) anlık güncellenerek oluşturduğu Workspace'e çıkış yapmadan yönlendirilmesi sağlandı.
+- Workspace davet ve bildirim akışı kuruldu; davet kabul edildiğinde üyenin aktif olarak listelenmesi entegre edildi.
 
 ### [20 Temmuz 2026] - Günlük Özet: RLS, Workspace Yönetimi ve Task Detail UI
 - RLS hatalarının giderilmesi, Workspace yönetim arayüzü ve Task Detail UI geliştirmeleri tamamlandı.

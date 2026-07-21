@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
+import { resolvePostLoginRedirect } from "@/app/actions/notifications";
 import { AuthSplitShell } from "@/components/auth/auth-split-shell";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import apiClient from "@/lib/api-client";
+import { persistAuthSession } from "@/lib/auth-session";
+import { writeActiveWorkspaceId } from "@/hooks/use-workspaces";
 import {
   formatAuthApiError,
   registerSchema,
@@ -27,7 +29,6 @@ import {
 } from "@/lib/validations/auth";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -41,15 +42,43 @@ export default function RegisterPage() {
   const onSubmit = async (values: RegisterFormValues) => {
     setIsSubmitting(true);
     try {
+      const email = values.email.trim().toLowerCase();
+      const password = values.password;
+
       await apiClient.post("/auth/register", {
         firstName: values.firstName.trim(),
         lastName: values.lastName.trim(),
-        email: values.email.trim().toLowerCase(),
-        password: values.password,
+        email,
+        password,
       });
 
-      toast.success("Kayıt başarılı. Giriş yapabilirsiniz.");
-      router.push("/login");
+      // Anlık oturum: kayıt sonrası otomatik giriş — çıkış/giriş döngüsü yok
+      const { data } = await apiClient.post<{
+        access_token?: string;
+        refresh_token?: string;
+        user?: unknown;
+      }>("/auth/login", { email, password });
+
+      if (!data.access_token) {
+        toast.success("Kayıt başarılı. Giriş yapabilirsiniz.");
+        window.location.assign("/login");
+        return;
+      }
+
+      await persistAuthSession(
+        data.access_token,
+        data.user,
+        data.refresh_token,
+      );
+
+      const redirect = await resolvePostLoginRedirect();
+      if (redirect.workspaceId) {
+        writeActiveWorkspaceId(redirect.workspaceId);
+      }
+
+      toast.success("Kayıt başarılı — çalışma alanına yönlendiriliyorsun");
+      window.location.assign(redirect.href);
+      return;
     } catch (error) {
       const message = isAxiosError(error)
         ? (error.response?.data?.message ?? "Kayıt işlemi başarısız oldu")

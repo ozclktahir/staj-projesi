@@ -161,9 +161,4 @@ export async function getMemberVisibleProjectIds(
   return Array.from(ids);
 }
 
-export type WorkspaceMemberOption = {
-  id: string;
-  displayName: string;
-  email: string | null;
-  role: string | null;
-};
+export type { WorkspaceMemberOption } from "@/lib/member-labels";

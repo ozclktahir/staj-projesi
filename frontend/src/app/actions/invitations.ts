@@ -138,8 +138,43 @@ export async function createInvitation(
       };
     }
 
+    const invitationId = data.id as string;
+
+    // Workspace adı + davetli kullanıcı (profiles) → bildirim
+    const [{ data: workspace }, { data: inviteeProfile }] = await Promise.all([
+      supabase
+        .from("workspaces")
+        .select("name")
+        .eq("id", workspaceId)
+        .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .ilike("email", email)
+        .maybeSingle(),
+    ]);
+
+    if (inviteeProfile?.id) {
+      const { createInviteNotification } = await import(
+        "@/app/actions/notifications"
+      );
+      const inviterName =
+        (typeof user.user_metadata?.full_name === "string" &&
+          user.user_metadata.full_name) ||
+        user.email ||
+        "Bir yönetici";
+
+      await createInviteNotification({
+        workspaceId,
+        workspaceName: (workspace?.name as string) ?? "Workspace",
+        inviteeUserId: inviteeProfile.id as string,
+        invitationId,
+        invitedByName: inviterName,
+      });
+    }
+
     revalidatePath("/");
-    return { success: true, invitationId: data.id as string };
+    return { success: true, invitationId };
   } catch (error) {
     console.error("[createInvitation] catch:", toPlainErrorMessage(error));
     return { success: false, error: toPlainErrorMessage(error) };
@@ -340,12 +375,18 @@ export async function acceptInvitation(
       .maybeSingle();
 
     if (!existing) {
+      const invitedRole =
+        typeof invitation.role === "string" && invitation.role.trim()
+          ? invitation.role === "OWNER"
+            ? "Admin"
+            : invitation.role
+          : "Member";
       const { error: memberError } = await supabase
         .from("workspace_members")
         .insert({
           workspace_id: workspaceId,
           user_id: user.id,
-          role: "Member",
+          role: invitedRole,
         });
       if (memberError) {
         return { success: false, error: toPlainErrorMessage(memberError) };
@@ -357,7 +398,20 @@ export async function acceptInvitation(
       .update({ status: "ACCEPTED" })
       .eq("id", id);
 
+    // İlgili invite bildirimlerini okundu yap
+    try {
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", user.id)
+        .eq("type", "WORKSPACE_INVITE")
+        .contains("metadata", { invitation_id: id });
+    } catch {
+      // notifications tablosu yoksa yoksay
+    }
+
     revalidatePath("/");
+    revalidatePath("/onboarding");
     return {
       success: true,
       acceptedCount: 1,

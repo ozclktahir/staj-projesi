@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isAxiosError } from "axios";
 import { toast } from "sonner";
+import { resolvePostLoginRedirect } from "@/app/actions/notifications";
 import { AuthSplitShell } from "@/components/auth/auth-split-shell";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import apiClient from "@/lib/api-client";
 import { persistAuthSession } from "@/lib/auth-session";
-import { acceptPendingInvitations } from "@/app/actions/invitations";
+import { writeActiveWorkspaceId } from "@/hooks/use-workspaces";
 import {
   loginSchema,
   formatAuthApiError,
@@ -61,21 +62,14 @@ export default function LoginPage() {
         data.refresh_token,
       );
 
-      // Bekleyen davetleri otomatik kabul et (invite-only üyelik)
-      try {
-        const accepted = await acceptPendingInvitations();
-        if (accepted.success && accepted.acceptedCount > 0) {
-          toast.success(
-            `${accepted.acceptedCount} workspace daveti kabul edildi`,
-          );
-        }
-      } catch (inviteError) {
-        console.error("[login] acceptPendingInvitations:", inviteError);
+      // Admin olduğu varsayılan workspace'e yönlendir
+      const redirect = await resolvePostLoginRedirect();
+      if (redirect.workspaceId) {
+        writeActiveWorkspaceId(redirect.workspaceId);
       }
 
       toast.success("Giriş başarılı");
-      // Hard navigate: eski/expired cookie + RSC cache kaynaklı Internal Server Error'ı önler
-      window.location.assign("/");
+      window.location.assign(redirect.href);
       return;
     } catch (error) {
       const message = isAxiosError(error)

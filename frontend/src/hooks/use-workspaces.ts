@@ -12,6 +12,7 @@ import {
   WORKSPACE_QUERY_KEY,
   withWorkspaceQuery,
 } from "@/lib/active-workspace";
+import { pickDefaultAdminWorkspace } from "@/lib/member-labels";
 
 export const ACTIVE_WORKSPACE_KEY = "active_workspace_id";
 
@@ -144,7 +145,11 @@ export function useWorkspaces() {
       const preferred = fromUrl || stored || activeWorkspaceId;
       const stillValid =
         preferred && list.some((workspace) => workspace.id === preferred);
-      return stillValid ? preferred : (list[0]?.id ?? null);
+      if (stillValid) return preferred;
+
+      // Varsayılan: Admin olduğu workspace
+      const adminDefault = pickDefaultAdminWorkspace(list);
+      return adminDefault?.id ?? list[0]?.id ?? null;
     },
     [activeWorkspaceId, urlWorkspaceId],
   );

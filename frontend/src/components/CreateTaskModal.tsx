@@ -217,7 +217,6 @@ export function CreateTaskModal({
               {members.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.displayName}
-                  {member.email ? ` (${member.email})` : ""}
                 </option>
               ))}
             </select>

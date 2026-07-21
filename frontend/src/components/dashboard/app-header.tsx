@@ -1,9 +1,10 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { Bell, LogOut, UserRound } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { CreateProjectModal } from "@/components/CreateProjectModal";
+import { InviteNotificationsMenu } from "@/components/invite-notifications-menu";
 import { Button } from "@/components/ui/button";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { clearAuthSession } from "@/lib/auth-session";
@@ -15,7 +16,7 @@ type AppHeaderProps = {
 
 function AppHeaderInner({ userName = "Kullanıcı" }: AppHeaderProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const { activeWorkspace, activeWorkspaceId } = useWorkspaces();
+  const { activeWorkspace, activeWorkspaceId, refresh } = useWorkspaces();
   const canCreateProject = isAdminRole(activeWorkspace?.role);
 
   async function handleLogout() {
@@ -49,16 +50,11 @@ function AppHeaderInner({ userName = "Kullanıcı" }: AppHeaderProps) {
           />
         ) : null}
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="relative rounded-[var(--radius)] text-muted-foreground hover:text-foreground"
-          aria-label="Bildirimler"
-        >
-          <Bell className="size-5" />
-          <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
-        </Button>
+        <InviteNotificationsMenu
+          onAccepted={() => {
+            void refresh();
+          }}
+        />
 
         <div className="flex items-center gap-2 rounded-[var(--radius)] border border-border bg-card px-2.5 py-1.5">
           <span className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-primary">

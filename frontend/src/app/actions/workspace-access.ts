@@ -1,7 +1,6 @@
 "use server";
 
 import { getAuthenticatedUser } from "@/lib/supabase/server";
-import { acceptPendingInvitations } from "@/app/actions/invitations";
 
 export type WorkspaceAccessResult = {
   hasAccess: boolean;
@@ -11,13 +10,11 @@ export type WorkspaceAccessResult = {
 
 /**
  * Kullanıcının sahibi olduğu veya üye olduğu en az bir workspace var mı?
- * Önce bekleyen davetleri kabul eder.
  * hasAccess=false → onboarding (kendi workspace'ini oluşturabilir); davet zorunlu değil.
+ * Not: Davetler otomatik kabul edilmez — kullanıcı bildirim panelinden kabul eder.
  */
 export async function ensureWorkspaceAccess(): Promise<WorkspaceAccessResult> {
   try {
-    await acceptPendingInvitations();
-
     const auth = await getAuthenticatedUser();
     if (!auth) {
       return { hasAccess: false, workspaceCount: 0, userId: null };

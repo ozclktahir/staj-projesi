@@ -37,8 +37,11 @@ export function OnboardingCreateWorkspace() {
 
       writeActiveWorkspaceId(result.workspace.id);
       toast.success("Workspace oluşturuldu — Admin olarak devam ediyorsun");
-      router.replace(`/?workspaceId=${encodeURIComponent(result.workspace.id)}`);
-      router.refresh();
+      // Hard navigate: session/context anında güncellenir (çıkış gerekmez)
+      window.location.assign(
+        `/?workspaceId=${encodeURIComponent(result.workspace.id)}`,
+      );
+      return;
     } catch (error) {
       toast.error(
         error instanceof Error
