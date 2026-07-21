@@ -101,7 +101,10 @@ export function DashboardHome({
               Aktif çalışma alanların ve projelerin
             </p>
           </div>
-          <CreateProjectModal triggerLabel="Yeni Proje" />
+          <CreateProjectModal
+            triggerLabel="Yeni Proje"
+            workspaceId={workspaceId}
+          />
         </div>
 
         {hasProjects ? (
@@ -156,7 +159,10 @@ export function DashboardHome({
               </CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center pb-8">
-              <CreateProjectModal triggerLabel="İlk Projeyi Oluştur" />
+              <CreateProjectModal
+                triggerLabel="İlk Projeyi Oluştur"
+                workspaceId={workspaceId}
+              />
             </CardContent>
           </Card>
         )}

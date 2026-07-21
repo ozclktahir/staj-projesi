@@ -17,12 +17,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { readActiveWorkspaceId } from "@/hooks/use-workspaces";
 
 type CreateProjectModalProps = {
   triggerLabel?: string;
   triggerVariant?: "default" | "outline" | "secondary" | "ghost";
   triggerClassName?: string;
   trigger?: ReactNode;
+  /** Aktif workspace — Dashboard'dan geçirilmeli */
+  workspaceId?: string | null;
 };
 
 export function CreateProjectModal({
@@ -30,12 +33,16 @@ export function CreateProjectModal({
   triggerVariant = "default",
   triggerClassName,
   trigger,
+  workspaceId: workspaceIdProp = null,
 }: CreateProjectModalProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const resolveWorkspaceId = () =>
+    workspaceIdProp?.trim() || readActiveWorkspaceId() || null;
 
   const resetForm = () => {
     setName("");
@@ -47,7 +54,17 @@ export function CreateProjectModal({
     setIsSubmitting(true);
 
     try {
-      const result = await createProject({ name, description });
+      const activeWorkspaceId = resolveWorkspaceId();
+      if (!activeWorkspaceId) {
+        toast.error("Lütfen önce bir çalışma alanı seçin.");
+        return;
+      }
+
+      const result = await createProject({
+        name,
+        description,
+        workspaceId: activeWorkspaceId,
+      });
 
       if (!result.success) {
         toast.error(result.error);
@@ -99,7 +116,8 @@ export function CreateProjectModal({
         <DialogHeader>
           <DialogTitle>Yeni Proje</DialogTitle>
           <DialogDescription>
-            Proje adı ve isteğe bağlı bir açıklama girin.
+            Proje adı ve isteğe bağlı bir açıklama girin. Proje aktif çalışma
+            alanına kaydedilir.
           </DialogDescription>
         </DialogHeader>
 
@@ -126,7 +144,7 @@ export function CreateProjectModal({
               placeholder="Kısa bir açıklama (opsiyonel)"
               rows={4}
               disabled={isSubmitting}
-              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-[var(--radius)] border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-[var(--radius)] border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 

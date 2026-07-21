@@ -138,78 +138,105 @@ export async function getCurrentUserProjects(
       cookieStore.get("active_workspace_id")?.value?.trim() ||
       null;
 
-    // Aktif workspace yoksa boş liste (workspace bağlamı zorunlu)
     if (!activeWorkspaceId) {
       return { userName, projects: [] };
     }
 
-    // Şema ile uyumlu select (updated_at dahil) — SADECE activeWorkspaceId
-    let query = supabase
+    // Sahipsiz (workspace_id NULL) eski projeleri varsayılan/ilk workspace'e bağla
+    try {
+      const { data: memberships } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", user.id)
+        .limit(20);
+
+      const memberIds = (memberships ?? [])
+        .map((row) => row.workspace_id as string | undefined)
+        .filter((id): id is string => Boolean(id));
+      const defaultWorkspaceId = memberIds[0] ?? activeWorkspaceId;
+
+      if (defaultWorkspaceId) {
+        await supabase
+          .from("projects")
+          .update({ workspace_id: defaultWorkspaceId })
+          .is("workspace_id", null)
+          .or(`created_by.eq.${user.id},user_id.eq.${user.id}`);
+      }
+    } catch (backfillError) {
+      console.warn("[getCurrentUserProjects] orphan backfill:", backfillError);
+    }
+
+    // SADECE aktif workspace_id ile filtrele (RLS ek erişim kontrolü sağlar)
+    const selectCols =
+      "id, name, description, created_at, updated_at, workspace_id, user_id, created_by";
+
+    let { data, error } = await supabase
       .from("projects")
-      .select(
-        "id, name, description, created_at, updated_at, workspace_id, user_id, created_by",
-      )
+      .select(selectCols)
       .eq("workspace_id", activeWorkspaceId)
-      .or(`created_by.eq.${user.id},user_id.eq.${user.id}`)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
-    const { data, error } = await query;
+    if (error?.message?.includes("deleted_at")) {
+      ({ data, error } = await supabase
+        .from("projects")
+        .select(selectCols)
+        .eq("workspace_id", activeWorkspaceId)
+        .order("created_at", { ascending: false }));
+    }
 
-    if (!error && data) {
-      return {
-        userName,
-        projects: data.map((row) => ({
-          id: row.id as string,
-          name: (row.name as string) ?? "Adsız proje",
-          description: (row.description as string | null) ?? null,
-          created_at: (row.created_at as string | null) ?? null,
-          updated_at: (row.updated_at as string | null) ?? null,
-          workspace_id: (row.workspace_id as string | null) ?? null,
-          user_id: (row.user_id as string | null) ?? null,
-          created_by: (row.created_by as string | null) ?? null,
-        })),
-      };
+    if (error?.message?.includes("updated_at")) {
+      ({ data, error } = await supabase
+        .from("projects")
+        .select(
+          "id, name, description, created_at, workspace_id, user_id, created_by",
+        )
+        .eq("workspace_id", activeWorkspaceId)
+        .order("created_at", { ascending: false }));
     }
 
     if (error) {
       console.error("[getCurrentUserProjects] query:", error.message);
+      return { userName, projects: [] };
     }
 
-    // Fallback: updated_at / deleted_at yoksa
-    try {
-      let fallbackQuery = supabase
+    // Fallback: bu workspace'te kayıt yoksa, sahipsiz kalanları da göster
+    let rows = data ?? [];
+    if (rows.length === 0) {
+      const orphans = await supabase
         .from("projects")
-        .select("id, name, description, created_at, workspace_id")
-        .eq("workspace_id", activeWorkspaceId)
+        .select(
+          "id, name, description, created_at, updated_at, workspace_id, user_id, created_by",
+        )
+        .is("workspace_id", null)
         .or(`created_by.eq.${user.id},user_id.eq.${user.id}`)
         .order("created_at", { ascending: false });
 
-      const fallback = await fallbackQuery;
-
-      if (fallback.error || !fallback.data) {
-        console.error(
-          "[getCurrentUserProjects] fallback:",
-          fallback.error?.message ?? "data null",
-        );
-        return { userName, projects: [] };
+      if (!orphans.error && orphans.data?.length) {
+        rows = orphans.data;
       }
-
-      return {
-        userName,
-        projects: fallback.data.map((row) => ({
-          id: row.id as string,
-          name: (row.name as string) ?? "Adsız proje",
-          description: (row.description as string | null) ?? null,
-          created_at: (row.created_at as string | null) ?? null,
-          updated_at: null,
-          workspace_id: (row.workspace_id as string | null) ?? null,
-        })),
-      };
-    } catch (fallbackError) {
-      console.error("[getCurrentUserProjects] fallback catch:", fallbackError);
-      return { userName, projects: [] };
     }
+
+    return {
+      userName,
+      projects: rows.map((row) => ({
+        id: row.id as string,
+        name: (row.name as string) ?? "Adsız proje",
+        description: (row.description as string | null) ?? null,
+        created_at: (row.created_at as string | null) ?? null,
+        updated_at:
+          "updated_at" in row
+            ? ((row.updated_at as string | null) ?? null)
+            : null,
+        workspace_id: (row.workspace_id as string | null) ?? null,
+        user_id:
+          "user_id" in row ? ((row.user_id as string | null) ?? null) : null,
+        created_by:
+          "created_by" in row
+            ? ((row.created_by as string | null) ?? null)
+            : null,
+      })),
+    };
   } catch (error) {
     console.error("[getCurrentUserProjects]", error);
     return { userName: "Kullanıcı", projects: [] };

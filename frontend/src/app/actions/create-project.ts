@@ -7,6 +7,8 @@ import { cookies } from "next/headers";
 export type CreateProjectInput = {
   name: string;
   description?: string;
+  /** Aktif workspace — zorunlu; yoksa hata */
+  workspaceId?: string | null;
 };
 
 /** Client'a her zaman düz, serileştirilebilir JSON dönülür. */
@@ -240,20 +242,55 @@ export async function createProject(
     const authUid = user.id;
     console.info("[createProject] auth.uid():", authUid);
 
-    const preferredWorkspaceId =
-      cookieStore.get("active_workspace_id")?.value?.trim() || null;
+    const requestedWorkspaceId =
+      input.workspaceId?.trim() ||
+      cookieStore.get("active_workspace_id")?.value?.trim() ||
+      null;
 
-    const { workspaceId, error: workspaceError } = await resolveWorkspaceId(
-      supabase,
-      authUid,
-      preferredWorkspaceId,
-    );
-
-    if (!workspaceId) {
+    if (!requestedWorkspaceId) {
       return {
         success: false,
-        error: workspaceError ?? "Çalışma alanı bulunamadı.",
+        error: "Lütfen önce bir çalışma alanı seçin.",
       };
+    }
+
+    // Kullanıcının bu workspace üyesi olduğunu doğrula (otomatik yeni WS oluşturma yok)
+    const { data: membership, error: membershipError } = await supabase
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("workspace_id", requestedWorkspaceId)
+      .eq("user_id", authUid)
+      .maybeSingle();
+
+    if (membershipError) {
+      return { success: false, error: toPlainErrorMessage(membershipError) };
+    }
+
+    let workspaceId = membership?.workspace_id as string | undefined;
+
+    if (!workspaceId) {
+      // Owner olabilir ama members satırı eksik — workspaces.owner_id kontrolü
+      const { data: owned } = await supabase
+        .from("workspaces")
+        .select("id")
+        .eq("id", requestedWorkspaceId)
+        .eq("owner_id", authUid)
+        .maybeSingle();
+
+      if (!owned?.id) {
+        return {
+          success: false,
+          error: "Lütfen önce bir çalışma alanı seçin.",
+        };
+      }
+
+      workspaceId = owned.id as string;
+      // Üyelik satırını tamamla
+      await supabase.from("workspace_members").insert({
+        workspace_id: workspaceId,
+        user_id: authUid,
+        role: "Admin",
+      });
     }
 
     // Şema: projects sahiplik sütunu = user_id (owner_id değil).
@@ -265,6 +302,13 @@ export async function createProject(
       created_by: authUid,
       user_id: authUid,
     };
+
+    if (!basePayload.workspace_id) {
+      return {
+        success: false,
+        error: "Lütfen önce bir çalışma alanı seçin.",
+      };
+    }
 
     if (basePayload.user_id !== authUid || basePayload.created_by !== authUid) {
       return {
