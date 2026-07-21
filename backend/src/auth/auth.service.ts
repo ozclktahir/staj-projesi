@@ -1,8 +1,9 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
-  TooManyRequestsException,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Session, User } from '@supabase/supabase-js';
@@ -29,10 +30,11 @@ export class AuthService {
       lower.includes('email rate limit') ||
       lower.includes('over_email_send_rate_limit')
     ) {
-      throw new TooManyRequestsException(
+      throw new HttpException(
         'E-posta gönderim limiti aşıldı. Supabase ücretsiz planda doğrulama maili kotası dolmuş olabilir. ' +
           '1) Birkaç dakika bekleyin veya 2) Supabase Dashboard → Authentication → Providers → Email → ' +
           '"Confirm email" seçeneğini kapatın (geliştirme için önerilir).',
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
 

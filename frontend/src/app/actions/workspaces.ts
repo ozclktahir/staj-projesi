@@ -65,10 +65,10 @@ function createUserScopedClient(
 }
 
 /** Backend/Supabase satırını düz WorkspaceListItem'a çevirir (wrapper yok). */
-export function mapWorkspaceRow(
+export async function mapWorkspaceRow(
   row: Record<string, unknown>,
   role?: string | null,
-): WorkspaceListItem | null {
+): Promise<WorkspaceListItem | null> {
   // Nest bazen { data: {...} } sarmalayabilir — aç
   const source =
     row.data && typeof row.data === "object" && !Array.isArray(row.data)
@@ -158,7 +158,7 @@ export async function getWorkspaces(): Promise<GetWorkspacesResult> {
           };
         }
 
-        const workspaces = normalizeMemberRows(fallback.data);
+        const workspaces = await normalizeMemberRows(fallback.data);
         return { success: true, workspaces };
       }
 
@@ -166,14 +166,14 @@ export async function getWorkspaces(): Promise<GetWorkspacesResult> {
       return { success: false, error: toPlainErrorMessage(error) };
     }
 
-    return { success: true, workspaces: normalizeMemberRows(data) };
+    return { success: true, workspaces: await normalizeMemberRows(data) };
   } catch (error) {
     console.error("[getWorkspaces] catch:", toPlainErrorMessage(error));
     return { success: false, error: toPlainErrorMessage(error) };
   }
 }
 
-function normalizeMemberRows(data: unknown): WorkspaceListItem[] {
+async function normalizeMemberRows(data: unknown): Promise<WorkspaceListItem[]> {
   if (!Array.isArray(data)) return [];
 
   const workspaces: WorkspaceListItem[] = [];
@@ -187,7 +187,7 @@ function normalizeMemberRows(data: unknown): WorkspaceListItem[] {
       ? row.workspaces[0]
       : row.workspaces;
     if (!wsRaw || typeof wsRaw !== "object") continue;
-    const mapped = mapWorkspaceRow(wsRaw, row.role ?? null);
+    const mapped = await mapWorkspaceRow(wsRaw, row.role ?? null);
     if (mapped) workspaces.push(mapped);
   }
   return workspaces;
@@ -306,7 +306,7 @@ export async function createWorkspace(
       }
     }
 
-    const mapped = mapWorkspaceRow(
+    const mapped = await mapWorkspaceRow(
       workspace as Record<string, unknown>,
       "Admin",
     );

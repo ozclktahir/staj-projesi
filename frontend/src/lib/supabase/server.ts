@@ -134,6 +134,7 @@ export async function getCurrentUserProjects(): Promise<{
     const activeWorkspaceId =
       cookieStore.get("active_workspace_id")?.value?.trim() || null;
 
+    // Şema ile uyumlu select (updated_at dahil)
     let query = supabase
       .from("projects")
       .select(
@@ -149,14 +150,32 @@ export async function getCurrentUserProjects(): Promise<{
 
     const { data, error } = await query;
 
+    if (!error && data) {
+      return {
+        userName,
+        projects: data.map((row) => ({
+          id: row.id as string,
+          name: (row.name as string) ?? "Adsız proje",
+          description: (row.description as string | null) ?? null,
+          created_at: (row.created_at as string | null) ?? null,
+          updated_at: (row.updated_at as string | null) ?? null,
+          workspace_id: (row.workspace_id as string | null) ?? null,
+          user_id: (row.user_id as string | null) ?? null,
+          created_by: (row.created_by as string | null) ?? null,
+        })),
+      };
+    }
+
     if (error) {
       console.error("[getCurrentUserProjects] query:", error.message);
-      // updated_at / workspace_id yoksa sade select
+    }
+
+    // Fallback: updated_at / ekstra sütunlar yoksa veya sorgu başarısızsa
+    try {
       let fallbackQuery = supabase
         .from("projects")
         .select("id, name, description, created_at, workspace_id")
-        .eq("created_by", user.id)
-        .is("deleted_at", null)
+        .or(`created_by.eq.${user.id},user_id.eq.${user.id}`)
         .order("created_at", { ascending: false });
 
       if (activeWorkspaceId) {
@@ -165,16 +184,29 @@ export async function getCurrentUserProjects(): Promise<{
 
       const fallback = await fallbackQuery;
 
+      if (fallback.error || !fallback.data) {
+        console.error(
+          "[getCurrentUserProjects] fallback:",
+          fallback.error?.message ?? "data null",
+        );
+        return { userName, projects: [] };
+      }
+
       return {
         userName,
-        projects: (fallback.data as DashboardProject[] | null) ?? [],
+        projects: fallback.data.map((row) => ({
+          id: row.id as string,
+          name: (row.name as string) ?? "Adsız proje",
+          description: (row.description as string | null) ?? null,
+          created_at: (row.created_at as string | null) ?? null,
+          updated_at: null,
+          workspace_id: (row.workspace_id as string | null) ?? null,
+        })),
       };
+    } catch (fallbackError) {
+      console.error("[getCurrentUserProjects] fallback catch:", fallbackError);
+      return { userName, projects: [] };
     }
-
-    return {
-      userName,
-      projects: (data as DashboardProject[] | null) ?? [],
-    };
   } catch (error) {
     console.error("[getCurrentUserProjects]", error);
     return { userName: "Kullanıcı", projects: [] };
