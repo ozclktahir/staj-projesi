@@ -284,6 +284,9 @@
 - Workspace silme işlevi (`deleteWorkspace`) ve UI onay modalı eklendi.
 - `updateTaskStatus` aksiyonu veritabanı enum değerleriyle senkronize edilerek görev durumu güncellenememe hatası giderildi.
 - `TaskDetailSheet` bileşeni üzerinden görev düzenleme, alt görev (subtask) ve yorum sistemleri entegre edildi.
+- Admin ve Kullanıcı rolleri (RBAC) ayrıştırıldı; izinsiz girişler için yetkisizlik yönlendirmesi eklendi.
+- Admin kullanıcı davet sistemi (`invitations`) entegre edildi.
+- Admin için üye ve proje durum takip paneli (Admin Overview) oluşturuldu.
 
 ### [20 Temmuz 2026] - Günlük Özet: RLS, Workspace Yönetimi ve Task Detail UI
 - RLS hatalarının giderilmesi, Workspace yönetim arayüzü ve Task Detail UI geliştirmeleri tamamlandı.

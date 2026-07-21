@@ -48,21 +48,28 @@ export function proxy(request: NextRequest) {
     const isPublicRoute = publicRoutes.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`),
     );
+    const isUnauthorizedRoute =
+      pathname === "/unauthorized" || pathname.startsWith("/unauthorized/");
     const session = hasSession(request);
 
     if (!session && !isPublicRoute) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("from", pathname);
       const res = NextResponse.redirect(loginUrl);
-      // Bayrak kalıntısı varsa temizle
       if (readCookie(request, AUTH_COOKIE)) {
         clearAuthCookies(res);
       }
       return res;
     }
 
+    // Oturumlu kullanıcı public auth sayfalarına gidemez (unauthorized hariç)
     if (session && isPublicRoute) {
       return NextResponse.redirect(new URL("/", request.url));
+    }
+
+    // unauthorized sayfası oturum gerektirir; public değil
+    if (!session && isUnauthorizedRoute) {
+      return NextResponse.redirect(new URL("/login", request.url));
     }
 
     return NextResponse.next();

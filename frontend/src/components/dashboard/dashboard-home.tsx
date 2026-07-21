@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { CheckCircle2, CircleDashed, FolderKanban, ListTodo } from "lucide-react";
+import type { AdminMemberOverview } from "@/app/actions/admin-overview";
 import { CreateProjectModal } from "@/components/CreateProjectModal";
+import { AdminOverviewPanel } from "@/components/dashboard/admin-overview-panel";
 import {
   Card,
   CardContent,
@@ -18,6 +20,8 @@ type DashboardHomeProps = {
   projects: DashboardProject[];
   stats: DashboardTaskStats;
   workspaceId?: string | null;
+  showAdminOverview?: boolean;
+  adminMembers?: AdminMemberOverview[];
 };
 
 export function DashboardHome({
@@ -25,6 +29,8 @@ export function DashboardHome({
   projects,
   stats,
   workspaceId = null,
+  showAdminOverview = false,
+  adminMembers = [],
 }: DashboardHomeProps) {
   const hasProjects = projects.length > 0;
 
@@ -90,6 +96,10 @@ export function DashboardHome({
           </Card>
         ))}
       </section>
+
+      {showAdminOverview ? (
+        <AdminOverviewPanel members={adminMembers} />
+      ) : null}
 
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-3">

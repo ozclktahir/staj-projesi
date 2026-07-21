@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import apiClient from "@/lib/api-client";
 import { persistAuthSession } from "@/lib/auth-session";
+import { acceptPendingInvitations } from "@/app/actions/invitations";
 import {
   loginSchema,
   formatAuthApiError,
@@ -59,6 +60,18 @@ export default function LoginPage() {
         data.user,
         data.refresh_token,
       );
+
+      // Bekleyen davetleri otomatik kabul et (invite-only üyelik)
+      try {
+        const accepted = await acceptPendingInvitations();
+        if (accepted.success && accepted.acceptedCount > 0) {
+          toast.success(
+            `${accepted.acceptedCount} workspace daveti kabul edildi`,
+          );
+        }
+      } catch (inviteError) {
+        console.error("[login] acceptPendingInvitations:", inviteError);
+      }
 
       toast.success("Giriş başarılı");
       // Hard navigate: eski/expired cookie + RSC cache kaynaklı Internal Server Error'ı önler

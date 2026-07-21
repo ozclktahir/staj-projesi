@@ -13,9 +13,11 @@ import {
   Settings,
   Star,
   Trash2,
+  UserPlus,
 } from "lucide-react";
 import { CreateWorkspaceModal } from "@/components/create-workspace-modal";
 import { DeleteWorkspaceModal } from "@/components/delete-workspace-modal";
+import { InviteMemberModal } from "@/components/invite-member-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
+import { isAdminRole } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -50,6 +53,9 @@ function SidebarInner() {
   } = useWorkspaces();
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+
+  const canInvite = isAdminRole(activeWorkspace?.role);
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950">
@@ -125,6 +131,18 @@ function SidebarInner() {
             )}
 
             <DropdownMenuSeparator />
+            {canInvite ? (
+              <DropdownMenuItem
+                className="cursor-pointer gap-2 text-primary focus:text-primary"
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setInviteOpen(true);
+                }}
+              >
+                <UserPlus className="size-4" />
+                Üye Davet Et
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem
               className="cursor-pointer gap-2 text-primary focus:text-primary"
               onSelect={(event) => {
@@ -137,10 +155,10 @@ function SidebarInner() {
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer gap-2 text-red-600 focus:bg-red-500/10 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
-              disabled={!activeWorkspace}
+              disabled={!activeWorkspace || !canInvite}
               onSelect={(event) => {
                 event.preventDefault();
-                if (activeWorkspace) setDeleteOpen(true);
+                if (activeWorkspace && canInvite) setDeleteOpen(true);
               }}
             >
               <Trash2 className="size-4" />
@@ -207,6 +225,13 @@ function SidebarInner() {
         onDeleted={({ deletedId, nextWorkspaceId }) => {
           void afterWorkspaceDeleted(deletedId, nextWorkspaceId);
         }}
+      />
+
+      <InviteMemberModal
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        workspaceId={activeWorkspaceId}
+        workspaceName={activeWorkspace?.name}
       />
     </aside>
   );
