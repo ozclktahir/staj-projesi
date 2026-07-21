@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { setActiveWorkspaceCookie } from "@/app/actions/set-active-workspace";
 import {
@@ -78,6 +78,10 @@ export function clearActiveWorkspaceId() {
   }
 }
 
+/**
+ * Aktif workspace seçimi yalnızca hangi projelerin gösterileceğini belirler.
+ * Dropdown listesi (workspaces[]) ASLA aktif filtreyle küçültülmez.
+ */
 export function useWorkspaces() {
   const router = useRouter();
   const pathname = usePathname();
@@ -91,83 +95,118 @@ export function useWorkspaces() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const workspacesRef = useRef(workspaces);
+  workspacesRef.current = workspaces;
+
+  const persistActiveOnly = useCallback(async (id: string) => {
+    const clean = id.trim();
+    if (!clean) return;
+
+    writeActiveWorkspaceId(clean);
+    setActiveWorkspaceId(clean);
+
+    const cookieResult = await setActiveWorkspaceCookie(clean);
+    if (!cookieResult.success) {
+      console.error(
+        "[useWorkspaces] setActiveWorkspaceCookie failed:",
+        cookieResult.error,
+      );
+    }
+  }, []);
+
   const persistAndNavigate = useCallback(
     async (id: string) => {
       const clean = id.trim();
       if (!clean) return;
 
-      writeActiveWorkspaceId(clean);
-      setActiveWorkspaceId(clean);
-
-      const cookieResult = await setActiveWorkspaceCookie(clean);
-      if (!cookieResult.success) {
-        console.error(
-          "[useWorkspaces] setActiveWorkspaceCookie failed:",
-          cookieResult.error,
-        );
-      }
+      // Listeye dokunma — sadece aktif seçim + URL
+      await persistActiveOnly(clean);
 
       const targetPath = pathname.startsWith("/project/")
         ? "/"
         : pathname || "/";
       const href = withWorkspaceQuery(targetPath, clean);
-      console.info("[useWorkspaces] switch workspace", { clean, href });
+      console.info("[useWorkspaces] switch workspace (list unchanged)", {
+        clean,
+        href,
+        listCount: workspacesRef.current.length,
+      });
       router.push(href);
       router.refresh();
     },
-    [pathname, router],
+    [pathname, persistActiveOnly, router],
+  );
+
+  const resolvePreferredId = useCallback(
+    (list: WorkspaceListItem[]) => {
+      const fromUrl = urlWorkspaceId?.trim() || null;
+      const stored = readActiveWorkspaceId();
+      const preferred = fromUrl || stored || activeWorkspaceId;
+      const stillValid =
+        preferred && list.some((workspace) => workspace.id === preferred);
+      return stillValid ? preferred : (list[0]?.id ?? null);
+    },
+    [activeWorkspaceId, urlWorkspaceId],
   );
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     const result = await getWorkspaces();
     if (!result.success) {
-      setWorkspaces([]);
+      // Mevcut listeyi silme — geçici hata dropdown'u boşaltmasın
+      console.error("[useWorkspaces] getWorkspaces failed:", result.error);
       setError(result.error);
       setLoading(false);
-      return [] as WorkspaceListItem[];
+      return workspacesRef.current;
     }
 
     const list = Array.isArray(result.workspaces) ? result.workspaces : [];
+    console.info("[useWorkspaces] full workspace list", {
+      count: list.length,
+      ids: list.map((w) => w.id),
+    });
+
+    // Tam listeyi yaz — aktif id ile filtreleme YOK
     setWorkspaces(list);
 
-    const fromUrl = urlWorkspaceId?.trim() || null;
-    const stored = readActiveWorkspaceId();
-    const preferred = fromUrl || stored;
-    const stillValid =
-      preferred && list.some((workspace) => workspace.id === preferred);
-    const nextId = stillValid ? preferred : (list[0]?.id ?? null);
-
+    const nextId = resolvePreferredId(list);
     if (nextId) {
       writeActiveWorkspaceId(nextId);
       setActiveWorkspaceId(nextId);
       void setActiveWorkspaceCookie(nextId);
-      if (!fromUrl) {
+      if (!urlWorkspaceId) {
         router.replace(withWorkspaceQuery(pathname || "/", nextId));
       }
-    } else {
-      setActiveWorkspaceId(null);
     }
 
     setLoading(false);
     return list;
-  }, [pathname, router, urlWorkspaceId]);
+  }, [pathname, resolvePreferredId, router, urlWorkspaceId]);
 
+  // İlk yükleme — URL değişiminde listeyi yeniden sıfırlama
+  const initialLoadDone = useRef(false);
   useEffect(() => {
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
     void refresh();
-  }, [refresh]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once
+  }, []);
 
+  // URL'deki workspaceId değişince SADECE aktif seçimi güncelle (listeyi değil)
   useEffect(() => {
-    if (urlWorkspaceId) {
-      writeActiveWorkspaceId(urlWorkspaceId);
-      setActiveWorkspaceId(urlWorkspaceId);
-      void setActiveWorkspaceCookie(urlWorkspaceId);
-    }
-  }, [urlWorkspaceId]);
+    if (!urlWorkspaceId) return;
+    if (urlWorkspaceId === activeWorkspaceId) return;
+
+    writeActiveWorkspaceId(urlWorkspaceId);
+    setActiveWorkspaceId(urlWorkspaceId);
+    void setActiveWorkspaceCookie(urlWorkspaceId);
+  }, [urlWorkspaceId, activeWorkspaceId]);
 
   const selectWorkspace = useCallback(
     (id: string) => {
+      // workspaces[] dokunulmaz
       void persistAndNavigate(id);
     },
     [persistAndNavigate],
@@ -177,6 +216,7 @@ export function useWorkspaces() {
     (workspace: WorkspaceListItem) => {
       setWorkspaces((prev) => {
         const without = prev.filter((item) => item.id !== workspace.id);
+        // Mevcut liste korunur; yeni workspace eklenir
         return [workspace, ...without];
       });
       void persistAndNavigate(workspace.id);

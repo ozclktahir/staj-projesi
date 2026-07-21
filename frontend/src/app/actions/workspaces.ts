@@ -20,6 +20,11 @@ export type CreateWorkspaceResult =
   | { success: true; workspace: WorkspaceListItem }
   | { success: false; error: string };
 
+const WORKSPACE_SELECT =
+  "id, name, description, owner_id, created_at, updated_at";
+const WORKSPACE_SELECT_LEGACY =
+  "id, name, description, owner_id, created_at";
+
 function getSupabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -69,7 +74,6 @@ export async function mapWorkspaceRow(
   row: Record<string, unknown>,
   role?: string | null,
 ): Promise<WorkspaceListItem | null> {
-  // Nest bazen { data: {...} } sarmalayabilir — aç
   const source =
     row.data && typeof row.data === "object" && !Array.isArray(row.data)
       ? (row.data as Record<string, unknown>)
@@ -102,6 +106,11 @@ async function getAccessToken(): Promise<string | null> {
   );
 }
 
+/**
+ * Kullanıcının TÜM workspace'lerini döner.
+ * ASLA active_workspace_id ile filtrelenmez.
+ * Kaynak: owner_id == user.id  VEYA  workspace_members.user_id == user.id
+ */
 export async function getWorkspaces(): Promise<GetWorkspacesResult> {
   try {
     const env = getSupabaseEnv();
@@ -134,39 +143,94 @@ export async function getWorkspaces(): Promise<GetWorkspacesResult> {
       };
     }
 
-    const { data, error } = await supabase
-      .from("workspace_members")
-      .select(
-        "role, workspaces(id, name, description, owner_id, created_at, updated_at)",
-      )
-      .eq("user_id", user.id);
+    const authUid = user.id;
+    console.log("[getWorkspaces] listing ALL workspaces for user", authUid);
 
-    if (error) {
-      // updated_at henüz yoksa eski select ile dene
-      if (toPlainErrorMessage(error).includes("updated_at")) {
-        const fallback = await supabase
-          .from("workspace_members")
-          .select(
-            "role, workspaces(id, name, description, owner_id, created_at)",
-          )
-          .eq("user_id", user.id);
+    // 1) Sahip olunan workspace'ler (üyelik satırı eksik olsa bile)
+    let ownedQuery = await supabase
+      .from("workspaces")
+      .select(WORKSPACE_SELECT)
+      .eq("owner_id", authUid);
 
-        if (fallback.error) {
-          return {
-            success: false,
-            error: toPlainErrorMessage(fallback.error),
-          };
-        }
-
-        const workspaces = await normalizeMemberRows(fallback.data);
-        return { success: true, workspaces };
-      }
-
-      console.error("[getWorkspaces]", error);
-      return { success: false, error: toPlainErrorMessage(error) };
+    if (
+      ownedQuery.error &&
+      toPlainErrorMessage(ownedQuery.error).includes("updated_at")
+    ) {
+      ownedQuery = await supabase
+        .from("workspaces")
+        .select(WORKSPACE_SELECT_LEGACY)
+        .eq("owner_id", authUid);
     }
 
-    return { success: true, workspaces: await normalizeMemberRows(data) };
+    if (ownedQuery.error) {
+      console.error("[getWorkspaces] owned query:", ownedQuery.error);
+      return {
+        success: false,
+        error: toPlainErrorMessage(ownedQuery.error),
+      };
+    }
+
+    // 2) Üye olunan workspace'ler (aktif filtre YOK)
+    let memberQuery = await supabase
+      .from("workspace_members")
+      .select(`role, workspaces(${WORKSPACE_SELECT})`)
+      .eq("user_id", authUid);
+
+    if (
+      memberQuery.error &&
+      toPlainErrorMessage(memberQuery.error).includes("updated_at")
+    ) {
+      memberQuery = await supabase
+        .from("workspace_members")
+        .select(`role, workspaces(${WORKSPACE_SELECT_LEGACY})`)
+        .eq("user_id", authUid);
+    }
+
+    if (memberQuery.error) {
+      console.error("[getWorkspaces] members query:", memberQuery.error);
+      return {
+        success: false,
+        error: toPlainErrorMessage(memberQuery.error),
+      };
+    }
+
+    const byId = new Map<string, WorkspaceListItem>();
+
+    for (const row of ownedQuery.data ?? []) {
+      if (!row || typeof row !== "object") continue;
+      const mapped = await mapWorkspaceRow(
+        row as Record<string, unknown>,
+        "OWNER",
+      );
+      if (mapped) byId.set(mapped.id, mapped);
+    }
+
+    for (const mapped of await normalizeMemberRows(memberQuery.data)) {
+      const existing = byId.get(mapped.id);
+      if (existing) {
+        // Üyelik rolü varsa koru; owner kaydı zaten OWNER
+        if (mapped.role && existing.role === "OWNER" && mapped.role !== "OWNER") {
+          byId.set(mapped.id, { ...existing, role: mapped.role });
+        } else if (!existing.role && mapped.role) {
+          byId.set(mapped.id, { ...existing, role: mapped.role });
+        }
+      } else {
+        byId.set(mapped.id, mapped);
+      }
+    }
+
+    const workspaces = Array.from(byId.values()).sort((a, b) => {
+      const ta = a.created_at ? Date.parse(a.created_at) : 0;
+      const tb = b.created_at ? Date.parse(b.created_at) : 0;
+      return tb - ta;
+    });
+
+    console.log("[getWorkspaces] returning", {
+      count: workspaces.length,
+      ids: workspaces.map((w) => w.id),
+    });
+
+    return { success: true, workspaces };
   } catch (error) {
     console.error("[getWorkspaces] catch:", toPlainErrorMessage(error));
     return { success: false, error: toPlainErrorMessage(error) };
@@ -255,7 +319,7 @@ export async function createWorkspace(
     let { data: workspace, error: workspaceError } = await supabase
       .from("workspaces")
       .insert(payload)
-      .select("id, name, description, owner_id, created_at, updated_at")
+      .select(WORKSPACE_SELECT)
       .single();
 
     if (
@@ -265,7 +329,7 @@ export async function createWorkspace(
       ({ data: workspace, error: workspaceError } = await supabase
         .from("workspaces")
         .insert(payload)
-        .select("id, name, description, owner_id, created_at")
+        .select(WORKSPACE_SELECT_LEGACY)
         .single());
     }
 
@@ -279,13 +343,38 @@ export async function createWorkspace(
       };
     }
 
-    const { error: memberError } = await supabase
+    const newWorkspaceId = workspace.id as string;
+
+    // Üyelik kaydı zorunlu (RLS: getWorkspaces + proje oluşturma)
+    let memberRole = "OWNER";
+    let { error: memberError } = await supabase
       .from("workspace_members")
       .insert({
-        workspace_id: workspace.id as string,
+        workspace_id: newWorkspaceId,
         user_id: authUid,
-        role: "Admin",
+        role: memberRole,
       });
+
+    // Şema Admin/Member/Guest kabul ediyorsa OWNER yerine Admin
+    if (memberError) {
+      const msg = toPlainErrorMessage(memberError).toLowerCase();
+      const roleRejected =
+        msg.includes("role") ||
+        msg.includes("check") ||
+        msg.includes("invalid") ||
+        msg.includes("enum");
+
+      if (roleRejected) {
+        memberRole = "Admin";
+        ({ error: memberError } = await supabase
+          .from("workspace_members")
+          .insert({
+            workspace_id: newWorkspaceId,
+            user_id: authUid,
+            role: memberRole,
+          }));
+      }
+    }
 
     if (memberError) {
       const msg = toPlainErrorMessage(memberError).toLowerCase();
@@ -304,17 +393,24 @@ export async function createWorkspace(
         );
         return { success: false, error: toPlainErrorMessage(memberError) };
       }
+      // Trigger zaten Admin eklemiş olabilir
+      memberRole = "Admin";
     }
+
+    console.info("[createWorkspace] membership ensured", {
+      workspace_id: newWorkspaceId,
+      user_id: authUid,
+      role: memberRole,
+    });
 
     const mapped = await mapWorkspaceRow(
       workspace as Record<string, unknown>,
-      "Admin",
+      memberRole,
     );
     if (!mapped) {
       return { success: false, error: "Geçersiz workspace yanıtı." };
     }
 
-    // Düz JSON — frontend state'i doğrudan tetikleyebilir
     return { success: true, workspace: mapped };
   } catch (error) {
     console.error("[createWorkspace] catch:", toPlainErrorMessage(error));

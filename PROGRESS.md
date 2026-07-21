@@ -280,6 +280,7 @@
 - `createProject` aksiyonuna `workspace_id` zorunluluğu eklendi; projelerin workspace bağımsız sahipsiz kalması engellendi.
 - Workspace değişimi esnasında proje ve görevlerin dinamik filtrelenmesi sağlandı.
 - `projects` tablosuna `workspace_id` ilişkisi veritabanı seviyesinde bağlandı; `createProject` hatası görünür kılındı ve workspace çerez kalıcılığı sağlandı.
+- Workspace listesinin aktif filtre nedeniyle kaybolma hatası giderildi; `getWorkspaces` sorgusu tüm kullanıcı üyeliklerini kapsayacak şekilde düzeltildi ve `createWorkspace` üyelik atama akışı sağlama alındı.
 
 ### [20 Temmuz 2026] - Günlük Özet: RLS, Workspace Yönetimi ve Task Detail UI
 - RLS hatalarının giderilmesi, Workspace yönetim arayüzü ve Task Detail UI geliştirmeleri tamamlandı.

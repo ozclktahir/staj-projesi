@@ -176,6 +176,8 @@ function SidebarInner() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={(workspace) => {
+          // Optimistic: mevcut liste korunur, yeni workspace eklenir + aktif yapılır.
+          // getWorkspaces artık TÜM üyelikleri döndürür; arka planda senkronla.
           upsertWorkspace(workspace);
           void refresh();
         }}
