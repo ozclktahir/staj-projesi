@@ -222,7 +222,7 @@ export async function getCurrentUserProjects(
       }
     }
 
-    // MEMBER: yalnızca kendisine atanan / görevlerinin bulunduğu projeler
+    // MEMBER: atanmış görevlerin projeleri + assigned_to projeleri
     const roleCtx = await resolveWorkspaceRole(
       supabase,
       activeWorkspaceId,
@@ -234,8 +234,44 @@ export async function getCurrentUserProjects(
         activeWorkspaceId,
         user.id,
       );
+
+      if (visibleIds.length === 0) {
+        console.warn(
+          "[getCurrentUserProjects] member has no visible project ids",
+          { userId: user.id, workspaceId: activeWorkspaceId },
+        );
+        return { userName, projects: [] };
+      }
+
       const visible = new Set(visibleIds);
-      rows = rows.filter((row) => visible.has(row.id as string));
+      let filtered = rows.filter((row) => visible.has(row.id as string));
+
+      // RLS veya workspace filtresi yüzünden satır kaçtıysa ID ile yeniden çek
+      const missing = visibleIds.filter(
+        (id) => !filtered.some((row) => row.id === id),
+      );
+      if (missing.length > 0) {
+        const byIds = await supabase
+          .from("projects")
+          .select(
+            "id, name, description, created_at, updated_at, workspace_id, user_id, created_by",
+          )
+          .in("id", missing);
+        if (!byIds.error && byIds.data?.length) {
+          filtered = [...filtered, ...byIds.data];
+        } else if (byIds.error) {
+          console.warn(
+            "[getCurrentUserProjects] member project fallback:",
+            byIds.error.message,
+          );
+        }
+      }
+
+      rows = filtered;
+      console.log("[getCurrentUserProjects] member filtered", {
+        visibleCount: visibleIds.length,
+        returned: rows.length,
+      });
     }
 
     return {
@@ -355,7 +391,37 @@ export async function getProjectById(
       ("user_id" in data && data.user_id === user.id) ||
       data.created_by === user.id;
 
-    if (!ownedByUser) {
+    const workspaceId =
+      "workspace_id" in data
+        ? ((data.workspace_id as string | null) ?? null)
+        : null;
+
+    // Admin / owner: her zaman erişim
+    // Member: workspace üyesi VE (proje sahibi VEYA atanmış görevi var VEYA project.assigned_to)
+    let allowed = ownedByUser;
+    if (!allowed && workspaceId) {
+      const roleCtx = await resolveWorkspaceRole(
+        supabase,
+        workspaceId,
+        user.id,
+      );
+      if (roleCtx.isAdmin) {
+        allowed = true;
+      } else if (roleCtx.role) {
+        const visibleIds = await getMemberVisibleProjectIds(
+          supabase,
+          workspaceId,
+          user.id,
+        );
+        allowed = visibleIds.includes(data.id as string);
+      }
+    }
+
+    if (!allowed) {
+      console.warn("[getProjectById] access denied", {
+        projectId,
+        userId: user.id,
+      });
       return null;
     }
 
@@ -364,10 +430,7 @@ export async function getProjectById(
       name: data.name,
       description: data.description,
       created_at: data.created_at,
-      workspace_id:
-        "workspace_id" in data
-          ? ((data.workspace_id as string | null) ?? null)
-          : null,
+      workspace_id: workspaceId,
     };
   } catch (error) {
     console.error("[getProjectById]", error);
@@ -403,50 +466,134 @@ export async function getProjectTasks(
     const { supabase, user } = auth;
     const activeWorkspaceId = workspaceId?.trim() || null;
 
-    let query = supabase
-      .from("tasks")
-      .select(
-        "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to",
-      )
-      .eq("project_id", projectId)
-      .is("deleted_at", null)
-      .is("parent_task_id", null)
-      .order("created_at", { ascending: false });
-
+    let isAdmin = false;
     if (activeWorkspaceId) {
-      query = query.eq("workspace_id", activeWorkspaceId);
+      const roleCtx = await resolveWorkspaceRole(
+        supabase,
+        activeWorkspaceId,
+        user.id,
+      );
+      isAdmin = roleCtx.isAdmin;
+    } else {
+      // workspaceId yoksa proje üzerinden çöz
+      const { data: proj } = await supabase
+        .from("projects")
+        .select("workspace_id")
+        .eq("id", projectId)
+        .maybeSingle();
+      if (typeof proj?.workspace_id === "string") {
+        const roleCtx = await resolveWorkspaceRole(
+          supabase,
+          proj.workspace_id,
+          user.id,
+        );
+        isAdmin = roleCtx.isAdmin;
+      }
     }
 
-    const primary = await query;
-    let rows: Record<string, unknown>[] | null =
-      (primary.data as Record<string, unknown>[] | null) ?? null;
-    let error = primary.error;
+    const selectFull =
+      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to";
 
-    if (
-      error?.message?.includes("deleted_at") ||
-      error?.message?.includes("parent_task_id") ||
-      error?.message?.includes("due_date") ||
-      error?.message?.includes("assignee_id") ||
-      error?.message?.includes("assigned_to")
-    ) {
-      let fallback = supabase
+    async function fetchTasks(opts: {
+      withWorkspace: boolean;
+      assigneeOnly: boolean;
+      columns: string;
+    }) {
+      let q = supabase
         .from("tasks")
-        .select(
-          "id, title, description, status, priority, project_id, workspace_id, created_at, created_by",
-        )
+        .select(opts.columns)
         .eq("project_id", projectId)
         .order("created_at", { ascending: false });
 
-      if (activeWorkspaceId) {
-        fallback = fallback.eq("workspace_id", activeWorkspaceId);
+      if (opts.withWorkspace && activeWorkspaceId) {
+        q = q.eq("workspace_id", activeWorkspaceId);
       }
-
-      const fallbackResult = await fallback;
-      rows = (fallbackResult.data as Record<string, unknown>[] | null) ?? null;
-      error = fallbackResult.error;
+      if (opts.assigneeOnly) {
+        q = q.eq("assignee_id", user.id);
+      }
+      return q;
     }
 
-    if (error) {
+    let rows: Record<string, unknown>[] | null = null;
+    let error: { message: string } | null = null;
+
+    if (isAdmin) {
+      const primary = await supabase
+        .from("tasks")
+        .select(selectFull)
+        .eq("project_id", projectId)
+        .is("deleted_at", null)
+        .is("parent_task_id", null)
+        .order("created_at", { ascending: false });
+      // workspace filtresi admin için opsiyonel — null workspace_id kaçmasın
+      rows = (primary.data as Record<string, unknown>[] | null) ?? null;
+      error = primary.error;
+      if (
+        error?.message?.includes("deleted_at") ||
+        error?.message?.includes("parent_task_id") ||
+        error?.message?.includes("due_date") ||
+        error?.message?.includes("assignee")
+      ) {
+        const fb = await fetchTasks({
+          withWorkspace: false,
+          assigneeOnly: false,
+          columns:
+            "id, title, description, status, priority, project_id, workspace_id, created_at, created_by, assignee_id",
+        });
+        rows = (fb.data as Record<string, unknown>[] | null) ?? null;
+        error = fb.error;
+      }
+    } else {
+      // MEMBER: assignee_id == user.id (workspace filtresi YOK — kaçırmamak için)
+      const attempts = [
+        () =>
+          supabase
+            .from("tasks")
+            .select(selectFull)
+            .eq("project_id", projectId)
+            .eq("assignee_id", user.id)
+            .order("created_at", { ascending: false }),
+        () =>
+          supabase
+            .from("tasks")
+            .select(
+              "id, title, description, status, priority, project_id, workspace_id, created_at, created_by, assignee_id",
+            )
+            .eq("project_id", projectId)
+            .eq("assignee_id", user.id)
+            .order("created_at", { ascending: false }),
+        () =>
+          supabase
+            .from("tasks")
+            .select(
+              "id, title, description, status, priority, project_id, workspace_id, created_at, created_by, assigned_to",
+            )
+            .eq("project_id", projectId)
+            .eq("assigned_to", user.id)
+            .order("created_at", { ascending: false }),
+        () =>
+          supabase
+            .from("tasks")
+            .select(selectFull)
+            .eq("project_id", projectId)
+            .or(`assignee_id.eq.${user.id},assigned_to.eq.${user.id}`)
+            .order("created_at", { ascending: false }),
+      ];
+
+      for (const attempt of attempts) {
+        const result = await attempt();
+        if (result.error) {
+          console.warn("[getProjectTasks] member attempt:", result.error.message);
+          error = result.error;
+          continue;
+        }
+        rows = (result.data as Record<string, unknown>[] | null) ?? null;
+        error = null;
+        if (rows && rows.length > 0) break;
+      }
+    }
+
+    if (error && (!rows || rows.length === 0)) {
       console.error("[getProjectTasks]", error.message);
       return [];
     }
@@ -456,25 +603,23 @@ export async function getProjectTasks(
       return row.parent_task_id == null;
     });
 
-    // MEMBER: yalnızca kendisine atanan görevler
-    const wsForRole =
-      activeWorkspaceId ||
-      (typeof topLevel[0]?.workspace_id === "string"
-        ? (topLevel[0].workspace_id as string)
-        : null);
-
-    if (wsForRole) {
-      const roleCtx = await resolveWorkspaceRole(supabase, wsForRole, user.id);
-      if (!roleCtx.isAdmin) {
-        topLevel = topLevel.filter((row) => {
-          const assignee =
-            (typeof row.assignee_id === "string" && row.assignee_id) ||
-            (typeof row.assigned_to === "string" && row.assigned_to) ||
-            null;
-          return assignee === user.id;
-        });
-      }
+    // MEMBER güvenlik ağı
+    if (!isAdmin) {
+      topLevel = topLevel.filter((row) => {
+        const assignee =
+          (typeof row.assignee_id === "string" && row.assignee_id) ||
+          (typeof row.assigned_to === "string" && row.assigned_to) ||
+          null;
+        return assignee === user.id;
+      });
     }
+
+    console.log("[getProjectTasks]", {
+      projectId,
+      isAdmin,
+      count: topLevel.length,
+      userId: user.id,
+    });
 
     const tasks: ProjectTask[] = topLevel.map((row) => ({
       id: row.id as string,
