@@ -12,6 +12,7 @@ export type WorkspaceAccessResult = {
 /**
  * Kullanıcının sahibi olduğu veya üye olduğu en az bir workspace var mı?
  * Önce bekleyen davetleri kabul eder.
+ * hasAccess=false → onboarding (kendi workspace'ini oluşturabilir); davet zorunlu değil.
  */
 export async function ensureWorkspaceAccess(): Promise<WorkspaceAccessResult> {
   try {

@@ -9,8 +9,9 @@ export default async function DashboardLayout({
 }>) {
   const access = await ensureWorkspaceAccess();
 
+  // Davet zorunluluğu yok: workspace'i olmayan kullanıcı onboarding'e gider
   if (!access.hasAccess) {
-    redirect("/unauthorized");
+    redirect("/onboarding");
   }
 
   return <DashboardShell>{children}</DashboardShell>;

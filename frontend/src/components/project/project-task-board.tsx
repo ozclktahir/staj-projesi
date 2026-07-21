@@ -46,18 +46,21 @@ function priorityClass(priority: ProjectTask["priority"]): string {
 function AssigneeBadge({ assignee }: { assignee?: TaskAssignee | null }) {
   if (!assignee) {
     return (
-      <span className="inline-flex max-w-[140px] items-center gap-1.5 truncate text-xs text-muted-foreground/70">
-        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted">
-          <UserRound className="size-3 text-muted-foreground/60" />
+      <span
+        className="inline-flex max-w-[120px] items-center gap-1.5 truncate text-xs text-muted-foreground/70"
+        title="Atanmadı"
+      >
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted">
+          <UserRound className="size-3.5 text-muted-foreground/60" />
         </span>
-        Atanmadı
+        <span className="truncate">Atanmadı</span>
       </span>
     );
   }
 
   return (
     <span
-      className="inline-flex max-w-[150px] items-center gap-1.5"
+      className="inline-flex max-w-[130px] items-center gap-1.5"
       title={assignee.email ?? assignee.displayName}
     >
       {assignee.avatarUrl ? (
@@ -65,10 +68,10 @@ function AssigneeBadge({ assignee }: { assignee?: TaskAssignee | null }) {
         <img
           src={assignee.avatarUrl}
           alt={assignee.displayName}
-          className="size-5 shrink-0 rounded-full object-cover ring-1 ring-border"
+          className="size-6 shrink-0 rounded-full object-cover ring-1 ring-border"
         />
       ) : (
-        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[9px] font-semibold text-primary">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary">
           {assignee.initials}
         </span>
       )}
@@ -163,40 +166,42 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
                       key={task.id}
                       className="rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/40 hover:shadow-md"
                     >
-                      <button
-                        type="button"
-                        onClick={() => setSelectedTaskId(task.id)}
-                        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      >
-                        <p className="text-sm font-semibold leading-snug text-foreground">
-                          {task.title}
-                        </p>
-                        {task.description?.trim() ? (
-                          <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
-                            {task.description}
+                      <div className="flex items-start justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTaskId(task.id)}
+                          className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <p className="text-sm font-semibold leading-snug text-foreground">
+                            {task.title}
                           </p>
-                        ) : null}
-                        {(task.subtask_total ?? 0) > 0 ? (
-                          <p className="mt-2 text-xs font-medium text-muted-foreground">
-                            {task.subtask_done ?? 0}/{task.subtask_total} Alt
-                            Görev
-                          </p>
-                        ) : null}
-                      </button>
-
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex min-w-0 flex-wrap items-center gap-2">
-                          <span
-                            className={cn(
-                              "rounded-md px-2 py-0.5 text-xs font-medium",
-                              priorityClass(task.priority),
-                            )}
-                          >
-                            {TASK_PRIORITY_LABELS[task.priority] ??
-                              TASK_PRIORITY_LABELS.MEDIUM}
-                          </span>
+                          {task.description?.trim() ? (
+                            <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+                              {task.description}
+                            </p>
+                          ) : null}
+                          {(task.subtask_total ?? 0) > 0 ? (
+                            <p className="mt-2 text-xs font-medium text-muted-foreground">
+                              {task.subtask_done ?? 0}/{task.subtask_total} Alt
+                              Görev
+                            </p>
+                          ) : null}
+                        </button>
+                        <div className="shrink-0 pt-0.5">
                           <AssigneeBadge assignee={task.assignee} />
                         </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                        <span
+                          className={cn(
+                            "rounded-md px-2 py-0.5 text-xs font-medium",
+                            priorityClass(task.priority),
+                          )}
+                        >
+                          {TASK_PRIORITY_LABELS[task.priority] ??
+                            TASK_PRIORITY_LABELS.MEDIUM}
+                        </span>
                         <select
                           aria-label="Görev durumu"
                           value={task.status}

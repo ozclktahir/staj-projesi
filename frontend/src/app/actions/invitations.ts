@@ -257,6 +257,7 @@ export async function acceptPendingInvitations(): Promise<AcceptInvitationsResul
 
     if (workspaceIds.length > 0) {
       revalidatePath("/");
+      revalidatePath("/onboarding");
       revalidatePath("/unauthorized");
     }
 

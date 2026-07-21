@@ -48,6 +48,8 @@ export function proxy(request: NextRequest) {
     const isPublicRoute = publicRoutes.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`),
     );
+    const isOnboardingRoute =
+      pathname === "/onboarding" || pathname.startsWith("/onboarding/");
     const isUnauthorizedRoute =
       pathname === "/unauthorized" || pathname.startsWith("/unauthorized/");
     const session = hasSession(request);
@@ -62,13 +64,13 @@ export function proxy(request: NextRequest) {
       return res;
     }
 
-    // Oturumlu kullanıcı public auth sayfalarına gidemez (unauthorized hariç)
+    // Oturumlu kullanıcı public auth sayfalarına gidemez
     if (session && isPublicRoute) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
-    // unauthorized sayfası oturum gerektirir; public değil
-    if (!session && isUnauthorizedRoute) {
+    // onboarding / unauthorized oturum gerektirir
+    if (!session && (isOnboardingRoute || isUnauthorizedRoute)) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
 

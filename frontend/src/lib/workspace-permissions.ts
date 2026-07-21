@@ -11,7 +11,7 @@ export type WorkspaceRoleContext = {
   isAdmin: boolean;
 };
 
-/** Workspace sahibi veya workspace_members.role üzerinden rol çözümler. */
+/** Workspace sahibi veya workspace_members.role üzerinden rol çözümler (workspace-scoped RBAC). */
 export async function resolveWorkspaceRole(
   supabase: SupabaseClient,
   workspaceId: string,
