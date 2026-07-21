@@ -2,12 +2,18 @@
 -- Tasks/Projects: Member assignee görünürlüğü (RLS)
 -- Tarih: 21 Temmuz 2026
 -- Admin üyeye görev atadığında (assignee_id) üyenin SELECT edebilmesi için.
+-- Not: tasks/projects şemasında user_id YOKTUR.
+--      tasks  → created_by, assignee_id, assigned_to
+--      projects → created_by, assigned_to (owner_id varsa opsiyonel)
 -- Supabase SQL Editor'de çalıştırın.
 -- =============================================================================
 
 ALTER TABLE public.tasks
   ADD COLUMN IF NOT EXISTS assignee_id UUID REFERENCES auth.users(id);
 ALTER TABLE public.tasks
+  ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES auth.users(id);
+
+ALTER TABLE public.projects
   ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES auth.users(id);
 
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee_id ON public.tasks (assignee_id);
@@ -42,7 +48,7 @@ $$;
 REVOKE ALL ON FUNCTION public.is_workspace_member(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.is_workspace_member(uuid) TO authenticated;
 
--- Tasks SELECT: üye / creator / assignee
+-- Tasks SELECT: creator / assignee / workspace üyesi
 DROP POLICY IF EXISTS "tasks_select_member_or_assignee" ON public.tasks;
 DROP POLICY IF EXISTS "tasks_select_own" ON public.tasks;
 DROP POLICY IF EXISTS "Users can view tasks" ON public.tasks;
@@ -53,7 +59,6 @@ CREATE POLICY "tasks_select_member_or_assignee"
   TO authenticated
   USING (
     created_by = auth.uid()
-    OR user_id = auth.uid()
     OR assignee_id = auth.uid()
     OR assigned_to = auth.uid()
     OR public.is_workspace_member(workspace_id)
@@ -67,14 +72,12 @@ CREATE POLICY "tasks_update_assignee_or_member"
   TO authenticated
   USING (
     created_by = auth.uid()
-    OR user_id = auth.uid()
     OR assignee_id = auth.uid()
     OR assigned_to = auth.uid()
     OR public.is_workspace_member(workspace_id)
   )
   WITH CHECK (
     created_by = auth.uid()
-    OR user_id = auth.uid()
     OR assignee_id = auth.uid()
     OR assigned_to = auth.uid()
     OR public.is_workspace_member(workspace_id)
@@ -89,7 +92,6 @@ CREATE POLICY "projects_select_member"
   TO authenticated
   USING (
     created_by = auth.uid()
-    OR user_id = auth.uid()
     OR assigned_to = auth.uid()
     OR public.is_workspace_member(workspace_id)
   );
