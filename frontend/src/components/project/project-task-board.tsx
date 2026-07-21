@@ -64,6 +64,7 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
 
     if (!result.success) {
       setTasks(previous);
+      console.error("[ProjectTaskBoard] updateTaskStatus failed:", result.error);
       toast.error(result.error);
       return;
     }

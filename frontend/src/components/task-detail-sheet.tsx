@@ -104,12 +104,13 @@ export function TaskDetailSheet({
 
     if (!result.success) {
       setTask({ ...task, status: previous });
+      console.error("[TaskDetailSheet] updateTaskStatus failed:", result.error);
       toast.error(result.error);
       return;
     }
 
     toast.success("Durum güncellendi");
-    onStatusUpdated?.(task.id, status);
+    onStatusUpdated?.(task.id, result.status);
   }
 
   function toggleChecklistItem(id: string) {

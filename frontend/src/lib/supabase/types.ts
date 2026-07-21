@@ -55,6 +55,28 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   DONE: "Tamamlandı",
 };
 
+/** Frontend/API → kanonik TaskStatus (todo / TODO / in_progress / IN_PROGRESS vb.) */
+export function normalizeTaskStatusInput(value: unknown): TaskStatus | null {
+  if (typeof value !== "string") return null;
+  const key = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (key === "TODO" || key === "TO_DO") return "TODO";
+  if (key === "IN_PROGRESS" || key === "INPROGRESS" || key === "DOING") {
+    return "IN_PROGRESS";
+  }
+  if (key === "DONE" || key === "COMPLETED" || key === "COMPLETE") return "DONE";
+  return null;
+}
+
+/** DB enum/check farklı yazımları kabul edebilir — sırayla dene */
+export function taskStatusDbVariants(status: TaskStatus): string[] {
+  const lower: Record<TaskStatus, string> = {
+    TODO: "todo",
+    IN_PROGRESS: "in_progress",
+    DONE: "done",
+  };
+  return [status, lower[status]];
+}
+
 export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
   LOW: "Düşük",
   MEDIUM: "Orta",

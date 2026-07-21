@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import {
-  TASK_STATUSES,
+  normalizeTaskStatusInput,
+  taskStatusDbVariants,
   type TaskStatus,
 } from "@/lib/supabase/types";
 
@@ -33,24 +34,23 @@ function toPlainErrorMessage(error: unknown): string {
   }
 }
 
-function isTaskStatus(value: unknown): value is TaskStatus {
-  return (
-    typeof value === "string" &&
-    (TASK_STATUSES as string[]).includes(value)
-  );
-}
-
 export async function updateTaskStatus(
   taskId: string,
-  status: TaskStatus,
+  status: string | TaskStatus,
 ): Promise<UpdateTaskStatusResult> {
   try {
     const id = taskId?.trim() ?? "";
     if (!id) {
       return { success: false, error: "Görev kimliği zorunludur." };
     }
-    if (!isTaskStatus(status)) {
-      return { success: false, error: "Geçersiz görev durumu." };
+
+    const canonical = normalizeTaskStatusInput(status);
+    if (!canonical) {
+      console.error("[updateTaskStatus] invalid status input:", status);
+      return {
+        success: false,
+        error: `Geçersiz görev durumu: ${String(status)}`,
+      };
     }
 
     const auth = await getAuthenticatedUser();
@@ -62,32 +62,81 @@ export async function updateTaskStatus(
     }
 
     const { supabase } = auth;
+    const variants = taskStatusDbVariants(canonical);
 
-    const { data, error } = await supabase
-      .from("tasks")
-      .update({ status })
-      .eq("id", id)
-      .select("id, status, project_id")
-      .maybeSingle();
+    console.log("[updateTaskStatus] attempt", {
+      taskId: id,
+      input: status,
+      canonical,
+      variants,
+    });
 
-    if (error) {
-      console.error("[updateTaskStatus]", error);
-      return { success: false, error: toPlainErrorMessage(error) };
+    let lastError: unknown = null;
+    let updated: { id: string; status: string; project_id: string | null } | null =
+      null;
+
+    for (const candidate of variants) {
+      const { data, error } = await supabase
+        .from("tasks")
+        .update({ status: candidate })
+        .eq("id", id)
+        .select("id, status, project_id")
+        .maybeSingle();
+
+      if (error) {
+        console.error("[updateTaskStatus] update error for", candidate, {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        lastError = error;
+
+        const msg = toPlainErrorMessage(error).toLowerCase();
+        const enumMismatch =
+          msg.includes("enum") ||
+          msg.includes("invalid input") ||
+          msg.includes("check") ||
+          msg.includes("status");
+        if (enumMismatch) {
+          continue; // diğer yazımı dene
+        }
+        return { success: false, error: toPlainErrorMessage(error) };
+      }
+
+      if (data) {
+        updated = {
+          id: data.id as string,
+          status: String(data.status),
+          project_id:
+            typeof data.project_id === "string" ? data.project_id : null,
+        };
+        console.log("[updateTaskStatus] success with variant", candidate, updated);
+        break;
+      }
     }
 
-    if (!data) {
-      return { success: false, error: "Görev bulunamadı veya erişim yok." };
+    if (!updated) {
+      const message = lastError
+        ? toPlainErrorMessage(lastError)
+        : "Görev bulunamadı veya güncelleme yetkiniz yok (RLS).";
+      console.error("[updateTaskStatus] no row updated:", message);
+      return { success: false, error: message };
     }
 
-    const projectId =
-      typeof data.project_id === "string" ? data.project_id : null;
+    const projectId = updated.project_id;
     if (projectId) {
       revalidatePath(`/project/${projectId}`);
     }
     revalidatePath("/");
+    revalidatePath("/dashboard");
     revalidatePath("/projects");
+    revalidatePath("/my-tasks");
 
-    return { success: true, status: isTaskStatus(data.status) ? data.status : status };
+    const persisted =
+      normalizeTaskStatusInput(updated.status) ?? canonical;
+
+    return { success: true, status: persisted };
   } catch (error) {
     console.error("[updateTaskStatus] catch:", toPlainErrorMessage(error));
     return { success: false, error: toPlainErrorMessage(error) };

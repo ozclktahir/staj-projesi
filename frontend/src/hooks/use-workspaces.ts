@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { setActiveWorkspaceCookie } from "@/app/actions/set-active-workspace";
+import { setActiveWorkspaceCookie, clearActiveWorkspaceCookie } from "@/app/actions/set-active-workspace";
 import {
   getWorkspaces,
   type WorkspaceListItem,
@@ -224,6 +224,38 @@ export function useWorkspaces() {
     [persistAndNavigate],
   );
 
+  /** Silme sonrası liste + aktif seçim güncellemesi */
+  const afterWorkspaceDeleted = useCallback(
+    async (deletedId: string, nextWorkspaceId: string | null) => {
+      const remaining = workspacesRef.current.filter((w) => w.id !== deletedId);
+      setWorkspaces(remaining);
+
+      const wasActive = activeWorkspaceId === deletedId;
+      const fallbackId =
+        nextWorkspaceId && remaining.some((w) => w.id === nextWorkspaceId)
+          ? nextWorkspaceId
+          : (remaining[0]?.id ?? null);
+
+      if (wasActive || !fallbackId) {
+        if (fallbackId) {
+          await persistAndNavigate(fallbackId);
+        } else {
+          clearActiveWorkspaceId();
+          setActiveWorkspaceId(null);
+          await clearActiveWorkspaceCookie();
+          router.push(pathname || "/");
+          router.refresh();
+        }
+      } else {
+        router.refresh();
+      }
+
+      // Sunucu listesiyle senkron
+      void refresh();
+    },
+    [activeWorkspaceId, pathname, persistAndNavigate, refresh, router],
+  );
+
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
 
@@ -236,5 +268,6 @@ export function useWorkspaces() {
     refresh,
     selectWorkspace,
     upsertWorkspace,
+    afterWorkspaceDeleted,
   };
 }

@@ -30,3 +30,25 @@ export async function setActiveWorkspaceCookie(
     return { success: false, error: message };
   }
 }
+
+/** Aktif workspace çerezini temizler. */
+export async function clearActiveWorkspaceCookie(): Promise<
+  { success: true } | { success: false; error: string }
+> {
+  try {
+    const cookieStore = await cookies();
+    cookieStore.set(ACTIVE_WORKSPACE_COOKIE, "", {
+      path: "/",
+      maxAge: 0,
+      sameSite: "lax",
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+    });
+    return { success: true };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Cookie silinemedi.";
+    console.error("[clearActiveWorkspaceCookie]", message);
+    return { success: false, error: message };
+  }
+}

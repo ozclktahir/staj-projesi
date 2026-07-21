@@ -358,6 +358,16 @@ function normalizeTaskStatus(value: unknown): TaskStatus {
   if (value === "IN_PROGRESS" || value === "DONE" || value === "TODO") {
     return value;
   }
+  if (typeof value === "string") {
+    const key = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
+    if (key === "TODO" || key === "TO_DO") return "TODO";
+    if (key === "IN_PROGRESS" || key === "INPROGRESS" || key === "DOING") {
+      return "IN_PROGRESS";
+    }
+    if (key === "DONE" || key === "COMPLETED" || key === "COMPLETE") {
+      return "DONE";
+    }
+  }
   return "TODO";
 }
 

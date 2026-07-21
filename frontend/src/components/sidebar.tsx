@@ -12,8 +12,10 @@ import {
   Plus,
   Settings,
   Star,
+  Trash2,
 } from "lucide-react";
 import { CreateWorkspaceModal } from "@/components/create-workspace-modal";
+import { DeleteWorkspaceModal } from "@/components/delete-workspace-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,8 +46,10 @@ function SidebarInner() {
     selectWorkspace,
     refresh,
     upsertWorkspace,
+    afterWorkspaceDeleted,
   } = useWorkspaces();
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950">
@@ -131,6 +135,17 @@ function SidebarInner() {
               <Plus className="size-4" />
               Create New Workspace
             </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer gap-2 text-red-600 focus:bg-red-500/10 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+              disabled={!activeWorkspace}
+              onSelect={(event) => {
+                event.preventDefault();
+                if (activeWorkspace) setDeleteOpen(true);
+              }}
+            >
+              <Trash2 className="size-4" />
+              Workspace&apos;i Sil
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -176,10 +191,21 @@ function SidebarInner() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={(workspace) => {
-          // Optimistic: mevcut liste korunur, yeni workspace eklenir + aktif yapılır.
-          // getWorkspaces artık TÜM üyelikleri döndürür; arka planda senkronla.
           upsertWorkspace(workspace);
           void refresh();
+        }}
+      />
+
+      <DeleteWorkspaceModal
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        workspace={
+          activeWorkspace
+            ? { id: activeWorkspace.id, name: activeWorkspace.name }
+            : null
+        }
+        onDeleted={({ deletedId, nextWorkspaceId }) => {
+          void afterWorkspaceDeleted(deletedId, nextWorkspaceId);
         }}
       />
     </aside>

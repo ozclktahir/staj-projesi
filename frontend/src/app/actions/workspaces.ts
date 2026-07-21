@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/auth-session";
 import type { WorkspaceListItem } from "@/lib/supabase/types";
@@ -414,6 +415,137 @@ export async function createWorkspace(
     return { success: true, workspace: mapped };
   } catch (error) {
     console.error("[createWorkspace] catch:", toPlainErrorMessage(error));
+    return { success: false, error: toPlainErrorMessage(error) };
+  }
+}
+
+export type DeleteWorkspaceResult =
+  | { success: true; nextWorkspaceId: string | null }
+  | { success: false; error: string };
+
+/**
+ * Workspace silme — yalnızca owner_id = auth.uid().
+ * Başarıda kullanıcının kalan workspace'lerinden ilkini nextWorkspaceId olarak döner.
+ */
+export async function deleteWorkspace(
+  workspaceId: string,
+): Promise<DeleteWorkspaceResult> {
+  try {
+    const id = workspaceId?.trim() ?? "";
+    if (!id) {
+      return { success: false, error: "Workspace kimliği zorunludur." };
+    }
+
+    const env = getSupabaseEnv();
+    if (!env) {
+      return {
+        success: false,
+        error:
+          "NEXT_PUBLIC_SUPABASE_URL veya NEXT_PUBLIC_SUPABASE_ANON_KEY tanımlı değil.",
+      };
+    }
+
+    const token = await getAccessToken();
+    if (!token) {
+      return {
+        success: false,
+        error: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    const supabase = createUserScopedClient(env.url, env.anonKey, token);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token);
+
+    if (userError || !user?.id) {
+      return {
+        success: false,
+        error: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    const authUid = user.id;
+    console.log("[deleteWorkspace] request", { workspaceId: id, authUid });
+
+    const { data: owned, error: ownedError } = await supabase
+      .from("workspaces")
+      .select("id, name, owner_id")
+      .eq("id", id)
+      .eq("owner_id", authUid)
+      .maybeSingle();
+
+    if (ownedError) {
+      console.error("[deleteWorkspace] ownership check:", ownedError);
+      return { success: false, error: toPlainErrorMessage(ownedError) };
+    }
+
+    if (!owned?.id) {
+      return {
+        success: false,
+        error: "Bu workspace'i silme yetkiniz yok (yalnızca sahip silebilir).",
+      };
+    }
+
+    // Bağımlı kayıtları temizle (FK engellerini azalt)
+    const { error: tasksError } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("workspace_id", id);
+    if (tasksError) {
+      console.warn("[deleteWorkspace] tasks cleanup:", tasksError.message);
+    }
+
+    const { error: projectsError } = await supabase
+      .from("projects")
+      .delete()
+      .eq("workspace_id", id);
+    if (projectsError) {
+      console.warn("[deleteWorkspace] projects cleanup:", projectsError.message);
+    }
+
+    const { error: membersError } = await supabase
+      .from("workspace_members")
+      .delete()
+      .eq("workspace_id", id);
+    if (membersError) {
+      console.warn(
+        "[deleteWorkspace] workspace_members cleanup:",
+        membersError.message,
+      );
+    }
+
+    const { error: deleteError } = await supabase
+      .from("workspaces")
+      .delete()
+      .eq("id", id)
+      .eq("owner_id", authUid);
+
+    if (deleteError) {
+      console.error("[deleteWorkspace] workspaces delete:", deleteError);
+      return { success: false, error: toPlainErrorMessage(deleteError) };
+    }
+
+    // Kalan workspace'lerden ilkini seç
+    const remaining = await getWorkspaces();
+    let nextWorkspaceId: string | null = null;
+    if (remaining.success) {
+      nextWorkspaceId =
+        remaining.workspaces.find((w) => w.id !== id)?.id ??
+        remaining.workspaces[0]?.id ??
+        null;
+    }
+
+    console.log("[deleteWorkspace] success", { deleted: id, nextWorkspaceId });
+
+    revalidatePath("/");
+    revalidatePath("/dashboard");
+    revalidatePath("/projects");
+
+    return { success: true, nextWorkspaceId };
+  } catch (error) {
+    console.error("[deleteWorkspace] catch:", toPlainErrorMessage(error));
     return { success: false, error: toPlainErrorMessage(error) };
   }
 }
