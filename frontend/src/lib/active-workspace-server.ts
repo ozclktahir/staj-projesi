@@ -9,5 +9,11 @@ export async function resolveActiveWorkspaceId(
   if (fromQuery) return fromQuery;
 
   const cookieStore = await cookies();
-  return cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value?.trim() || null;
+  const raw = cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value;
+  if (!raw) return null;
+  try {
+    return decodeURIComponent(raw).trim() || null;
+  } catch {
+    return raw.trim() || null;
+  }
 }

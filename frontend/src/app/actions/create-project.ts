@@ -240,14 +240,33 @@ export async function createProject(
 
     // Tek kaynak: JWT'den doğrulanmış auth.uid()
     const authUid = user.id;
-    console.info("[createProject] auth.uid():", authUid);
+    console.log("[createProject] auth.uid():", authUid);
+    console.log("[createProject] input.workspaceId:", input.workspaceId);
+
+    const cookieWorkspaceRaw =
+      cookieStore.get("active_workspace_id")?.value ?? null;
+    let cookieWorkspaceId: string | null = null;
+    if (cookieWorkspaceRaw) {
+      try {
+        cookieWorkspaceId = decodeURIComponent(cookieWorkspaceRaw).trim();
+      } catch {
+        cookieWorkspaceId = cookieWorkspaceRaw.trim();
+      }
+    }
+    console.log("[createProject] cookie active_workspace_id:", cookieWorkspaceId);
 
     const requestedWorkspaceId =
-      input.workspaceId?.trim() ||
-      cookieStore.get("active_workspace_id")?.value?.trim() ||
+      (typeof input.workspaceId === "string" && input.workspaceId.trim()) ||
+      cookieWorkspaceId ||
       null;
 
+    console.log(
+      "[createProject] resolved requestedWorkspaceId:",
+      requestedWorkspaceId,
+    );
+
     if (!requestedWorkspaceId) {
+      console.error("[createProject] workspace_id missing (null/undefined)");
       return {
         success: false,
         error: "Lütfen önce bir çalışma alanı seçin.",
@@ -263,21 +282,37 @@ export async function createProject(
       .maybeSingle();
 
     if (membershipError) {
-      return { success: false, error: toPlainErrorMessage(membershipError) };
+      console.error("[createProject] membership check:", membershipError);
+      return {
+        success: false,
+        error: toPlainErrorMessage(membershipError),
+      };
     }
 
     let workspaceId = membership?.workspace_id as string | undefined;
 
     if (!workspaceId) {
       // Owner olabilir ama members satırı eksik — workspaces.owner_id kontrolü
-      const { data: owned } = await supabase
+      const { data: owned, error: ownedError } = await supabase
         .from("workspaces")
         .select("id")
         .eq("id", requestedWorkspaceId)
         .eq("owner_id", authUid)
         .maybeSingle();
 
+      if (ownedError) {
+        console.error("[createProject] owner check:", ownedError);
+        return {
+          success: false,
+          error: toPlainErrorMessage(ownedError),
+        };
+      }
+
       if (!owned?.id) {
+        console.error(
+          "[createProject] not a member/owner of workspace:",
+          requestedWorkspaceId,
+        );
         return {
           success: false,
           error: "Lütfen önce bir çalışma alanı seçin.",
@@ -285,25 +320,39 @@ export async function createProject(
       }
 
       workspaceId = owned.id as string;
-      // Üyelik satırını tamamla
-      await supabase.from("workspace_members").insert({
-        workspace_id: workspaceId,
-        user_id: authUid,
-        role: "Admin",
-      });
+      const { error: memberInsertError } = await supabase
+        .from("workspace_members")
+        .insert({
+          workspace_id: workspaceId,
+          user_id: authUid,
+          role: "Admin",
+        });
+      if (memberInsertError) {
+        console.warn(
+          "[createProject] workspace_members bootstrap:",
+          memberInsertError,
+        );
+      }
     }
 
-    // Şema: projects sahiplik sütunu = user_id (owner_id değil).
-    // RLS: created_by = auth.uid() AND is_workspace_member(workspace_id)
+    // Şema: workspace_id zorunlu — asla null/undefined olmamalı
     const basePayload = {
       name,
       description,
-      workspace_id: workspaceId,
+      workspace_id: workspaceId as string,
       created_by: authUid,
       user_id: authUid,
     };
 
-    if (!basePayload.workspace_id) {
+    if (
+      basePayload.workspace_id == null ||
+      basePayload.workspace_id === "" ||
+      typeof basePayload.workspace_id !== "string"
+    ) {
+      console.error(
+        "[createProject] payload.workspace_id invalid:",
+        basePayload.workspace_id,
+      );
       return {
         success: false,
         error: "Lütfen önce bir çalışma alanı seçin.",
@@ -317,18 +366,31 @@ export async function createProject(
       };
     }
 
-    console.info("[createProject] projects insert payload", {
+    console.log("[createProject] projects insert payload", {
+      name: basePayload.name,
       workspace_id: basePayload.workspace_id,
       created_by: basePayload.created_by,
       user_id: basePayload.user_id,
     });
 
-    // 1) Tam payload (created_by + user_id)
-    let { error: insertError } = await supabase
+    // 1) Tam payload (workspace_id + created_by + user_id)
+    let { data: inserted, error: insertError } = await supabase
       .from("projects")
       .insert(basePayload)
-      .select("id")
+      .select("id, workspace_id")
       .single();
+
+    console.log("[createProject] insert attempt 1", {
+      inserted,
+      insertError: insertError
+        ? {
+            message: insertError.message,
+            code: insertError.code,
+            details: insertError.details,
+            hint: insertError.hint,
+          }
+        : null,
+    });
 
     // 2) created_by sütunu yoksa: yalnızca user_id (sahiplik)
     if (
@@ -341,11 +403,15 @@ export async function createProject(
         workspace_id: basePayload.workspace_id,
         user_id: authUid,
       };
-      ({ error: insertError } = await supabase
+      ({ data: inserted, error: insertError } = await supabase
         .from("projects")
         .insert(userIdOnly)
-        .select("id")
+        .select("id, workspace_id")
         .single());
+      console.log("[createProject] insert attempt 2 (user_id only)", {
+        inserted,
+        error: insertError?.message,
+      });
     }
 
     // 3) user_id sütunu yoksa (nadir): created_by ile dene
@@ -359,21 +425,33 @@ export async function createProject(
         workspace_id: basePayload.workspace_id,
         created_by: authUid,
       };
-      ({ error: insertError } = await supabase
+      ({ data: inserted, error: insertError } = await supabase
         .from("projects")
         .insert(createdByOnly)
-        .select("id")
+        .select("id, workspace_id")
         .single());
+      console.log("[createProject] insert attempt 3 (created_by only)", {
+        inserted,
+        error: insertError?.message,
+      });
     }
 
     if (insertError) {
-      console.error("[createProject] projects insert:", insertError);
+      const message = toPlainErrorMessage(insertError);
+      console.error("[createProject] projects insert FAILED:", {
+        message,
+        code: insertError.code,
+        details: insertError.details,
+        hint: insertError.hint,
+        payload: basePayload,
+      });
       return {
         success: false,
-        error: toPlainErrorMessage(insertError),
+        error: message,
       };
     }
 
+    console.log("[createProject] success", inserted);
     shouldRevalidate = true;
   } catch (error) {
     // redirect()/NEXT_REDIRECT asla yutulmamalı

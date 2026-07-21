@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { setActiveWorkspaceCookie } from "@/app/actions/set-active-workspace";
 import {
   getWorkspaces,
   type WorkspaceListItem,
@@ -14,26 +15,50 @@ import {
 
 export const ACTIVE_WORKSPACE_KEY = "active_workspace_id";
 
-export function readActiveWorkspaceId(): string | null {
-  if (typeof window === "undefined") return null;
+function decodeCookieValue(raw: string | null | undefined): string | null {
+  if (!raw) return null;
   try {
-    return localStorage.getItem(ACTIVE_WORKSPACE_KEY);
+    return decodeURIComponent(raw).trim() || null;
   } catch {
-    return null;
+    return raw.trim() || null;
   }
 }
 
-/** localStorage + cookie (Server Action / RSC okuyabilsin diye) */
+export function readActiveWorkspaceId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const fromLs = localStorage.getItem(ACTIVE_WORKSPACE_KEY)?.trim();
+    if (fromLs) return fromLs;
+  } catch {
+    // ignore
+  }
+  try {
+    const match = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(`${ACTIVE_WORKSPACE_COOKIE}=`));
+    if (match) {
+      return decodeCookieValue(match.split("=").slice(1).join("="));
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+/** localStorage + document.cookie + server cookie (Server Action) */
 export function writeActiveWorkspaceId(id: string) {
   if (typeof window === "undefined") return;
+  const clean = id.trim();
+  if (!clean) return;
+
   try {
-    localStorage.setItem(ACTIVE_WORKSPACE_KEY, id);
+    localStorage.setItem(ACTIVE_WORKSPACE_KEY, clean);
   } catch {
     // ignore
   }
   try {
     const maxAge = 60 * 60 * 24 * 365;
-    document.cookie = `${ACTIVE_WORKSPACE_COOKIE}=${encodeURIComponent(id)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+    document.cookie = `${ACTIVE_WORKSPACE_COOKIE}=${encodeURIComponent(clean)}; path=/; max-age=${maxAge}; SameSite=Lax`;
   } catch {
     // ignore
   }
@@ -66,18 +91,28 @@ export function useWorkspaces() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const navigateWithWorkspace = useCallback(
-    (id: string) => {
-      writeActiveWorkspaceId(id);
-      setActiveWorkspaceId(id);
+  const persistAndNavigate = useCallback(
+    async (id: string) => {
+      const clean = id.trim();
+      if (!clean) return;
 
-      // Proje detayındaysak başka workspace'e geçince dashboard'a dön
-      if (pathname.startsWith("/project/")) {
-        router.push(withWorkspaceQuery("/", id));
-        return;
+      writeActiveWorkspaceId(clean);
+      setActiveWorkspaceId(clean);
+
+      const cookieResult = await setActiveWorkspaceCookie(clean);
+      if (!cookieResult.success) {
+        console.error(
+          "[useWorkspaces] setActiveWorkspaceCookie failed:",
+          cookieResult.error,
+        );
       }
 
-      router.push(withWorkspaceQuery(pathname || "/", id));
+      const targetPath = pathname.startsWith("/project/")
+        ? "/"
+        : pathname || "/";
+      const href = withWorkspaceQuery(targetPath, clean);
+      console.info("[useWorkspaces] switch workspace", { clean, href });
+      router.push(href);
       router.refresh();
     },
     [pathname, router],
@@ -107,8 +142,8 @@ export function useWorkspaces() {
     if (nextId) {
       writeActiveWorkspaceId(nextId);
       setActiveWorkspaceId(nextId);
-      // URL'de yoksa ekle (ilk yükleme)
-      if (!fromUrl && nextId) {
+      void setActiveWorkspaceCookie(nextId);
+      if (!fromUrl) {
         router.replace(withWorkspaceQuery(pathname || "/", nextId));
       }
     } else {
@@ -123,19 +158,19 @@ export function useWorkspaces() {
     void refresh();
   }, [refresh]);
 
-  // URL değişince aktif id'yi senkronla
   useEffect(() => {
     if (urlWorkspaceId) {
       writeActiveWorkspaceId(urlWorkspaceId);
       setActiveWorkspaceId(urlWorkspaceId);
+      void setActiveWorkspaceCookie(urlWorkspaceId);
     }
   }, [urlWorkspaceId]);
 
   const selectWorkspace = useCallback(
     (id: string) => {
-      navigateWithWorkspace(id);
+      void persistAndNavigate(id);
     },
-    [navigateWithWorkspace],
+    [persistAndNavigate],
   );
 
   const upsertWorkspace = useCallback(
@@ -144,9 +179,9 @@ export function useWorkspaces() {
         const without = prev.filter((item) => item.id !== workspace.id);
         return [workspace, ...without];
       });
-      navigateWithWorkspace(workspace.id);
+      void persistAndNavigate(workspace.id);
     },
-    [navigateWithWorkspace],
+    [persistAndNavigate],
   );
 
   const activeWorkspace =

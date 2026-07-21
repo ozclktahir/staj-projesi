@@ -41,8 +41,13 @@ export function CreateProjectModal({
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const resolveWorkspaceId = () =>
-    workspaceIdProp?.trim() || readActiveWorkspaceId() || null;
+  const resolveWorkspaceId = (): string | null => {
+    const fromProp =
+      typeof workspaceIdProp === "string" ? workspaceIdProp.trim() : "";
+    if (fromProp) return fromProp;
+    const fromStore = readActiveWorkspaceId();
+    return fromStore?.trim() || null;
+  };
 
   const resetForm = () => {
     setName("");
@@ -55,19 +60,34 @@ export function CreateProjectModal({
 
     try {
       const activeWorkspaceId = resolveWorkspaceId();
-      if (!activeWorkspaceId) {
+      console.log("[CreateProjectModal] submit", {
+        name,
+        workspaceIdProp,
+        activeWorkspaceId,
+      });
+
+      if (
+        activeWorkspaceId == null ||
+        activeWorkspaceId === "" ||
+        activeWorkspaceId === "undefined" ||
+        activeWorkspaceId === "null"
+      ) {
         toast.error("Lütfen önce bir çalışma alanı seçin.");
         return;
       }
 
-      const result = await createProject({
+      const payload = {
         name,
         description,
         workspaceId: activeWorkspaceId,
-      });
+      };
+      console.log("[CreateProjectModal] createProject payload", payload);
+
+      const result = await createProject(payload);
 
       if (!result.success) {
-        toast.error(result.error);
+        console.error("[CreateProjectModal] createProject failed:", result.error);
+        toast.error(result.error || "Proje oluşturulamadı.");
         return;
       }
 
@@ -80,6 +100,7 @@ export function CreateProjectModal({
         error instanceof Error
           ? error.message
           : "Proje oluşturulurken bir hata oluştu.";
+      console.error("[CreateProjectModal] catch:", error);
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -144,7 +165,7 @@ export function CreateProjectModal({
               placeholder="Kısa bir açıklama (opsiyonel)"
               rows={4}
               disabled={isSubmitting}
-              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-[var(--radius)] border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-[var(--radius)] border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
