@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { Button } from "@/components/ui/button";
 import { clearAuthSession } from "@/lib/auth-session";
+import { readActiveWorkspaceId } from "@/hooks/use-workspaces";
 
 type AppHeaderProps = {
   userName?: string;
@@ -13,6 +14,7 @@ type AppHeaderProps = {
 
 export function AppHeader({ userName = "Kullanıcı" }: AppHeaderProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const workspaceId = readActiveWorkspaceId();
 
   async function handleLogout() {
     if (isLoggingOut) return;
@@ -39,6 +41,7 @@ export function AppHeader({ userName = "Kullanıcı" }: AppHeaderProps) {
       <div className="flex items-center gap-2">
         <CreateProjectModal
           triggerLabel="Yeni Proje"
+          workspaceId={workspaceId}
           triggerClassName="hidden rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90 sm:inline-flex"
         />
 
