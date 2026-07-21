@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ListTodo } from "lucide-react";
+import { ListTodo, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
@@ -17,6 +17,7 @@ import {
   TASK_STATUSES,
   TASK_STATUS_LABELS,
   type ProjectTask,
+  type TaskAssignee,
   type TaskStatus,
 } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,42 @@ function priorityClass(priority: ProjectTask["priority"]): string {
     default:
       return "bg-primary/15 text-primary";
   }
+}
+
+function AssigneeBadge({ assignee }: { assignee?: TaskAssignee | null }) {
+  if (!assignee) {
+    return (
+      <span className="inline-flex max-w-[140px] items-center gap-1.5 truncate text-xs text-muted-foreground/70">
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted">
+          <UserRound className="size-3 text-muted-foreground/60" />
+        </span>
+        Atanmadı
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex max-w-[150px] items-center gap-1.5"
+      title={assignee.email ?? assignee.displayName}
+    >
+      {assignee.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={assignee.avatarUrl}
+          alt={assignee.displayName}
+          className="size-5 shrink-0 rounded-full object-cover ring-1 ring-border"
+        />
+      ) : (
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[9px] font-semibold text-primary">
+          {assignee.initials}
+        </span>
+      )}
+      <span className="truncate text-xs font-medium text-foreground">
+        {assignee.displayName}
+      </span>
+    </span>
+  );
 }
 
 export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps) {
@@ -147,16 +184,19 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
                         ) : null}
                       </button>
 
-                      <div className="mt-3 flex items-center justify-between gap-2">
-                        <span
-                          className={cn(
-                            "rounded-md px-2 py-0.5 text-xs font-medium",
-                            priorityClass(task.priority),
-                          )}
-                        >
-                          {TASK_PRIORITY_LABELS[task.priority] ??
-                            TASK_PRIORITY_LABELS.MEDIUM}
-                        </span>
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span
+                            className={cn(
+                              "rounded-md px-2 py-0.5 text-xs font-medium",
+                              priorityClass(task.priority),
+                            )}
+                          >
+                            {TASK_PRIORITY_LABELS[task.priority] ??
+                              TASK_PRIORITY_LABELS.MEDIUM}
+                          </span>
+                          <AssigneeBadge assignee={task.assignee} />
+                        </div>
                         <select
                           aria-label="Görev durumu"
                           value={task.status}

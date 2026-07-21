@@ -33,6 +33,14 @@ export type DashboardProject = {
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
 
+export type TaskAssignee = {
+  id: string;
+  displayName: string;
+  email: string | null;
+  avatarUrl: string | null;
+  initials: string;
+};
+
 export type ProjectTask = {
   id: string;
   title: string;
@@ -44,6 +52,8 @@ export type ProjectTask = {
   due_date?: string | null;
   parent_task_id?: string | null;
   assignee_id?: string | null;
+  /** Join edilmiş atanan kullanıcı özeti */
+  assignee?: TaskAssignee | null;
   created_at?: string | null;
   updated_at?: string | null;
   created_by?: string | null;

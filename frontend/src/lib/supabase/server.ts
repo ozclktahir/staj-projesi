@@ -4,6 +4,7 @@ import type {
   DashboardProject,
   DashboardTaskStats,
   ProjectTask,
+  TaskAssignee,
   TaskPriority,
   TaskStatus,
 } from "@/lib/supabase/types";
@@ -438,8 +439,82 @@ export async function getProjectById(
   }
 }
 
-function normalizeTaskStatus(value: unknown): TaskStatus {
-  return normalizeTaskStatusInput(value) ?? "TODO";
+function mapProfileToAssignee(
+  id: string,
+  profile: Record<string, unknown> | null | undefined,
+): TaskAssignee {
+  const email =
+    (profile && typeof profile.email === "string" && profile.email) || null;
+  const fullName =
+    (profile && typeof profile.full_name === "string" && profile.full_name) ||
+    (profile && typeof profile.name === "string" && profile.name) ||
+    null;
+  const displayName =
+    fullName?.trim() ||
+    (email ? email.split("@")[0] : null) ||
+    "Kullanıcı";
+
+  const parts = displayName.split(/\s+/).filter(Boolean);
+  const initials =
+    parts.length >= 2
+      ? `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase()
+      : displayName.slice(0, 2).toUpperCase();
+
+  const avatarUrl =
+    (profile && typeof profile.avatar_url === "string" && profile.avatar_url) ||
+    (profile && typeof profile.avatar === "string" && profile.avatar) ||
+    null;
+
+  return { id, displayName, email, avatarUrl, initials };
+}
+
+async function enrichTasksWithAssignees(
+  supabase: SupabaseClient,
+  tasks: ProjectTask[],
+): Promise<ProjectTask[]> {
+  const assigneeIds = [
+    ...new Set(
+      tasks
+        .map((t) => t.assignee_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  ];
+
+  if (assigneeIds.length === 0) {
+    return tasks.map((t) => ({ ...t, assignee: null }));
+  }
+
+  const profileById = new Map<string, Record<string, unknown>>();
+  const { data: profiles, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .in("id", assigneeIds);
+
+  if (error) {
+    console.warn("[enrichTasksWithAssignees] profiles:", error.message);
+  }
+
+  for (const p of profiles ?? []) {
+    if (p && typeof p === "object" && "id" in p) {
+      profileById.set(
+        String((p as { id: string }).id),
+        p as Record<string, unknown>,
+      );
+    }
+  }
+
+  return tasks.map((task) => {
+    if (!task.assignee_id) {
+      return { ...task, assignee: null };
+    }
+    return {
+      ...task,
+      assignee: mapProfileToAssignee(
+        task.assignee_id,
+        profileById.get(task.assignee_id) ?? null,
+      ),
+    };
+  });
 }
 
 function normalizeTaskPriority(value: unknown): TaskPriority {
@@ -492,6 +567,8 @@ export async function getProjectTasks(
     }
 
     const selectFull =
+      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to, assignee:profiles!assignee_id(*)";
+    const selectFullNoJoin =
       "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to";
 
     async function fetchTasks(opts: {
@@ -525,26 +602,26 @@ export async function getProjectTasks(
         .is("deleted_at", null)
         .is("parent_task_id", null)
         .order("created_at", { ascending: false });
-      // workspace filtresi admin için opsiyonel — null workspace_id kaçmasın
       rows = (primary.data as Record<string, unknown>[] | null) ?? null;
       error = primary.error;
       if (
+        error?.message?.includes("profiles") ||
+        error?.message?.includes("assignee") ||
+        error?.message?.includes("relationship") ||
         error?.message?.includes("deleted_at") ||
         error?.message?.includes("parent_task_id") ||
-        error?.message?.includes("due_date") ||
-        error?.message?.includes("assignee")
+        error?.message?.includes("due_date")
       ) {
-        const fb = await fetchTasks({
-          withWorkspace: false,
-          assigneeOnly: false,
-          columns:
-            "id, title, description, status, priority, project_id, workspace_id, created_at, created_by, assignee_id",
-        });
+        const fb = await supabase
+          .from("tasks")
+          .select(selectFullNoJoin)
+          .eq("project_id", projectId)
+          .order("created_at", { ascending: false });
         rows = (fb.data as Record<string, unknown>[] | null) ?? null;
         error = fb.error;
       }
     } else {
-      // MEMBER: assignee_id == user.id (workspace filtresi YOK — kaçırmamak için)
+      // MEMBER: assignee_id == user.id
       const attempts = [
         () =>
           supabase
@@ -556,27 +633,16 @@ export async function getProjectTasks(
         () =>
           supabase
             .from("tasks")
-            .select(
-              "id, title, description, status, priority, project_id, workspace_id, created_at, created_by, assignee_id",
-            )
+            .select(selectFullNoJoin)
             .eq("project_id", projectId)
             .eq("assignee_id", user.id)
             .order("created_at", { ascending: false }),
         () =>
           supabase
             .from("tasks")
-            .select(
-              "id, title, description, status, priority, project_id, workspace_id, created_at, created_by, assigned_to",
-            )
+            .select(selectFullNoJoin)
             .eq("project_id", projectId)
             .eq("assigned_to", user.id)
-            .order("created_at", { ascending: false }),
-        () =>
-          supabase
-            .from("tasks")
-            .select(selectFull)
-            .eq("project_id", projectId)
-            .or(`assignee_id.eq.${user.id},assigned_to.eq.${user.id}`)
             .order("created_at", { ascending: false }),
       ];
 
@@ -621,34 +687,66 @@ export async function getProjectTasks(
       userId: user.id,
     });
 
-    const tasks: ProjectTask[] = topLevel.map((row) => ({
-      id: row.id as string,
-      title: (row.title as string) ?? "Adsız görev",
-      description: (row.description as string | null) ?? null,
-      status: normalizeTaskStatus(row.status),
-      priority: normalizeTaskPriority(row.priority),
-      project_id: (row.project_id as string | null) ?? null,
-      workspace_id: (row.workspace_id as string | null) ?? null,
-      due_date:
-        "due_date" in row ? ((row.due_date as string | null) ?? null) : null,
-      parent_task_id:
-        "parent_task_id" in row
-          ? ((row.parent_task_id as string | null) ?? null)
-          : null,
-      assignee_id:
+    const tasks: ProjectTask[] = topLevel.map((row) => {
+      const assigneeId =
         "assignee_id" in row
           ? ((row.assignee_id as string | null) ?? null)
           : "assigned_to" in row
             ? ((row.assigned_to as string | null) ?? null)
-            : null,
-      created_at: (row.created_at as string | null) ?? null,
-      created_by: (row.created_by as string | null) ?? null,
-      subtask_done: 0,
-      subtask_total: 0,
-    }));
+            : null;
 
-    const parentIds = tasks.map((t) => t.id);
-    if (parentIds.length === 0) return tasks;
+      let assignee: TaskAssignee | null = null;
+      const joined = row.assignee;
+      if (assigneeId && joined && typeof joined === "object" && !Array.isArray(joined)) {
+        assignee = mapProfileToAssignee(
+          assigneeId,
+          joined as Record<string, unknown>,
+        );
+      } else if (
+        assigneeId &&
+        Array.isArray(joined) &&
+        joined[0] &&
+        typeof joined[0] === "object"
+      ) {
+        assignee = mapProfileToAssignee(
+          assigneeId,
+          joined[0] as Record<string, unknown>,
+        );
+      }
+
+      return {
+        id: row.id as string,
+        title: (row.title as string) ?? "Adsız görev",
+        description: (row.description as string | null) ?? null,
+        status: normalizeTaskStatus(row.status),
+        priority: normalizeTaskPriority(row.priority),
+        project_id: (row.project_id as string | null) ?? null,
+        workspace_id: (row.workspace_id as string | null) ?? null,
+        due_date:
+          "due_date" in row ? ((row.due_date as string | null) ?? null) : null,
+        parent_task_id:
+          "parent_task_id" in row
+            ? ((row.parent_task_id as string | null) ?? null)
+            : null,
+        assignee_id: assigneeId,
+        assignee,
+        created_at: (row.created_at as string | null) ?? null,
+        created_by: (row.created_by as string | null) ?? null,
+        subtask_done: 0,
+        subtask_total: 0,
+      };
+    });
+
+    // Join yoksa / eksikse profiles tablosundan zenginleştir
+    const needsEnrich = tasks.some((t) => t.assignee_id && !t.assignee);
+    const enriched = needsEnrich
+      ? await enrichTasksWithAssignees(supabase, tasks)
+      : tasks.map((t) =>
+          t.assignee_id ? t : { ...t, assignee: t.assignee ?? null },
+        );
+
+    const parentIds = enriched.map((t) => t.id);
+    if (parentIds.length === 0) return enriched;
 
     const { data: children, error: childError } = await supabase
       .from("tasks")
@@ -662,13 +760,13 @@ export async function getProjectTasks(
         .select("parent_task_id, status")
         .in("parent_task_id", parentIds);
       if (!fallbackChildren.error && fallbackChildren.data) {
-        applySubtaskCounts(tasks, fallbackChildren.data);
+        applySubtaskCounts(enriched, fallbackChildren.data);
       }
     } else if (!childError && children) {
-      applySubtaskCounts(tasks, children);
+      applySubtaskCounts(enriched, children);
     }
 
-    return tasks;
+    return enriched;
   } catch (error) {
     console.error("[getProjectTasks]", error);
     return [];
