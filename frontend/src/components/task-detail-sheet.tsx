@@ -14,6 +14,8 @@ import {
 } from "@/app/actions/subtasks";
 import { updateTask } from "@/app/actions/update-task";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
+import { getWorkspaceMembers } from "@/app/actions/workspace-members";
+import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,6 +65,9 @@ export function TaskDetailSheet({
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
+  const [assigneeId, setAssigneeId] = useState("");
+  const [members, setMembers] = useState<WorkspaceMemberOption[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [comments, setComments] = useState<TaskComment[]>([]);
@@ -94,11 +99,21 @@ export function TaskDetailSheet({
     setDescription(details.task.description ?? "");
     setDueDate(toDateInputValue(details.task.due_date));
     setPriority(details.task.priority);
+    setAssigneeId(details.task.assignee_id ?? "");
     setSubtasks(subResult.success ? subResult.subtasks : []);
     setComments(commentResult.success ? commentResult.comments : []);
     setSubtaskDraft("");
     setCommentDraft("");
     setLoading(false);
+
+    if (details.task.workspace_id) {
+      void getWorkspaceMembers(details.task.workspace_id).then((result) => {
+        if (result.success) {
+          setMembers(result.members);
+          setIsAdmin(result.isAdmin);
+        }
+      });
+    }
 
     if (!subResult.success) {
       console.error("[TaskDetailSheet] getSubtasks:", subResult.error);
@@ -150,6 +165,7 @@ export function TaskDetailSheet({
       description,
       due_date: dueDate ? new Date(`${dueDate}T12:00:00`).toISOString() : null,
       priority,
+      assigneeId: assigneeId || null,
     });
 
     setSaving(false);
@@ -165,6 +181,7 @@ export function TaskDetailSheet({
     setDescription(result.task.description ?? "");
     setDueDate(toDateInputValue(result.task.due_date));
     setPriority(result.task.priority);
+    setAssigneeId(result.task.assignee_id ?? "");
     toast.success("Görev kaydedildi");
     onTaskUpdated?.({
       id: result.task.id,
@@ -172,6 +189,7 @@ export function TaskDetailSheet({
       description: result.task.description,
       priority: result.task.priority,
       due_date: result.task.due_date,
+      assignee_id: result.task.assignee_id,
     });
     router.refresh();
   }
@@ -332,6 +350,27 @@ export function TaskDetailSheet({
                     className="h-9 rounded-lg"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="task-assignee" className="text-xs">
+                  Atanan Kişi
+                </Label>
+                <select
+                  id="task-assignee"
+                  value={assigneeId}
+                  onChange={(e) => setAssigneeId(e.target.value)}
+                  disabled={!isAdmin && members.length <= 1}
+                  className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-sm"
+                >
+                  <option value="">Atanmamış</option>
+                  {members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.displayName}
+                      {member.email ? ` (${member.email})` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-1.5">

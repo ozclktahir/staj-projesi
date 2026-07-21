@@ -1,5 +1,5 @@
-import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import type {
   DashboardProject,
   DashboardTaskStats,
@@ -7,6 +7,11 @@ import type {
   TaskPriority,
   TaskStatus,
 } from "@/lib/supabase/types";
+import {
+  getMemberVisibleProjectIds,
+  resolveWorkspaceRole,
+} from "@/lib/workspace-permissions";
+import { normalizeTaskStatusInput } from "@/lib/supabase/types";
 
 export type {
   DashboardProject,
@@ -217,6 +222,22 @@ export async function getCurrentUserProjects(
       }
     }
 
+    // MEMBER: yalnızca kendisine atanan / görevlerinin bulunduğu projeler
+    const roleCtx = await resolveWorkspaceRole(
+      supabase,
+      activeWorkspaceId,
+      user.id,
+    );
+    if (!roleCtx.isAdmin) {
+      const visibleIds = await getMemberVisibleProjectIds(
+        supabase,
+        activeWorkspaceId,
+        user.id,
+      );
+      const visible = new Set(visibleIds);
+      rows = rows.filter((row) => visible.has(row.id as string));
+    }
+
     return {
       userName,
       projects: rows.map((row) => ({
@@ -355,20 +376,7 @@ export async function getProjectById(
 }
 
 function normalizeTaskStatus(value: unknown): TaskStatus {
-  if (value === "IN_PROGRESS" || value === "DONE" || value === "TODO") {
-    return value;
-  }
-  if (typeof value === "string") {
-    const key = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
-    if (key === "TODO" || key === "TO_DO") return "TODO";
-    if (key === "IN_PROGRESS" || key === "INPROGRESS" || key === "DOING") {
-      return "IN_PROGRESS";
-    }
-    if (key === "DONE" || key === "COMPLETED" || key === "COMPLETE") {
-      return "DONE";
-    }
-  }
-  return "TODO";
+  return normalizeTaskStatusInput(value) ?? "TODO";
 }
 
 function normalizeTaskPriority(value: unknown): TaskPriority {
@@ -392,13 +400,13 @@ export async function getProjectTasks(
       return [];
     }
 
-    const { supabase } = auth;
+    const { supabase, user } = auth;
     const activeWorkspaceId = workspaceId?.trim() || null;
 
     let query = supabase
       .from("tasks")
       .select(
-        "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by",
+        "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to",
       )
       .eq("project_id", projectId)
       .is("deleted_at", null)
@@ -417,7 +425,9 @@ export async function getProjectTasks(
     if (
       error?.message?.includes("deleted_at") ||
       error?.message?.includes("parent_task_id") ||
-      error?.message?.includes("due_date")
+      error?.message?.includes("due_date") ||
+      error?.message?.includes("assignee_id") ||
+      error?.message?.includes("assigned_to")
     ) {
       let fallback = supabase
         .from("tasks")
@@ -441,10 +451,30 @@ export async function getProjectTasks(
       return [];
     }
 
-    const topLevel = (rows ?? []).filter((row) => {
+    let topLevel = (rows ?? []).filter((row) => {
       if (!("parent_task_id" in row)) return true;
       return row.parent_task_id == null;
     });
+
+    // MEMBER: yalnızca kendisine atanan görevler
+    const wsForRole =
+      activeWorkspaceId ||
+      (typeof topLevel[0]?.workspace_id === "string"
+        ? (topLevel[0].workspace_id as string)
+        : null);
+
+    if (wsForRole) {
+      const roleCtx = await resolveWorkspaceRole(supabase, wsForRole, user.id);
+      if (!roleCtx.isAdmin) {
+        topLevel = topLevel.filter((row) => {
+          const assignee =
+            (typeof row.assignee_id === "string" && row.assignee_id) ||
+            (typeof row.assigned_to === "string" && row.assigned_to) ||
+            null;
+          return assignee === user.id;
+        });
+      }
+    }
 
     const tasks: ProjectTask[] = topLevel.map((row) => ({
       id: row.id as string,
@@ -460,6 +490,12 @@ export async function getProjectTasks(
         "parent_task_id" in row
           ? ((row.parent_task_id as string | null) ?? null)
           : null,
+      assignee_id:
+        "assignee_id" in row
+          ? ((row.assignee_id as string | null) ?? null)
+          : "assigned_to" in row
+            ? ((row.assigned_to as string | null) ?? null)
+            : null,
       created_at: (row.created_at as string | null) ?? null,
       created_by: (row.created_by as string | null) ?? null,
       subtask_done: 0,

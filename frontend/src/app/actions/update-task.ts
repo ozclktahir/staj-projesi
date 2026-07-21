@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 import {
   normalizeTaskStatusInput,
   TASK_PRIORITIES,
@@ -17,6 +18,7 @@ export type UpdateTaskInput = {
   due_date?: string | null;
   priority?: TaskPriority;
   status?: TaskStatus | string;
+  assigneeId?: string | null;
 };
 
 export type UpdateTaskResult =
@@ -68,7 +70,45 @@ export async function updateTask(
       };
     }
 
-    const { supabase } = auth;
+    const { supabase, user } = auth;
+
+    const { data: existing, error: fetchError } = await supabase
+      .from("tasks")
+      .select("id, workspace_id, assignee_id, assigned_to, created_by")
+      .eq("id", taskId)
+      .maybeSingle();
+
+    if (fetchError || !existing) {
+      return {
+        success: false,
+        error: toPlainErrorMessage(fetchError ?? "Görev bulunamadı."),
+      };
+    }
+
+    const workspaceId =
+      typeof existing.workspace_id === "string" ? existing.workspace_id : null;
+
+    if (workspaceId) {
+      const roleCtx = await resolveWorkspaceRole(
+        supabase,
+        workspaceId,
+        user.id,
+      );
+
+      if (!roleCtx.isAdmin) {
+        const assignee =
+          (typeof existing.assignee_id === "string" && existing.assignee_id) ||
+          (typeof existing.assigned_to === "string" && existing.assigned_to) ||
+          null;
+        if (assignee !== user.id) {
+          return {
+            success: false,
+            error: "Yalnızca size atanan görevleri düzenleyebilirsiniz.",
+          };
+        }
+      }
+    }
+
     const patch: Record<string, unknown> = {};
 
     if (typeof input.title === "string") {
@@ -106,6 +146,44 @@ export async function updateTask(
       patch.status = status;
     }
 
+    if (input.assigneeId !== undefined && workspaceId) {
+      const roleCtx = await resolveWorkspaceRole(
+        supabase,
+        workspaceId,
+        user.id,
+      );
+      let assigneeId =
+        typeof input.assigneeId === "string" && input.assigneeId.trim()
+          ? input.assigneeId.trim()
+          : null;
+
+      if (!roleCtx.isAdmin) {
+        assigneeId = user.id;
+      } else if (assigneeId) {
+        const { data: member } = await supabase
+          .from("workspace_members")
+          .select("user_id")
+          .eq("workspace_id", workspaceId)
+          .eq("user_id", assigneeId)
+          .maybeSingle();
+        const { data: owner } = await supabase
+          .from("workspaces")
+          .select("id")
+          .eq("id", workspaceId)
+          .eq("owner_id", assigneeId)
+          .maybeSingle();
+        if (!member && !owner) {
+          return {
+            success: false,
+            error: "Atanan kişi bu workspace üyesi olmalıdır.",
+          };
+        }
+      }
+
+      patch.assignee_id = assigneeId;
+      patch.assigned_to = assigneeId;
+    }
+
     if (Object.keys(patch).length === 0) {
       return { success: false, error: "Güncellenecek alan yok." };
     }
@@ -117,15 +195,22 @@ export async function updateTask(
       .update(patch)
       .eq("id", taskId)
       .select(
-        "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by",
+        "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to",
       )
       .maybeSingle();
 
-    if (error?.message?.includes("due_date")) {
-      const { due_date: _omit, ...withoutDue } = patch;
+    if (
+      error?.message?.includes("due_date") ||
+      error?.message?.includes("assignee_id") ||
+      error?.message?.includes("assigned_to")
+    ) {
+      const retryPatch = { ...patch };
+      if (error.message.includes("due_date")) delete retryPatch.due_date;
+      if (error.message.includes("assignee_id")) delete retryPatch.assignee_id;
+      if (error.message.includes("assigned_to")) delete retryPatch.assigned_to;
       ({ data, error } = await supabase
         .from("tasks")
-        .update(withoutDue)
+        .update(retryPatch)
         .eq("id", taskId)
         .select(
           "id, title, description, status, priority, project_id, workspace_id, created_at, created_by",
@@ -158,7 +243,8 @@ export async function updateTask(
         title: (data.title as string) ?? "Adsız görev",
         description: (data.description as string | null) ?? null,
         status: (normalizeTaskStatusInput(data.status) ?? "TODO") as TaskStatus,
-        priority: (normalizePriority(data.priority) ?? "MEDIUM") as TaskPriority,
+        priority: (normalizePriority(data.priority) ??
+          "MEDIUM") as TaskPriority,
         project_id: (data.project_id as string | null) ?? null,
         workspace_id: (data.workspace_id as string | null) ?? null,
         due_date:
@@ -169,6 +255,12 @@ export async function updateTask(
           "parent_task_id" in data
             ? ((data.parent_task_id as string | null) ?? null)
             : null,
+        assignee_id:
+          "assignee_id" in data
+            ? ((data.assignee_id as string | null) ?? null)
+            : "assigned_to" in data
+              ? ((data.assigned_to as string | null) ?? null)
+              : null,
         created_at: (data.created_at as string | null) ?? null,
         created_by: (data.created_by as string | null) ?? null,
       },

@@ -75,7 +75,10 @@ export default async function ProjectDetailPage({
               Kartlara tıklayarak detay panelini aç. Durumu hızlıca değiştir.
             </p>
           </div>
-          <CreateTaskModal projectId={project.id} />
+          <CreateTaskModal
+            projectId={project.id}
+            workspaceId={effectiveWorkspaceId}
+          />
         </div>
 
         <ProjectTaskBoard tasks={tasks} />

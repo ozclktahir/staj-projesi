@@ -3,6 +3,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 
 export type CreateProjectInput = {
   name: string;
@@ -270,6 +271,23 @@ export async function createProject(
       return {
         success: false,
         error: "Lütfen önce bir çalışma alanı seçin.",
+      };
+    }
+
+    // MEMBER proje oluşturamaz — yalnızca Admin/OWNER
+    const roleCtx = await resolveWorkspaceRole(
+      supabase,
+      requestedWorkspaceId,
+      authUid,
+    );
+    if (!roleCtx.isAdmin) {
+      console.error("[createProject] denied for non-admin", {
+        role: roleCtx.role,
+        authUid,
+      });
+      return {
+        success: false,
+        error: "Proje oluşturmak için Workspace Admin yetkisi gerekir.",
       };
     }
 

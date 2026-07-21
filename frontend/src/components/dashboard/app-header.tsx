@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Bell, LogOut, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { Button } from "@/components/ui/button";
+import { useWorkspaces } from "@/hooks/use-workspaces";
 import { clearAuthSession } from "@/lib/auth-session";
-import { readActiveWorkspaceId } from "@/hooks/use-workspaces";
+import { isAdminRole } from "@/lib/rbac";
 
 type AppHeaderProps = {
   userName?: string;
 };
 
-export function AppHeader({ userName = "Kullanıcı" }: AppHeaderProps) {
+function AppHeaderInner({ userName = "Kullanıcı" }: AppHeaderProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const workspaceId = readActiveWorkspaceId();
+  const { activeWorkspace, activeWorkspaceId } = useWorkspaces();
+  const canCreateProject = isAdminRole(activeWorkspace?.role);
 
   async function handleLogout() {
     if (isLoggingOut) return;
@@ -39,11 +41,13 @@ export function AppHeader({ userName = "Kullanıcı" }: AppHeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <CreateProjectModal
-          triggerLabel="Yeni Proje"
-          workspaceId={workspaceId}
-          triggerClassName="hidden rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90 sm:inline-flex"
-        />
+        {canCreateProject ? (
+          <CreateProjectModal
+            triggerLabel="Yeni Proje"
+            workspaceId={activeWorkspaceId}
+            triggerClassName="hidden rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90 sm:inline-flex"
+          />
+        ) : null}
 
         <Button
           type="button"
@@ -84,5 +88,17 @@ export function AppHeader({ userName = "Kullanıcı" }: AppHeaderProps) {
         </Button>
       </div>
     </header>
+  );
+}
+
+export function AppHeader(props: AppHeaderProps) {
+  return (
+    <Suspense
+      fallback={
+        <header className="flex h-16 shrink-0 border-b border-border bg-background/80" />
+      }
+    >
+      <AppHeaderInner {...props} />
+    </Suspense>
   );
 }

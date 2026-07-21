@@ -22,6 +22,7 @@ type DashboardHomeProps = {
   workspaceId?: string | null;
   showAdminOverview?: boolean;
   adminMembers?: AdminMemberOverview[];
+  canCreateProject?: boolean;
 };
 
 export function DashboardHome({
@@ -31,6 +32,7 @@ export function DashboardHome({
   workspaceId = null,
   showAdminOverview = false,
   adminMembers = [],
+  canCreateProject = false,
 }: DashboardHomeProps) {
   const hasProjects = projects.length > 0;
 
@@ -111,10 +113,12 @@ export function DashboardHome({
               Aktif çalışma alanların ve projelerin
             </p>
           </div>
-          <CreateProjectModal
-            triggerLabel="Yeni Proje"
-            workspaceId={workspaceId}
-          />
+          {canCreateProject ? (
+            <CreateProjectModal
+              triggerLabel="Yeni Proje"
+              workspaceId={workspaceId}
+            />
+          ) : null}
         </div>
 
         {hasProjects ? (
@@ -169,10 +173,16 @@ export function DashboardHome({
               </CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center pb-8">
-              <CreateProjectModal
-                triggerLabel="İlk Projeyi Oluştur"
-                workspaceId={workspaceId}
-              />
+              {canCreateProject ? (
+                <CreateProjectModal
+                  triggerLabel="İlk Projeyi Oluştur"
+                  workspaceId={workspaceId}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Size atanan projeler burada görünecek.
+                </p>
+              )}
             </CardContent>
           </Card>
         )}

@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import {
+  getMemberVisibleProjectIds,
+  resolveWorkspaceRole,
+} from "@/lib/workspace-permissions";
+import {
   TASK_PRIORITIES,
   TASK_STATUSES,
   type TaskPriority,
@@ -15,6 +19,8 @@ export type CreateTaskInput = {
   description?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
+  /** Atanan kullanıcı (workspace üyesi) */
+  assigneeId?: string | null;
 };
 
 export type CreateTaskResult =
@@ -22,12 +28,8 @@ export type CreateTaskResult =
   | { success: false; error: string };
 
 function toPlainErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  if (typeof error === "string" && error.trim()) {
-    return error;
-  }
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
   if (
     error &&
     typeof error === "object" &&
@@ -55,15 +57,13 @@ function isNextRedirectError(error: unknown): boolean {
 
 function isTaskStatus(value: unknown): value is TaskStatus {
   return (
-    typeof value === "string" &&
-    (TASK_STATUSES as string[]).includes(value)
+    typeof value === "string" && (TASK_STATUSES as string[]).includes(value)
   );
 }
 
 function isTaskPriority(value: unknown): value is TaskPriority {
   return (
-    typeof value === "string" &&
-    (TASK_PRIORITIES as string[]).includes(value)
+    typeof value === "string" && (TASK_PRIORITIES as string[]).includes(value)
   );
 }
 
@@ -74,8 +74,6 @@ export async function createTask(
   let projectIdForRevalidate = "";
 
   try {
-    // project_id zorunlu — RLS INSERT politikası projects.user_id +
-    // workspace_members ilişkisine bağlıdır.
     const projectId = input.projectId?.trim() ?? "";
     const title = input.title?.trim() ?? "";
 
@@ -107,14 +105,15 @@ export async function createTask(
 
     let { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, workspace_id, created_by, user_id")
+      .select("id, workspace_id, created_by, user_id, assigned_to")
       .eq("id", projectId)
       .is("deleted_at", null)
       .maybeSingle();
 
     if (
       projectError?.message?.includes("user_id") ||
-      projectError?.message?.includes("deleted_at")
+      projectError?.message?.includes("deleted_at") ||
+      projectError?.message?.includes("assigned_to")
     ) {
       ({ data: project, error: projectError } = await supabase
         .from("projects")
@@ -142,37 +141,62 @@ export async function createTask(
       };
     }
 
-    // RLS ile uyumlu: proje sahibi veya workspace üyesi
-    const ownsProject =
-      ("user_id" in project && project.user_id === authUid) ||
-      project.created_by === authUid;
+    const roleCtx = await resolveWorkspaceRole(supabase, workspaceId, authUid);
 
-    const { data: membership, error: membershipError } = await supabase
-      .from("workspace_members")
-      .select("workspace_id")
-      .eq("workspace_id", workspaceId)
-      .eq("user_id", authUid)
-      .maybeSingle();
-
-    if (membershipError) {
-      console.warn(
-        "[createTask] workspace_members check:",
-        toPlainErrorMessage(membershipError),
-      );
-    }
-
-    const isWorkspaceMember = Boolean(membership?.workspace_id);
-
-    if (!ownsProject && !isWorkspaceMember) {
+    if (!roleCtx.role && !roleCtx.isOwner) {
       return {
         success: false,
-        error: "Bu projeye görev ekleme yetkiniz yok.",
+        error: "Bu workspace üyesi değilsiniz.",
       };
     }
 
-    // Zorunlu: project_id
-    // created_by / user_id varsa auth.uid() ile doldurulur (RLS WITH CHECK)
-    const basePayload = {
+    // MEMBER: yalnızca görünür (atanmış) projelere görev ekleyebilir
+    if (!roleCtx.isAdmin) {
+      const visible = await getMemberVisibleProjectIds(
+        supabase,
+        workspaceId,
+        authUid,
+      );
+      if (!visible.includes(projectId)) {
+        return {
+          success: false,
+          error: "Bu projeye görev ekleme yetkiniz yok.",
+        };
+      }
+    }
+
+    let assigneeId =
+      typeof input.assigneeId === "string" && input.assigneeId.trim()
+        ? input.assigneeId.trim()
+        : null;
+
+    if (!roleCtx.isAdmin) {
+      // Member yalnızca kendine atayabilir
+      assigneeId = authUid;
+    } else if (assigneeId) {
+      const { data: assigneeMember } = await supabase
+        .from("workspace_members")
+        .select("user_id")
+        .eq("workspace_id", workspaceId)
+        .eq("user_id", assigneeId)
+        .maybeSingle();
+
+      const { data: ownerRow } = await supabase
+        .from("workspaces")
+        .select("id")
+        .eq("id", workspaceId)
+        .eq("owner_id", assigneeId)
+        .maybeSingle();
+
+      if (!assigneeMember && !ownerRow) {
+        return {
+          success: false,
+          error: "Atanan kişi bu workspace üyesi olmalıdır.",
+        };
+      }
+    }
+
+    const basePayload: Record<string, unknown> = {
       title,
       description,
       status,
@@ -183,73 +207,52 @@ export async function createTask(
       user_id: authUid,
     };
 
-    if (!basePayload.project_id) {
-      return { success: false, error: "Proje kimliği (project_id) zorunludur." };
-    }
-    if (
-      basePayload.created_by !== authUid ||
-      basePayload.user_id !== authUid
-    ) {
-      return {
-        success: false,
-        error: "created_by / user_id, auth.uid() ile eşleşmiyor.",
-      };
+    if (assigneeId) {
+      basePayload.assignee_id = assigneeId;
+      basePayload.assigned_to = assigneeId;
     }
 
     console.info("[createTask] insert", {
-      project_id: basePayload.project_id,
-      workspace_id: basePayload.workspace_id,
-      created_by: basePayload.created_by,
-      user_id: basePayload.user_id,
-      status: basePayload.status,
-      priority: basePayload.priority,
+      project_id: projectId,
+      workspace_id: workspaceId,
+      assignee_id: assigneeId,
+      isAdmin: roleCtx.isAdmin,
     });
 
-    // 1) Tam payload (project_id + created_by + user_id)
     let { error: insertError } = await supabase
       .from("tasks")
       .insert(basePayload)
       .select("id")
       .single();
 
-    // 2) user_id sütunu yoksa: created_by ile dene
+    // Sütun uyumluluk fallback'leri
     if (
       insertError &&
-      toPlainErrorMessage(insertError).includes("user_id")
+      (toPlainErrorMessage(insertError).includes("assigned_to") ||
+        toPlainErrorMessage(insertError).includes("assignee_id"))
     ) {
-      const withoutUserId = {
-        title: basePayload.title,
-        description: basePayload.description,
-        status: basePayload.status,
-        priority: basePayload.priority,
-        project_id: basePayload.project_id,
-        workspace_id: basePayload.workspace_id,
-        created_by: authUid,
-      };
+      const retry = { ...basePayload };
+      if (toPlainErrorMessage(insertError).includes("assigned_to")) {
+        delete retry.assigned_to;
+      }
+      if (toPlainErrorMessage(insertError).includes("assignee_id")) {
+        delete retry.assignee_id;
+      }
       ({ error: insertError } = await supabase
         .from("tasks")
-        .insert(withoutUserId)
+        .insert(retry)
         .select("id")
         .single());
     }
 
-    // 3) created_by sütunu yoksa: user_id ile dene
     if (
       insertError &&
-      toPlainErrorMessage(insertError).includes("created_by")
+      toPlainErrorMessage(insertError).includes("user_id")
     ) {
-      const withoutCreatedBy = {
-        title: basePayload.title,
-        description: basePayload.description,
-        status: basePayload.status,
-        priority: basePayload.priority,
-        project_id: basePayload.project_id,
-        workspace_id: basePayload.workspace_id,
-        user_id: authUid,
-      };
+      const { user_id: _u, ...withoutUserId } = basePayload;
       ({ error: insertError } = await supabase
         .from("tasks")
-        .insert(withoutCreatedBy)
+        .insert(withoutUserId)
         .select("id")
         .single());
     }
@@ -262,9 +265,7 @@ export async function createTask(
     shouldRevalidate = true;
     projectIdForRevalidate = projectId;
   } catch (error) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
+    if (isNextRedirectError(error)) throw error;
     console.error("[createTask] catch:", toPlainErrorMessage(error));
     return { success: false, error: toPlainErrorMessage(error) };
   }
@@ -274,9 +275,7 @@ export async function createTask(
       revalidatePath(`/project/${projectIdForRevalidate}`);
       revalidatePath("/");
     } catch (error) {
-      if (isNextRedirectError(error)) {
-        throw error;
-      }
+      if (isNextRedirectError(error)) throw error;
       console.warn(
         "[createTask] revalidatePath uyarısı:",
         toPlainErrorMessage(error),

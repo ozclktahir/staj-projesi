@@ -43,6 +43,7 @@ export type ProjectTask = {
   workspace_id: string | null;
   due_date?: string | null;
   parent_task_id?: string | null;
+  assignee_id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   created_by?: string | null;

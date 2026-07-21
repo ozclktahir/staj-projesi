@@ -63,7 +63,7 @@ export async function getTaskDetails(
     let { data, error } = await supabase
       .from("tasks")
       .select(
-        "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by",
+        "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to",
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -71,7 +71,9 @@ export async function getTaskDetails(
 
     if (
       error?.message?.includes("deleted_at") ||
-      error?.message?.includes("due_date")
+      error?.message?.includes("due_date") ||
+      error?.message?.includes("assignee_id") ||
+      error?.message?.includes("assigned_to")
     ) {
       ({ data, error } = await supabase
         .from("tasks")
@@ -110,6 +112,12 @@ export async function getTaskDetails(
           "parent_task_id" in data
             ? ((data.parent_task_id as string | null) ?? null)
             : null,
+        assignee_id:
+          "assignee_id" in data
+            ? ((data.assignee_id as string | null) ?? null)
+            : "assigned_to" in data
+              ? ((data.assigned_to as string | null) ?? null)
+              : null,
         created_at: (data.created_at as string | null) ?? null,
         created_by: (data.created_by as string | null) ?? null,
       },

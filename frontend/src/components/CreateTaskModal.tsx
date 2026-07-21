@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { createTask } from "@/app/actions/create-task";
+import { getWorkspaceMembers } from "@/app/actions/workspace-members";
+import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +30,7 @@ import {
 
 type CreateTaskModalProps = {
   projectId: string;
+  workspaceId?: string | null;
 };
 
 const fieldClassName =
@@ -36,20 +39,42 @@ const fieldClassName =
 const textareaClassName =
   "flex w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50";
 
-export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
+export function CreateTaskModal({
+  projectId,
+  workspaceId = null,
+}: CreateTaskModalProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>("TODO");
   const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
+  const [assigneeId, setAssigneeId] = useState("");
+  const [members, setMembers] = useState<WorkspaceMemberOption[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open || !workspaceId) return;
+    void getWorkspaceMembers(workspaceId).then((result) => {
+      if (!result.success) {
+        console.error("[CreateTaskModal] members:", result.error);
+        return;
+      }
+      setMembers(result.members);
+      setIsAdmin(result.isAdmin);
+      if (!result.isAdmin && result.members[0]) {
+        setAssigneeId(result.members[0].id);
+      }
+    });
+  }, [open, workspaceId]);
 
   const resetForm = () => {
     setTitle("");
     setDescription("");
     setStatus("TODO");
     setPriority("MEDIUM");
+    setAssigneeId("");
   };
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -63,6 +88,7 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
         description,
         status,
         priority,
+        assigneeId: assigneeId || null,
       });
 
       if (!result.success) {
@@ -90,9 +116,7 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) {
-          resetForm();
-        }
+        if (!next) resetForm();
       }}
     >
       <DialogTrigger asChild>
@@ -109,7 +133,7 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
         <DialogHeader>
           <DialogTitle className="text-foreground">Yeni Görev</DialogTitle>
           <DialogDescription>
-            Başlık zorunludur. Durum ve öncelik varsayılan değerlerle gelir.
+            Başlık zorunludur. İsterseniz bir üyeye atayın.
           </DialogDescription>
         </DialogHeader>
 
@@ -178,6 +202,25 @@ export function CreateTaskModal({ projectId }: CreateTaskModalProps) {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="task-assignee">Atanan Kişi</Label>
+            <select
+              id="task-assignee"
+              value={assigneeId}
+              onChange={(event) => setAssigneeId(event.target.value)}
+              disabled={isSubmitting || (!isAdmin && members.length <= 1)}
+              className={fieldClassName}
+            >
+              <option value="">Atanmamış</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.displayName}
+                  {member.email ? ` (${member.email})` : ""}
+                </option>
+              ))}
+            </select>
           </div>
 
           <DialogFooter>

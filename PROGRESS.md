@@ -287,6 +287,9 @@
 - Admin ve Kullanıcı rolleri (RBAC) ayrıştırıldı; izinsiz girişler için yetkisizlik yönlendirmesi eklendi.
 - Admin kullanıcı davet sistemi (`invitations`) entegre edildi.
 - Admin için üye ve proje durum takip paneli (Admin Overview) oluşturuldu.
+- Workspace Admin ve Member yetkileri ayrıştırıldı.
+- Member rolü için proje oluşturma kısıtlaması ve izole proje/görev görünürlüğü (assignee bazlı) getirildi.
+- Görev atama (`assignee_id`) altyapısı ve arayüzü eklendi.
 
 ### [20 Temmuz 2026] - Günlük Özet: RLS, Workspace Yönetimi ve Task Detail UI
 - RLS hatalarının giderilmesi, Workspace yönetim arayüzü ve Task Detail UI geliştirmeleri tamamlandı.
