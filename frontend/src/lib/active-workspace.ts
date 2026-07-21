@@ -1,20 +1,9 @@
-import { cookies } from "next/headers";
+/** Client + Server güvenli sabitler ve yardımcılar (next/headers YOK). */
 
 export const WORKSPACE_QUERY_KEY = "workspaceId";
 export const ACTIVE_WORKSPACE_COOKIE = "active_workspace_id";
 
-/** Server: URL param veya cookie'den aktif workspace */
-export async function resolveActiveWorkspaceId(
-  fromSearchParam?: string | null,
-): Promise<string | null> {
-  const fromQuery = fromSearchParam?.trim() || null;
-  if (fromQuery) return fromQuery;
-
-  const cookieStore = await cookies();
-  return cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value?.trim() || null;
-}
-
-/** Client: path + workspaceId query birleştir */
+/** Path + workspaceId query birleştir */
 export function withWorkspaceQuery(
   href: string,
   workspaceId: string | null | undefined,

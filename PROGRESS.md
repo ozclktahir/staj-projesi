@@ -276,6 +276,7 @@
 - `projects` tablosundaki eksik `updated_at` şema hatası giderildi ve `getCurrentUserProjects` sorgusu güncellendi.
 - Workspace switcher aktifleştirildi; workspace geçişlerinde dinamik proje/görev filtrelemesi sağlandı.
 - Görev durum (status) yönetimi dinamikleştirildi (TODO -> IN_PROGRESS -> DONE geçişleri bağlandı).
+- Next.js Client/Server modül ayrımı sağlandı; `active-workspace.ts` içerisindeki server-only `next/headers` bağımlılığı temizlenerek build hatası giderildi.
 
 ### [20 Temmuz 2026] - Günlük Özet: RLS, Workspace Yönetimi ve Task Detail UI
 - RLS hatalarının giderilmesi, Workspace yönetim arayüzü ve Task Detail UI geliştirmeleri tamamlandı.

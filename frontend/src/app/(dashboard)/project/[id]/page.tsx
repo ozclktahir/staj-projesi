@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { CreateTaskModal } from "@/components/CreateTaskModal";
 import { ProjectTaskBoard } from "@/components/project/project-task-board";
-import { resolveActiveWorkspaceId, withWorkspaceQuery } from "@/lib/active-workspace";
+import { withWorkspaceQuery } from "@/lib/active-workspace";
+import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
 import { getProjectById, getProjectTasks } from "@/lib/supabase/server";
 
 type ProjectDetailPageProps = {

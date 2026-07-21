@@ -1,5 +1,5 @@
 import { DashboardHome } from "@/components/dashboard/dashboard-home";
-import { resolveActiveWorkspaceId } from "@/lib/active-workspace";
+import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
 import {
   getCurrentUserProjects,
   getDashboardTaskStats,
