@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Check,
   CheckSquare,
@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useWorkspaces } from "@/hooks/use-workspaces";
+import { withWorkspaceQuery } from "@/lib/active-workspace";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -33,9 +34,8 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
-export function Sidebar() {
+function SidebarInner() {
   const pathname = usePathname();
-  const router = useRouter();
   const {
     workspaces,
     activeWorkspace,
@@ -66,14 +66,9 @@ export function Sidebar() {
                     : (activeWorkspace?.name ?? "Workspace seç")}
                 </p>
                 <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  {[
-                    activeWorkspace?.role
-                      ? `Rol: ${activeWorkspace.role}`
-                      : null,
-                    activeWorkspace?.owner_id ? "owner_id ✓" : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || "Çalışma alanı"}
+                  {activeWorkspace?.role
+                    ? `Rol: ${activeWorkspace.role}`
+                    : "Çalışma alanı"}
                 </p>
               </div>
               <ChevronsUpDown className="size-4 shrink-0 text-slate-400" />
@@ -96,9 +91,8 @@ export function Sidebar() {
                   <DropdownMenuItem
                     key={workspace.id}
                     onSelect={() => {
-                      selectWorkspace(workspace.id);
                       if (workspace.id !== activeWorkspaceId) {
-                        router.refresh();
+                        selectWorkspace(workspace.id);
                       }
                     }}
                     className={cn(
@@ -147,11 +141,12 @@ export function Sidebar() {
             href === "/"
               ? pathname === "/"
               : pathname === href || pathname.startsWith(`${href}/`);
+          const hrefWithWs = withWorkspaceQuery(href, activeWorkspaceId);
 
           return (
             <Link
               key={href}
-              href={href}
+              href={hrefWithWs}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
@@ -182,12 +177,22 @@ export function Sidebar() {
         onOpenChange={setCreateOpen}
         onCreated={(workspace) => {
           upsertWorkspace(workspace);
-          void refresh().then(() => {
-            router.refresh();
-          });
+          void refresh();
         }}
       />
     </aside>
+  );
+}
+
+export function Sidebar() {
+  return (
+    <Suspense
+      fallback={
+        <aside className="flex h-full w-64 shrink-0 border-r border-border bg-card" />
+      }
+    >
+      <SidebarInner />
+    </Suspense>
   );
 }
 

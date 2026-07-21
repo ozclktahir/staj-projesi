@@ -11,17 +11,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { DashboardProject, DashboardTaskStats } from "@/lib/supabase/types";
+import { withWorkspaceQuery } from "@/lib/active-workspace";
 
 type DashboardHomeProps = {
   userName: string;
   projects: DashboardProject[];
   stats: DashboardTaskStats;
+  workspaceId?: string | null;
 };
 
 export function DashboardHome({
   userName,
   projects,
   stats,
+  workspaceId = null,
 }: DashboardHomeProps) {
   const hasProjects = projects.length > 0;
 
@@ -106,7 +109,10 @@ export function DashboardHome({
             {projects.map((project) => (
               <Link
                 key={project.id}
-                href={`/project/${project.id}`}
+                href={withWorkspaceQuery(
+                  `/project/${project.id}`,
+                  workspaceId ?? project.workspace_id,
+                )}
                 className="block rounded-[var(--radius)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <Card className="h-full rounded-[var(--radius)] border-border bg-card transition-colors hover:border-primary/40">

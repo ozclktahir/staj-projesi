@@ -117,7 +117,9 @@ function resolveUserName(user: User): string {
   return fullName || combined || user.email?.split("@")[0] || "Kullanıcı";
 }
 
-export async function getCurrentUserProjects(): Promise<{
+export async function getCurrentUserProjects(
+  workspaceId?: string | null,
+): Promise<{
   userName: string;
   projects: DashboardProject[];
 }> {
@@ -132,21 +134,25 @@ export async function getCurrentUserProjects(): Promise<{
     const userName = resolveUserName(user);
     const cookieStore = await cookies();
     const activeWorkspaceId =
-      cookieStore.get("active_workspace_id")?.value?.trim() || null;
+      workspaceId?.trim() ||
+      cookieStore.get("active_workspace_id")?.value?.trim() ||
+      null;
 
-    // Şema ile uyumlu select (updated_at dahil)
+    // Aktif workspace yoksa boş liste (workspace bağlamı zorunlu)
+    if (!activeWorkspaceId) {
+      return { userName, projects: [] };
+    }
+
+    // Şema ile uyumlu select (updated_at dahil) — SADECE activeWorkspaceId
     let query = supabase
       .from("projects")
       .select(
         "id, name, description, created_at, updated_at, workspace_id, user_id, created_by",
       )
+      .eq("workspace_id", activeWorkspaceId)
       .or(`created_by.eq.${user.id},user_id.eq.${user.id}`)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
-
-    if (activeWorkspaceId) {
-      query = query.eq("workspace_id", activeWorkspaceId);
-    }
 
     const { data, error } = await query;
 
@@ -170,17 +176,14 @@ export async function getCurrentUserProjects(): Promise<{
       console.error("[getCurrentUserProjects] query:", error.message);
     }
 
-    // Fallback: updated_at / ekstra sütunlar yoksa veya sorgu başarısızsa
+    // Fallback: updated_at / deleted_at yoksa
     try {
       let fallbackQuery = supabase
         .from("projects")
         .select("id, name, description, created_at, workspace_id")
+        .eq("workspace_id", activeWorkspaceId)
         .or(`created_by.eq.${user.id},user_id.eq.${user.id}`)
         .order("created_at", { ascending: false });
-
-      if (activeWorkspaceId) {
-        fallbackQuery = fallbackQuery.eq("workspace_id", activeWorkspaceId);
-      }
 
       const fallback = await fallbackQuery;
 
@@ -340,6 +343,7 @@ function normalizeTaskPriority(value: unknown): TaskPriority {
 
 export async function getProjectTasks(
   projectId: string,
+  workspaceId?: string | null,
 ): Promise<ProjectTask[]> {
   try {
     if (!projectId?.trim()) {
@@ -352,8 +356,9 @@ export async function getProjectTasks(
     }
 
     const { supabase } = auth;
+    const activeWorkspaceId = workspaceId?.trim() || null;
 
-    let { data, error } = await supabase
+    let query = supabase
       .from("tasks")
       .select(
         "id, title, description, status, priority, project_id, workspace_id, created_at, created_by",
@@ -362,14 +367,26 @@ export async function getProjectTasks(
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
+    if (activeWorkspaceId) {
+      query = query.eq("workspace_id", activeWorkspaceId);
+    }
+
+    let { data, error } = await query;
+
     if (error?.message?.includes("deleted_at")) {
-      ({ data, error } = await supabase
+      let fallback = supabase
         .from("tasks")
         .select(
           "id, title, description, status, priority, project_id, workspace_id, created_at, created_by",
         )
         .eq("project_id", projectId)
-        .order("created_at", { ascending: false }));
+        .order("created_at", { ascending: false });
+
+      if (activeWorkspaceId) {
+        fallback = fallback.eq("workspace_id", activeWorkspaceId);
+      }
+
+      ({ data, error } = await fallback);
     }
 
     if (error) {

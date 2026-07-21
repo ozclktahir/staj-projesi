@@ -1,13 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   getWorkspaces,
   type WorkspaceListItem,
 } from "@/app/actions/workspaces";
+import {
+  ACTIVE_WORKSPACE_COOKIE,
+  WORKSPACE_QUERY_KEY,
+  withWorkspaceQuery,
+} from "@/lib/active-workspace";
 
 export const ACTIVE_WORKSPACE_KEY = "active_workspace_id";
-export const ACTIVE_WORKSPACE_COOKIE = "active_workspace_id";
 
 export function readActiveWorkspaceId(): string | null {
   if (typeof window === "undefined") return null;
@@ -49,12 +54,34 @@ export function clearActiveWorkspaceId() {
 }
 
 export function useWorkspaces() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlWorkspaceId = searchParams.get(WORKSPACE_QUERY_KEY);
+
   const [workspaces, setWorkspaces] = useState<WorkspaceListItem[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(
-    null,
+    urlWorkspaceId,
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const navigateWithWorkspace = useCallback(
+    (id: string) => {
+      writeActiveWorkspaceId(id);
+      setActiveWorkspaceId(id);
+
+      // Proje detayındaysak başka workspace'e geçince dashboard'a dön
+      if (pathname.startsWith("/project/")) {
+        router.push(withWorkspaceQuery("/", id));
+        return;
+      }
+
+      router.push(withWorkspaceQuery(pathname || "/", id));
+      router.refresh();
+    },
+    [pathname, router],
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -67,41 +94,60 @@ export function useWorkspaces() {
       return [] as WorkspaceListItem[];
     }
 
-    // Backend doğrudan dizi döner; { data: [...] } wrapper yok
     const list = Array.isArray(result.workspaces) ? result.workspaces : [];
     setWorkspaces(list);
 
+    const fromUrl = urlWorkspaceId?.trim() || null;
     const stored = readActiveWorkspaceId();
+    const preferred = fromUrl || stored;
     const stillValid =
-      stored && list.some((workspace) => workspace.id === stored);
-    const nextId = stillValid ? stored : (list[0]?.id ?? null);
+      preferred && list.some((workspace) => workspace.id === preferred);
+    const nextId = stillValid ? preferred : (list[0]?.id ?? null);
 
     if (nextId) {
       writeActiveWorkspaceId(nextId);
+      setActiveWorkspaceId(nextId);
+      // URL'de yoksa ekle (ilk yükleme)
+      if (!fromUrl && nextId) {
+        router.replace(withWorkspaceQuery(pathname || "/", nextId));
+      }
+    } else {
+      setActiveWorkspaceId(null);
     }
-    setActiveWorkspaceId(nextId);
+
     setLoading(false);
     return list;
-  }, []);
+  }, [pathname, router, urlWorkspaceId]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  const selectWorkspace = useCallback((id: string) => {
-    writeActiveWorkspaceId(id);
-    setActiveWorkspaceId(id);
-  }, []);
+  // URL değişince aktif id'yi senkronla
+  useEffect(() => {
+    if (urlWorkspaceId) {
+      writeActiveWorkspaceId(urlWorkspaceId);
+      setActiveWorkspaceId(urlWorkspaceId);
+    }
+  }, [urlWorkspaceId]);
 
-  /** createWorkspace sonrası state'i anında güncelle */
-  const upsertWorkspace = useCallback((workspace: WorkspaceListItem) => {
-    setWorkspaces((prev) => {
-      const without = prev.filter((item) => item.id !== workspace.id);
-      return [workspace, ...without];
-    });
-    writeActiveWorkspaceId(workspace.id);
-    setActiveWorkspaceId(workspace.id);
-  }, []);
+  const selectWorkspace = useCallback(
+    (id: string) => {
+      navigateWithWorkspace(id);
+    },
+    [navigateWithWorkspace],
+  );
+
+  const upsertWorkspace = useCallback(
+    (workspace: WorkspaceListItem) => {
+      setWorkspaces((prev) => {
+        const without = prev.filter((item) => item.id !== workspace.id);
+        return [workspace, ...without];
+      });
+      navigateWithWorkspace(workspace.id);
+    },
+    [navigateWithWorkspace],
+  );
 
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;

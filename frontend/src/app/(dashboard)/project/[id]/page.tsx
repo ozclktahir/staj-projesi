@@ -3,29 +3,44 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { CreateTaskModal } from "@/components/CreateTaskModal";
 import { ProjectTaskBoard } from "@/components/project/project-task-board";
+import { resolveActiveWorkspaceId, withWorkspaceQuery } from "@/lib/active-workspace";
 import { getProjectById, getProjectTasks } from "@/lib/supabase/server";
 
 type ProjectDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ workspaceId?: string }>;
 };
 
 export default async function ProjectDetailPage({
   params,
+  searchParams,
 }: ProjectDetailPageProps) {
   const { id } = await params;
+  const sp = await searchParams;
+  const workspaceId = await resolveActiveWorkspaceId(sp.workspaceId ?? null);
   const project = await getProjectById(id);
 
   if (!project) {
     notFound();
   }
 
-  const tasks = await getProjectTasks(project.id);
+  // Proje başka workspace'e aitse görevleri filtrele / boş göster
+  const effectiveWorkspaceId = workspaceId ?? project.workspace_id ?? null;
+  if (
+    workspaceId &&
+    project.workspace_id &&
+    project.workspace_id !== workspaceId
+  ) {
+    notFound();
+  }
+
+  const tasks = await getProjectTasks(project.id, effectiveWorkspaceId);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
       <div className="space-y-3 rounded-lg border border-border bg-card p-5 shadow-sm">
         <Link
-          href="/projects"
+          href={withWorkspaceQuery("/projects", effectiveWorkspaceId)}
           className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
         >
           <ArrowLeft className="size-4" />
@@ -56,7 +71,7 @@ export default async function ProjectDetailPage({
           <div>
             <h2 className="text-sm font-semibold text-foreground">Görevler</h2>
             <p className="text-sm text-muted-foreground">
-              Kartlara tıklayarak detay panelini aç.
+              Kartlara tıklayarak detay panelini aç. Durumu hızlıca değiştir.
             </p>
           </div>
           <CreateTaskModal projectId={project.id} />

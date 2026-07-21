@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ListTodo } from "lucide-react";
+import { toast } from "sonner";
+import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
 import {
   Card,
@@ -39,8 +42,35 @@ function priorityClass(priority: ProjectTask["priority"]): string {
   }
 }
 
-export function ProjectTaskBoard({ tasks }: ProjectTaskBoardProps) {
+export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps) {
+  const router = useRouter();
+  const [tasks, setTasks] = useState(initialTasks);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
+  async function handleStatusChange(taskId: string, status: TaskStatus) {
+    const previous = tasks;
+    setTasks((prev) =>
+      prev.map((task) => (task.id === taskId ? { ...task, status } : task)),
+    );
+    setUpdatingId(taskId);
+
+    const result = await updateTaskStatus(taskId, status);
+    setUpdatingId(null);
+
+    if (!result.success) {
+      setTasks(previous);
+      toast.error(result.error);
+      return;
+    }
+
+    toast.success("Durum güncellendi");
+    router.refresh();
+  }
 
   if (tasks.length === 0) {
     return (
@@ -91,20 +121,25 @@ export function ProjectTaskBoard({ tasks }: ProjectTaskBoardProps) {
                   </p>
                 ) : (
                   columnTasks.map((task) => (
-                    <button
+                    <div
                       key={task.id}
-                      type="button"
-                      onClick={() => setSelectedTaskId(task.id)}
-                      className="rounded-lg border border-border bg-card p-4 text-left shadow-sm transition-shadow duration-150 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/40 hover:shadow-md"
                     >
-                      <p className="text-sm font-semibold leading-snug text-foreground">
-                        {task.title}
-                      </p>
-                      {task.description?.trim() ? (
-                        <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
-                          {task.description}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTaskId(task.id)}
+                        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <p className="text-sm font-semibold leading-snug text-foreground">
+                          {task.title}
                         </p>
-                      ) : null}
+                        {task.description?.trim() ? (
+                          <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+                            {task.description}
+                          </p>
+                        ) : null}
+                      </button>
+
                       <div className="mt-3 flex items-center justify-between gap-2">
                         <span
                           className={cn(
@@ -115,15 +150,27 @@ export function ProjectTaskBoard({ tasks }: ProjectTaskBoardProps) {
                           {TASK_PRIORITY_LABELS[task.priority] ??
                             TASK_PRIORITY_LABELS.MEDIUM}
                         </span>
-                        {task.created_at ? (
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(task.created_at).toLocaleDateString(
-                              "tr-TR",
-                            )}
-                          </span>
-                        ) : null}
+                        <select
+                          aria-label="Görev durumu"
+                          value={task.status}
+                          disabled={updatingId === task.id}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => {
+                            void handleStatusChange(
+                              task.id,
+                              event.target.value as TaskStatus,
+                            );
+                          }}
+                          className="h-8 max-w-[140px] rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+                        >
+                          {TASK_STATUSES.map((value) => (
+                            <option key={value} value={value}>
+                              {TASK_STATUS_LABELS[value]}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                    </button>
+                    </div>
                   ))
                 )}
               </div>
@@ -137,6 +184,14 @@ export function ProjectTaskBoard({ tasks }: ProjectTaskBoardProps) {
         open={Boolean(selectedTaskId)}
         onOpenChange={(next) => {
           if (!next) setSelectedTaskId(null);
+        }}
+        onStatusUpdated={(taskId, status) => {
+          setTasks((prev) =>
+            prev.map((task) =>
+              task.id === taskId ? { ...task, status } : task,
+            ),
+          );
+          router.refresh();
         }}
       />
     </>

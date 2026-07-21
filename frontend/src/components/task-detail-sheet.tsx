@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { CheckSquare, MessageSquare } from "lucide-react";
+import { toast } from "sonner";
 import { getTaskDetails } from "@/app/actions/get-task-details";
+import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -13,8 +15,10 @@ import {
 } from "@/components/ui/sheet";
 import {
   TASK_PRIORITY_LABELS,
+  TASK_STATUSES,
   TASK_STATUS_LABELS,
   type ProjectTask,
+  type TaskStatus,
 } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +39,7 @@ type TaskDetailSheetProps = {
   taskId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onStatusUpdated?: (taskId: string, status: TaskStatus) => void;
 };
 
 const CHECKLIST_SKELETON: ChecklistItem[] = [
@@ -47,6 +52,7 @@ export function TaskDetailSheet({
   taskId,
   open,
   onOpenChange,
+  onStatusUpdated,
 }: TaskDetailSheetProps) {
   const [task, setTask] = useState<ProjectTask | null>(null);
   const [description, setDescription] = useState("");
@@ -54,6 +60,7 @@ export function TaskDetailSheet({
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [commentDraft, setCommentDraft] = useState("");
   const [loading, setLoading] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,6 +92,25 @@ export function TaskDetailSheet({
       cancelled = true;
     };
   }, [open, taskId]);
+
+  async function handleStatusChange(status: TaskStatus) {
+    if (!task || task.status === status) return;
+    const previous = task.status;
+    setTask({ ...task, status });
+    setSavingStatus(true);
+
+    const result = await updateTaskStatus(task.id, status);
+    setSavingStatus(false);
+
+    if (!result.success) {
+      setTask({ ...task, status: previous });
+      toast.error(result.error);
+      return;
+    }
+
+    toast.success("Durum güncellendi");
+    onStatusUpdated?.(task.id, status);
+  }
 
   function toggleChecklistItem(id: string) {
     setChecklist((prev) =>
@@ -137,21 +163,40 @@ export function TaskDetailSheet({
               <SheetDescription className="sr-only">
                 Görev durumu, öncelik, açıklama, checklist ve yorumlar
               </SheetDescription>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <span className="rounded-lg bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
-                  {TASK_STATUS_LABELS[task.status]}
-                </span>
-                <span
-                  className={cn(
-                    "rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground",
-                    task.priority === "HIGH" && "bg-red-500/15 text-red-400",
-                    task.priority === "MEDIUM" && "bg-primary/15 text-primary",
-                    task.priority === "LOW" &&
-                      "bg-emerald-500/15 text-emerald-400",
-                  )}
+              <div className="mt-3 space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Durum
+                </label>
+                <select
+                  value={task.status}
+                  disabled={savingStatus}
+                  onChange={(event) => {
+                    void handleStatusChange(event.target.value as TaskStatus);
+                  }}
+                  className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                 >
-                  {TASK_PRIORITY_LABELS[task.priority]}
-                </span>
+                  {TASK_STATUSES.map((value) => (
+                    <option key={value} value={value}>
+                      {TASK_STATUS_LABELS[value]}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <span className="rounded-lg bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
+                    {TASK_STATUS_LABELS[task.status]}
+                  </span>
+                  <span
+                    className={cn(
+                      "rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground",
+                      task.priority === "HIGH" && "bg-red-500/15 text-red-400",
+                      task.priority === "MEDIUM" && "bg-primary/15 text-primary",
+                      task.priority === "LOW" &&
+                        "bg-emerald-500/15 text-emerald-400",
+                    )}
+                  >
+                    {TASK_PRIORITY_LABELS[task.priority]}
+                  </span>
+                </div>
               </div>
             </>
           ) : (
@@ -175,9 +220,6 @@ export function TaskDetailSheet({
                 placeholder="Açıklama ekle…"
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
-              <p className="text-xs text-muted-foreground">
-                Düzenleme UI hazır; kaydetme bir sonraki iterasyonda bağlanacak.
-              </p>
             </section>
 
             <section className="space-y-3">
@@ -210,9 +252,6 @@ export function TaskDetailSheet({
                   </li>
                 ))}
               </ul>
-              <p className="text-xs text-muted-foreground">
-                Checklist iskeleti — CRUD henüz yok.
-              </p>
             </section>
 
             <section className="space-y-3">
