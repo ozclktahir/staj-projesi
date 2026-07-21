@@ -139,6 +139,12 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
                             {task.description}
                           </p>
                         ) : null}
+                        {(task.subtask_total ?? 0) > 0 ? (
+                          <p className="mt-2 text-xs font-medium text-muted-foreground">
+                            {task.subtask_done ?? 0}/{task.subtask_total} Alt
+                            Görev
+                          </p>
+                        ) : null}
                       </button>
 
                       <div className="mt-3 flex items-center justify-between gap-2">
@@ -186,10 +192,10 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
         onOpenChange={(next) => {
           if (!next) setSelectedTaskId(null);
         }}
-        onStatusUpdated={(taskId, status) => {
+        onTaskUpdated={(partial) => {
           setTasks((prev) =>
             prev.map((task) =>
-              task.id === taskId ? { ...task, status } : task,
+              task.id === partial.id ? { ...task, ...partial } : task,
             ),
           );
           router.refresh();

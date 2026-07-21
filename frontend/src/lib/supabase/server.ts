@@ -398,19 +398,27 @@ export async function getProjectTasks(
     let query = supabase
       .from("tasks")
       .select(
-        "id, title, description, status, priority, project_id, workspace_id, created_at, created_by",
+        "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by",
       )
       .eq("project_id", projectId)
       .is("deleted_at", null)
+      .is("parent_task_id", null)
       .order("created_at", { ascending: false });
 
     if (activeWorkspaceId) {
       query = query.eq("workspace_id", activeWorkspaceId);
     }
 
-    let { data, error } = await query;
+    const primary = await query;
+    let rows: Record<string, unknown>[] | null =
+      (primary.data as Record<string, unknown>[] | null) ?? null;
+    let error = primary.error;
 
-    if (error?.message?.includes("deleted_at")) {
+    if (
+      error?.message?.includes("deleted_at") ||
+      error?.message?.includes("parent_task_id") ||
+      error?.message?.includes("due_date")
+    ) {
       let fallback = supabase
         .from("tasks")
         .select(
@@ -423,7 +431,9 @@ export async function getProjectTasks(
         fallback = fallback.eq("workspace_id", activeWorkspaceId);
       }
 
-      ({ data, error } = await fallback);
+      const fallbackResult = await fallback;
+      rows = (fallbackResult.data as Record<string, unknown>[] | null) ?? null;
+      error = fallbackResult.error;
     }
 
     if (error) {
@@ -431,7 +441,12 @@ export async function getProjectTasks(
       return [];
     }
 
-    return (data ?? []).map((row) => ({
+    const topLevel = (rows ?? []).filter((row) => {
+      if (!("parent_task_id" in row)) return true;
+      return row.parent_task_id == null;
+    });
+
+    const tasks: ProjectTask[] = topLevel.map((row) => ({
       id: row.id as string,
       title: (row.title as string) ?? "Adsız görev",
       description: (row.description as string | null) ?? null,
@@ -439,12 +454,66 @@ export async function getProjectTasks(
       priority: normalizeTaskPriority(row.priority),
       project_id: (row.project_id as string | null) ?? null,
       workspace_id: (row.workspace_id as string | null) ?? null,
+      due_date:
+        "due_date" in row ? ((row.due_date as string | null) ?? null) : null,
+      parent_task_id:
+        "parent_task_id" in row
+          ? ((row.parent_task_id as string | null) ?? null)
+          : null,
       created_at: (row.created_at as string | null) ?? null,
       created_by: (row.created_by as string | null) ?? null,
+      subtask_done: 0,
+      subtask_total: 0,
     }));
+
+    const parentIds = tasks.map((t) => t.id);
+    if (parentIds.length === 0) return tasks;
+
+    const { data: children, error: childError } = await supabase
+      .from("tasks")
+      .select("parent_task_id, status")
+      .in("parent_task_id", parentIds)
+      .is("deleted_at", null);
+
+    if (childError?.message?.includes("deleted_at")) {
+      const fallbackChildren = await supabase
+        .from("tasks")
+        .select("parent_task_id, status")
+        .in("parent_task_id", parentIds);
+      if (!fallbackChildren.error && fallbackChildren.data) {
+        applySubtaskCounts(tasks, fallbackChildren.data);
+      }
+    } else if (!childError && children) {
+      applySubtaskCounts(tasks, children);
+    }
+
+    return tasks;
   } catch (error) {
     console.error("[getProjectTasks]", error);
     return [];
+  }
+}
+
+function applySubtaskCounts(
+  tasks: ProjectTask[],
+  children: { parent_task_id: unknown; status: unknown }[],
+) {
+  const totals = new Map<string, { done: number; total: number }>();
+  for (const child of children) {
+    const pid =
+      typeof child.parent_task_id === "string" ? child.parent_task_id : null;
+    if (!pid) continue;
+    const entry = totals.get(pid) ?? { done: 0, total: 0 };
+    entry.total += 1;
+    if (normalizeTaskStatus(child.status) === "DONE") entry.done += 1;
+    totals.set(pid, entry);
+  }
+  for (const task of tasks) {
+    const entry = totals.get(task.id);
+    if (entry) {
+      task.subtask_done = entry.done;
+      task.subtask_total = entry.total;
+    }
   }
 }
 

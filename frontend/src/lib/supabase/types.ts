@@ -41,9 +41,32 @@ export type ProjectTask = {
   priority: TaskPriority;
   project_id: string | null;
   workspace_id: string | null;
+  due_date?: string | null;
+  parent_task_id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   created_by?: string | null;
+  /** Tamamlanan alt görev sayısı (Kanban özeti) */
+  subtask_done?: number;
+  /** Toplam alt görev sayısı */
+  subtask_total?: number;
+};
+
+export type Subtask = {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  parent_task_id: string;
+  done: boolean;
+};
+
+export type TaskComment = {
+  id: string;
+  task_id: string;
+  content: string;
+  user_id: string | null;
+  author_name: string;
+  created_at: string | null;
 };
 
 export const TASK_STATUSES: TaskStatus[] = ["TODO", "IN_PROGRESS", "DONE"];

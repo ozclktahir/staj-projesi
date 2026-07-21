@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CheckSquare, MessageSquare } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { CheckSquare, MessageSquare, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { createComment, getTaskComments } from "@/app/actions/comments";
 import { getTaskDetails } from "@/app/actions/get-task-details";
+import {
+  createSubtask,
+  deleteSubtask,
+  getSubtasks,
+  toggleSubtask,
+} from "@/app/actions/subtasks";
+import { updateTask } from "@/app/actions/update-task";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
@@ -14,84 +25,99 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
+  TASK_PRIORITIES,
   TASK_PRIORITY_LABELS,
   TASK_STATUSES,
   TASK_STATUS_LABELS,
   type ProjectTask,
+  type Subtask,
+  type TaskComment,
+  type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
-
-type ChecklistItem = {
-  id: string;
-  label: string;
-  done: boolean;
-};
-
-type CommentItem = {
-  id: string;
-  author: string;
-  body: string;
-  createdAt: string;
-};
 
 type TaskDetailSheetProps = {
   taskId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onStatusUpdated?: (taskId: string, status: TaskStatus) => void;
+  onTaskUpdated?: (task: Partial<ProjectTask> & { id: string }) => void;
 };
 
-const CHECKLIST_SKELETON: ChecklistItem[] = [
-  { id: "c1", label: "Gereksinimleri gözden geçir", done: true },
-  { id: "c2", label: "İlk taslağı hazırla", done: false },
-  { id: "c3", label: "Gözden geçirme için paylaş", done: false },
-];
+function toDateInputValue(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  return d.toISOString().slice(0, 10);
+}
 
 export function TaskDetailSheet({
   taskId,
   open,
   onOpenChange,
-  onStatusUpdated,
+  onTaskUpdated,
 }: TaskDetailSheetProps) {
+  const router = useRouter();
   const [task, setTask] = useState<ProjectTask | null>(null);
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [checklist, setChecklist] = useState<ChecklistItem[]>(CHECKLIST_SKELETON);
-  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [dueDate, setDueDate] = useState("");
+  const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [subtaskDraft, setSubtaskDraft] = useState("");
+  const [comments, setComments] = useState<TaskComment[]>([]);
   const [commentDraft, setCommentDraft] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open || !taskId) {
-      return;
-    }
-
-    let cancelled = false;
+  const loadAll = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
 
-    void getTaskDetails(taskId).then((result) => {
-      if (cancelled) return;
-      if (!result.success) {
-        setTask(null);
-        setError(result.error);
-        setLoading(false);
-        return;
-      }
-      setTask(result.task);
-      setDescription(result.task.description ?? "");
-      setChecklist(CHECKLIST_SKELETON);
-      setComments([]);
-      setCommentDraft("");
-      setLoading(false);
-    });
+    const [details, subResult, commentResult] = await Promise.all([
+      getTaskDetails(id),
+      getSubtasks(id),
+      getTaskComments(id),
+    ]);
 
+    if (!details.success) {
+      setTask(null);
+      setError(details.error);
+      setLoading(false);
+      return;
+    }
+
+    setTask(details.task);
+    setTitle(details.task.title);
+    setDescription(details.task.description ?? "");
+    setDueDate(toDateInputValue(details.task.due_date));
+    setPriority(details.task.priority);
+    setSubtasks(subResult.success ? subResult.subtasks : []);
+    setComments(commentResult.success ? commentResult.comments : []);
+    setSubtaskDraft("");
+    setCommentDraft("");
+    setLoading(false);
+
+    if (!subResult.success) {
+      console.error("[TaskDetailSheet] getSubtasks:", subResult.error);
+    }
+    if (!commentResult.success) {
+      console.error("[TaskDetailSheet] getTaskComments:", commentResult.error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open || !taskId) return;
+    let cancelled = false;
+    void loadAll(taskId).then(() => {
+      if (cancelled) return;
+    });
     return () => {
       cancelled = true;
     };
-  }, [open, taskId]);
+  }, [open, taskId, loadAll]);
 
   async function handleStatusChange(status: TaskStatus) {
     if (!task || task.status === status) return;
@@ -104,37 +130,110 @@ export function TaskDetailSheet({
 
     if (!result.success) {
       setTask({ ...task, status: previous });
-      console.error("[TaskDetailSheet] updateTaskStatus failed:", result.error);
+      console.error("[TaskDetailSheet] updateTaskStatus:", result.error);
       toast.error(result.error);
       return;
     }
 
     toast.success("Durum güncellendi");
-    onStatusUpdated?.(task.id, result.status);
+    onTaskUpdated?.({ id: task.id, status: result.status });
+    router.refresh();
   }
 
-  function toggleChecklistItem(id: string) {
-    setChecklist((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, done: !item.done } : item,
-      ),
+  async function handleSaveFields() {
+    if (!task) return;
+    setSaving(true);
+
+    const result = await updateTask({
+      taskId: task.id,
+      title,
+      description,
+      due_date: dueDate ? new Date(`${dueDate}T12:00:00`).toISOString() : null,
+      priority,
+    });
+
+    setSaving(false);
+
+    if (!result.success) {
+      console.error("[TaskDetailSheet] updateTask:", result.error);
+      toast.error(result.error);
+      return;
+    }
+
+    setTask(result.task);
+    setTitle(result.task.title);
+    setDescription(result.task.description ?? "");
+    setDueDate(toDateInputValue(result.task.due_date));
+    setPriority(result.task.priority);
+    toast.success("Görev kaydedildi");
+    onTaskUpdated?.({
+      id: result.task.id,
+      title: result.task.title,
+      description: result.task.description,
+      priority: result.task.priority,
+      due_date: result.task.due_date,
+    });
+    router.refresh();
+  }
+
+  async function handleAddSubtask() {
+    if (!task || !subtaskDraft.trim()) return;
+    const result = await createSubtask(task.id, subtaskDraft);
+    if (!result.success) {
+      console.error("[TaskDetailSheet] createSubtask:", result.error);
+      toast.error(result.error);
+      return;
+    }
+    setSubtasks((prev) => [...prev, result.subtask]);
+    setSubtaskDraft("");
+    toast.success("Alt görev eklendi");
+    onTaskUpdated?.({
+      id: task.id,
+      subtask_total: subtasks.length + 1,
+      subtask_done: subtasks.filter((s) => s.done).length,
+    });
+    router.refresh();
+  }
+
+  async function handleToggleSubtask(id: string) {
+    const result = await toggleSubtask(id);
+    if (!result.success) {
+      console.error("[TaskDetailSheet] toggleSubtask:", result.error);
+      toast.error(result.error);
+      return;
+    }
+    setSubtasks((prev) =>
+      prev.map((s) => (s.id === id ? result.subtask : s)),
     );
+    router.refresh();
   }
 
-  function addComment() {
-    const body = commentDraft.trim();
-    if (!body) return;
-    setComments((prev) => [
-      {
-        id: `local-${Date.now()}`,
-        author: "Sen",
-        body,
-        createdAt: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-    setCommentDraft("");
+  async function handleDeleteSubtask(id: string) {
+    const result = await deleteSubtask(id);
+    if (!result.success) {
+      console.error("[TaskDetailSheet] deleteSubtask:", result.error);
+      toast.error(result.error);
+      return;
+    }
+    setSubtasks((prev) => prev.filter((s) => s.id !== id));
+    toast.success("Alt görev silindi");
+    router.refresh();
   }
+
+  async function handleAddComment() {
+    if (!task || !commentDraft.trim()) return;
+    const result = await createComment(task.id, commentDraft);
+    if (!result.success) {
+      console.error("[TaskDetailSheet] createComment:", result.error);
+      toast.error(result.error);
+      return;
+    }
+    setComments((prev) => [...prev, result.comment]);
+    setCommentDraft("");
+    toast.success("Yorum eklendi");
+  }
+
+  const doneCount = subtasks.filter((s) => s.done).length;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -158,45 +257,35 @@ export function TaskDetailSheet({
             </>
           ) : task ? (
             <>
-              <SheetTitle className="text-left leading-snug text-foreground">
-                {task.title}
-              </SheetTitle>
+              <SheetTitle className="sr-only">{task.title}</SheetTitle>
               <SheetDescription className="sr-only">
-                Görev durumu, öncelik, açıklama, checklist ve yorumlar
+                Görev düzenleme, alt görevler ve yorumlar
               </SheetDescription>
-              <div className="mt-3 space-y-2">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Durum
-                </label>
-                <select
-                  value={task.status}
-                  disabled={savingStatus}
-                  onChange={(event) => {
-                    void handleStatusChange(event.target.value as TaskStatus);
-                  }}
-                  className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
-                >
-                  {TASK_STATUSES.map((value) => (
-                    <option key={value} value={value}>
-                      {TASK_STATUS_LABELS[value]}
-                    </option>
-                  ))}
-                </select>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <span className="rounded-lg bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
-                    {TASK_STATUS_LABELS[task.status]}
-                  </span>
-                  <span
-                    className={cn(
-                      "rounded-lg bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground",
-                      task.priority === "HIGH" && "bg-red-500/15 text-red-400",
-                      task.priority === "MEDIUM" && "bg-primary/15 text-primary",
-                      task.priority === "LOW" &&
-                        "bg-emerald-500/15 text-emerald-400",
-                    )}
+              <div className="mt-1 space-y-3">
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="h-auto border-0 bg-transparent px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
+                  placeholder="Görev başlığı"
+                />
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Durum</Label>
+                  <select
+                    value={task.status}
+                    disabled={savingStatus}
+                    onChange={(event) => {
+                      void handleStatusChange(
+                        event.target.value as TaskStatus,
+                      );
+                    }}
+                    className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                   >
-                    {TASK_PRIORITY_LABELS[task.priority]}
-                  </span>
+                    {TASK_STATUSES.map((value) => (
+                      <option key={value} value={value}>
+                        {TASK_STATUS_LABELS[value]}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </>
@@ -210,49 +299,135 @@ export function TaskDetailSheet({
 
         {!loading && !error && task ? (
           <div className="flex flex-1 flex-col gap-6 px-4 py-5">
-            <section className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Açıklama
-              </h3>
-              <textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={4}
-                placeholder="Açıklama ekle…"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
+            <section className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="task-priority" className="text-xs">
+                    Öncelik
+                  </Label>
+                  <select
+                    id="task-priority"
+                    value={priority}
+                    onChange={(e) =>
+                      setPriority(e.target.value as TaskPriority)
+                    }
+                    className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-sm"
+                  >
+                    {TASK_PRIORITIES.map((value) => (
+                      <option key={value} value={value}>
+                        {TASK_PRIORITY_LABELS[value]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="task-due" className="text-xs">
+                    Son teslim
+                  </Label>
+                  <Input
+                    id="task-due"
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="h-9 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="task-desc" className="text-xs">
+                  Açıklama
+                </Label>
+                <textarea
+                  id="task-desc"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  rows={4}
+                  placeholder="Açıklama ekle…"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                />
+              </div>
+
+              <Button
+                type="button"
+                size="sm"
+                disabled={saving || !title.trim()}
+                onClick={() => void handleSaveFields()}
+                className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {saving ? "Kaydediliyor…" : "Kaydet"}
+              </Button>
             </section>
 
             <section className="space-y-3">
               <div className="flex items-center gap-2 text-foreground">
                 <CheckSquare className="size-4 text-primary" />
-                <h3 className="text-sm font-semibold">Checklist</h3>
+                <h3 className="text-sm font-semibold">Alt Görevler</h3>
                 <span className="text-xs text-muted-foreground">
-                  {checklist.filter((i) => i.done).length}/{checklist.length}
+                  {doneCount}/{subtasks.length}
                 </span>
               </div>
-              <ul className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
-                {checklist.map((item) => (
-                  <li key={item.id} className="flex items-start gap-2">
-                    <input
-                      id={`check-${item.id}`}
-                      type="checkbox"
-                      checked={item.done}
-                      onChange={() => toggleChecklistItem(item.id)}
-                      className="mt-0.5 size-4 rounded border-border accent-primary"
-                    />
-                    <label
-                      htmlFor={`check-${item.id}`}
-                      className={cn(
-                        "text-sm text-foreground",
-                        item.done && "text-muted-foreground line-through",
-                      )}
-                    >
-                      {item.label}
-                    </label>
-                  </li>
-                ))}
-              </ul>
+
+              <div className="flex gap-2">
+                <Input
+                  value={subtaskDraft}
+                  onChange={(e) => setSubtaskDraft(e.target.value)}
+                  placeholder="Yeni alt görev…"
+                  className="h-9 rounded-lg"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleAddSubtask();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!subtaskDraft.trim()}
+                  onClick={() => void handleAddSubtask()}
+                  className="shrink-0 rounded-lg"
+                >
+                  Ekle
+                </Button>
+              </div>
+
+              {subtasks.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                  Henüz alt görev yok.
+                </div>
+              ) : (
+                <ul className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+                  {subtasks.map((item) => (
+                    <li key={item.id} className="flex items-start gap-2">
+                      <input
+                        id={`sub-${item.id}`}
+                        type="checkbox"
+                        checked={item.done}
+                        onChange={() => void handleToggleSubtask(item.id)}
+                        className="mt-0.5 size-4 rounded border-border accent-primary"
+                      />
+                      <label
+                        htmlFor={`sub-${item.id}`}
+                        className={cn(
+                          "min-w-0 flex-1 text-sm text-foreground",
+                          item.done && "text-muted-foreground line-through",
+                        )}
+                      >
+                        {item.title}
+                      </label>
+                      <button
+                        type="button"
+                        aria-label="Alt görevi sil"
+                        onClick={() => void handleDeleteSubtask(item.id)}
+                        className="rounded p-1 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
 
             <section className="space-y-3">
@@ -274,7 +449,7 @@ export function TaskDetailSheet({
                   size="sm"
                   className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
                   disabled={!commentDraft.trim()}
-                  onClick={addComment}
+                  onClick={() => void handleAddComment()}
                 >
                   Yorum ekle
                 </Button>
@@ -293,13 +468,19 @@ export function TaskDetailSheet({
                     >
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-primary">
-                          {comment.author}
+                          {comment.author_name}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(comment.createdAt).toLocaleString("tr-TR")}
+                          {comment.created_at
+                            ? new Date(comment.created_at).toLocaleString(
+                                "tr-TR",
+                              )
+                            : ""}
                         </span>
                       </div>
-                      <p className="text-sm text-foreground">{comment.body}</p>
+                      <p className="text-sm text-foreground">
+                        {comment.content}
+                      </p>
                     </li>
                   ))}
                 </ul>
