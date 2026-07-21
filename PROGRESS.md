@@ -292,6 +292,7 @@
 - Görev atama (`assignee_id`) altyapısı ve arayüzü eklendi.
 - Üye görünürlük hatası giderildi; `getProjects` sorgusu kullanıcıya atanmış görevleri içeren projeleri kapsayacak şekilde genişletildi.
 - Kanban görev kartlarına atanan kullanıcı (assignee) avatarı ve ismi görüntülenecek şekilde UI güncellemesi yapıldı.
+- `src/lib/supabase/server.ts` içerisindeki eksik `normalizeTaskStatus` ve `normalizeTaskPriority` fonksiyonları tanımlanarak ReferenceError hatası giderildi.
 
 ### [20 Temmuz 2026] - Günlük Özet: RLS, Workspace Yönetimi ve Task Detail UI
 - RLS hatalarının giderilmesi, Workspace yönetim arayüzü ve Task Detail UI geliştirmeleri tamamlandı.

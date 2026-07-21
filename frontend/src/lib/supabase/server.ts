@@ -517,10 +517,21 @@ async function enrichTasksWithAssignees(
   });
 }
 
-function normalizeTaskPriority(value: unknown): TaskPriority {
-  if (value === "LOW" || value === "HIGH" || value === "MEDIUM") {
-    return value;
+function normalizeTaskStatus(status: unknown): TaskStatus {
+  if (typeof status !== "string") return "TODO";
+  const s = status.toUpperCase();
+  if (s === "IN_PROGRESS" || s === "INPROGRESS" || s === "DEVAM_EDIYOR") {
+    return "IN_PROGRESS";
   }
+  if (s === "DONE" || s === "COMPLETED" || s === "TAMAMLANDI") return "DONE";
+  return "TODO";
+}
+
+function normalizeTaskPriority(priority: unknown): TaskPriority {
+  if (typeof priority !== "string") return "MEDIUM";
+  const p = priority.toUpperCase();
+  if (p === "HIGH" || p === "YUKSEK") return "HIGH";
+  if (p === "LOW" || p === "DUSUK") return "LOW";
   return "MEDIUM";
 }
 
