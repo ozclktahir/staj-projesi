@@ -12,6 +12,7 @@ export function ThemeProvider({
       attribute="class"
       defaultTheme="system"
       enableSystem
+      enableColorScheme
       storageKey="theme"
       disableTransitionOnChange
       {...props}

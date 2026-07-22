@@ -26,6 +26,21 @@ const themes = [
   },
 ];
 
+function applyHtmlThemeClass(next: "light" | "dark" | "system") {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  root.classList.remove("light", "dark");
+
+  if (next === "system") {
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    root.classList.add(prefersDark ? "dark" : "light");
+  } else {
+    root.classList.add(next);
+  }
+
+  console.info("[ThemeSelector] html.className =", root.className);
+}
+
 export function ThemeSelector() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -55,7 +70,10 @@ export function ThemeSelector() {
           <button
             key={value}
             type="button"
-            onClick={() => setTheme(value)}
+            onClick={() => {
+              setTheme(value);
+              applyHtmlThemeClass(value);
+            }}
             className={cn(
               "flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors",
               selected

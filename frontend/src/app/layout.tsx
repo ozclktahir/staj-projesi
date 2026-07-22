@@ -19,6 +19,23 @@ export const metadata: Metadata = {
   description: "İş ve Çalışma Alanı Yönetim Sistemi",
 };
 
+const themeInitScript = `
+(function() {
+  try {
+    var stored = localStorage.getItem('theme');
+    var theme = stored || 'system';
+    var resolved = theme;
+    if (theme === 'system') {
+      resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    var root = document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(resolved === 'dark' ? 'dark' : 'light');
+    root.style.colorScheme = resolved === 'dark' ? 'dark' : 'light';
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -30,11 +47,15 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="flex min-h-full flex-col bg-background text-foreground">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
+          enableColorScheme
           storageKey="theme"
           disableTransitionOnChange
         >

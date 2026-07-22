@@ -284,6 +284,7 @@
 - Kanban panosundaki görevler varsayılan olarak Yüksek -> Düşük öncelik sırasına göre dizildi. Kolon başlıklarına (header) öncelik ve tarihe göre sıralama/filtreleme seçenekleri eklendi.
 - Uygulamaya Beyaz-Mavi-Turuncu renk paletine sahip Açık Mod (Light Mode) desteği eklendi. Ayarlar sayfasından Koyu/Açık/Sistem teması seçimi sağlandı.
 - Tema sistemi global hale getirildi. Hardcoded koyu renk sınıfları temizlenerek tüm sayfaların (Sidebar, Header, Kanban, Modallar, Tablolar) Açık Mod ve Koyu Mod ile %100 uyumlu çalışması sağlandı.
+- Açık Mod (Light Mode) geçişinin çalışmama sorunu düzeltildi. Tailwind darkMode konfigürasyonu, ThemeProvider ve CSS değişkenleri senkronize edildi.
 
 ### [21 Temmuz 2026] - Auth bağlantı düzeltmeleri ve projects.updated_at şema sync
 - Auth akışındaki bağlantı hataları (port ve exception düzeltmeleri) giderildi.
