@@ -101,35 +101,50 @@ export function resolveUiDisplayName(input: {
 }
 
 /**
+ * Kişi adı (görev kartı / atanan kişi):
+ * full_name → first_name + last_name → first_name → e-posta yerel kısmı
+ * Kartta "Ali" / "Ali Yılmaz" görünür; mümkünse e-posta basılmaz.
+ */
+export function formatPersonName(
+  profile: Record<string, unknown> | null | undefined,
+  email?: string | null,
+): string {
+  const full =
+    cleanText(profile?.full_name) ||
+    cleanText(profile?.display_name) ||
+    cleanText(profile?.name);
+
+  if (full) return full;
+
+  const first = cleanText(profile?.first_name) ?? "";
+  const last = cleanText(profile?.last_name) ?? "";
+  const combined = `${first} ${last}`.trim();
+  if (combined) return combined;
+  if (first) return first;
+
+  const username = cleanText(profile?.username);
+  if (username) return username;
+
+  const mail =
+    cleanText(email) || cleanText(profile?.email) || null;
+  return emailLocalPart(mail) || mail || "";
+}
+
+
+/**
  * Kompakt etiket (header, kart): Ad Soyad → e-posta → e-posta yerel kısmı.
  */
 export function formatUserCompact(
   profile?: Record<string, unknown> | null,
   email?: string | null,
 ): string {
+  const person = formatPersonName(profile, email);
+  if (person) return person;
   const parts = extractUserNameParts(profile, email);
-  if (parts.name) return parts.name;
   if (parts.email) return parts.email;
   return resolveLabelFallback(parts.email);
 }
 
-/**
- * Dropdown / liste: Ad Soyad (email) — boş parçalar birleştirilmez.
- * Mantık: name ? (email ? `${name} (${email})` : name) : email || localPart
- */
-export function formatMemberOptionLabel(
-  profile: Record<string, unknown> | null | undefined,
-  email: string | null | undefined,
-): string {
-  const parts = extractUserNameParts(profile, email);
-  const name = parts.name;
-  const mail = parts.email;
-
-  if (name && mail) return `${name} (${mail})`;
-  if (name) return name;
-  if (mail) return mail;
-  return resolveLabelFallback(mail);
-}
 
 /** Auth user_metadata + email → görünen ad (client/header). */
 export function formatAuthUserLabel(input?: {

@@ -9,6 +9,7 @@ import type {
   TaskStatus,
 } from "@/lib/supabase/types";
 import {
+  formatPersonName,
   formatUserCompact,
   PROFILE_SELECT_FIELDS,
   PROFILE_SELECT_FIELDS_FALLBACK,
@@ -526,8 +527,11 @@ function mapProfileToAssignee(
   profile: Record<string, unknown> | null | undefined,
 ): TaskAssignee {
   const email =
-    (profile && typeof profile.email === "string" && profile.email) || null;
-  const displayName = formatUserCompact(profile, email);
+    (profile && typeof profile.email === "string" && profile.email.trim()) ||
+    null;
+
+  // Kartta gerçek ad: "Ali" / "Ali Yılmaz"
+  const displayName = formatPersonName(profile, email) || formatUserCompact(profile, email);
 
   const parts = displayName.split(/\s+/).filter(Boolean);
   const initials =
@@ -589,6 +593,15 @@ async function enrichTasksWithAssignees(
       }
     }
   }
+
+  console.info("[enrichTasksWithAssignees]", {
+    assigneeIds,
+    found: Array.from(profileById.keys()),
+    names: Array.from(profileById.entries()).map(([id, p]) => ({
+      id,
+      name: formatPersonName(p, null),
+    })),
+  });
 
   return tasks.map((task) => {
     if (!task.assignee_id) {
@@ -835,13 +848,8 @@ export async function getProjectTasks(
       };
     });
 
-    // Join yoksa / eksikse profiles tablosundan zenginleştir
-    const needsEnrich = tasks.some((t) => t.assignee_id && !t.assignee);
-    const enriched = needsEnrich
-      ? await enrichTasksWithAssignees(supabase, tasks)
-      : tasks.map((t) =>
-          t.assignee_id ? t : { ...t, assignee: t.assignee ?? null },
-        );
+    // Her zaman profiles'tan atanan kişi adını zenginleştir (Ali / Ali Yılmaz)
+    const enriched = await enrichTasksWithAssignees(supabase, tasks);
 
     const parentIds = enriched.map((t) => t.id);
     if (parentIds.length === 0) return enriched;

@@ -1,7 +1,12 @@
 "use server";
 
 import { getAuthenticatedUser } from "@/lib/supabase/server";
-import { formatMemberOptionLabel, PROFILE_SELECT_FIELDS, PROFILE_SELECT_FIELDS_FALLBACK } from "@/lib/member-labels";
+import {
+  formatMemberOptionLabel,
+  formatPersonName,
+  PROFILE_SELECT_FIELDS,
+  PROFILE_SELECT_FIELDS_FALLBACK,
+} from "@/lib/member-labels";
 import {
   resolveWorkspaceRole,
   type WorkspaceMemberOption,
@@ -126,13 +131,15 @@ export async function getWorkspaceMembers(
           profile.avatar_url) ||
         null;
 
+      const personName = formatPersonName(profile, email);
       return {
         id: uid,
         email,
         role: (row.role as string | null) ?? null,
-        fullName,
+        fullName: personName || fullName,
         avatarUrl,
-        displayName: formatMemberOptionLabel(profile, email),
+        // Dropdown'da önce ad: "Ali" / "Ali Yılmaz"
+        displayName: personName || formatMemberOptionLabel(profile, email),
       };
     });
 
