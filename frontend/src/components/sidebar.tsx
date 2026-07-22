@@ -58,13 +58,13 @@ function SidebarInner() {
   const canInvite = isAdminRole(activeWorkspace?.role);
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r-2 border-border bg-card">
-      <div className="border-b-2 border-border p-3">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r-2 border-border bg-card dark:border-r">
+      <div className="border-b-2 border-border p-3 dark:border-b">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center gap-2 rounded-lg border-2 border-border bg-background px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="flex w-full items-center gap-2 rounded-lg border-2 border-border bg-background px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:border dark:shadow-none"
             >
               <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
                 {(activeWorkspace?.name ?? "İY").slice(0, 2).toUpperCase()}
@@ -196,7 +196,7 @@ function SidebarInner() {
         })}
       </nav>
 
-      <div className="border-t-2 border-border p-4">
+      <div className="border-t-2 border-border p-4 dark:border-t">
         <p className="text-xs text-muted-foreground">Workspace yönetimi</p>
       </div>
 
