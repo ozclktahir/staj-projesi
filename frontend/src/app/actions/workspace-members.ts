@@ -2,7 +2,6 @@
 
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import {
-  formatMemberOptionLabel,
   formatPersonName,
   PROFILE_SELECT_FIELDS,
   PROFILE_SELECT_FIELDS_FALLBACK,
@@ -138,8 +137,12 @@ export async function getWorkspaceMembers(
         role: (row.role as string | null) ?? null,
         fullName: personName || fullName,
         avatarUrl,
-        // Dropdown'da önce ad: "Ali" / "Ali Yılmaz"
-        displayName: personName || formatMemberOptionLabel(profile, email),
+        // Dropdown'da gerçek ad: "Ali" / "Ali Yılmaz" / e-posta local
+        displayName:
+          personName ||
+          (email ? email.split("@")[0] : "") ||
+          email ||
+          "",
       };
     });
 

@@ -214,11 +214,20 @@ export function CreateTaskModal({
               className={fieldClassName}
             >
               <option value="">Atanmamış</option>
-              {members.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.displayName}
-                </option>
-              ))}
+              {members.map((member) => {
+                const label =
+                  member.fullName?.trim() ||
+                  member.displayName?.trim() ||
+                  member.email?.split("@")[0] ||
+                  member.email ||
+                  "";
+                if (!label) return null;
+                return (
+                  <option key={member.id} value={member.id}>
+                    {label}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

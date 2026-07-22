@@ -64,7 +64,10 @@ export function AdminOverviewPanel({ members }: AdminOverviewPanelProps) {
                   >
                     <td className="px-2 py-3">
                       <p className="font-medium text-foreground">
-                        {member.displayName}
+                        {member.displayName?.trim() ||
+                          member.email?.split("@")[0] ||
+                          member.email ||
+                          "—"}
                       </p>
                       {member.email ? (
                         <p className="text-xs text-muted-foreground">

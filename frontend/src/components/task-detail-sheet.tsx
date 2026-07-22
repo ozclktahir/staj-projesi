@@ -364,11 +364,20 @@ export function TaskDetailSheet({
                   className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-sm"
                 >
                   <option value="">Atanmamış</option>
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.displayName}
-                    </option>
-                  ))}
+                  {members.map((member) => {
+                    const label =
+                      member.fullName?.trim() ||
+                      member.displayName?.trim() ||
+                      member.email?.split("@")[0] ||
+                      member.email ||
+                      "";
+                    if (!label) return null;
+                    return (
+                      <option key={member.id} value={member.id}>
+                        {label}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

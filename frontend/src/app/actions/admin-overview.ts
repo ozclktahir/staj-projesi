@@ -3,7 +3,7 @@
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { isAdminRole } from "@/lib/rbac";
 import {
-  formatMemberOptionLabel,
+  formatPersonName,
   PROFILE_SELECT_FIELDS,
   PROFILE_SELECT_FIELDS_FALLBACK,
 } from "@/lib/member-labels";
@@ -210,7 +210,11 @@ export async function getAdminOverview(
       return {
         userId: uid,
         email,
-        displayName: formatMemberOptionLabel(profile, email),
+        displayName:
+          formatPersonName(profile, email) ||
+          (email ? email.split("@")[0] : "") ||
+          email ||
+          "",
         role: (m.role as string) ?? "Member",
         projectNames: projectsByUser.get(uid) ?? [],
         tasksDone: counts.done,

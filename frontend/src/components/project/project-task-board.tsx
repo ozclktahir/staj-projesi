@@ -58,28 +58,44 @@ function AssigneeBadge({ assignee }: { assignee?: TaskAssignee | null }) {
     );
   }
 
+  const label =
+    assignee.displayName?.trim() ||
+    assignee.email?.split("@")[0]?.trim() ||
+    assignee.email?.trim() ||
+    "";
+
+  if (!label) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/70">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted">
+          <UserRound className="size-3.5 text-muted-foreground/60" />
+        </span>
+        Atanmadı
+      </span>
+    );
+  }
+
   return (
     <span
       className="inline-flex max-w-[130px] items-center gap-1.5"
-      title={assignee.email ?? assignee.displayName}
+      title={assignee.email ?? label}
     >
       {assignee.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={assignee.avatarUrl}
-          alt={assignee.displayName}
+          alt={label}
           className="size-6 shrink-0 rounded-full object-cover ring-1 ring-border"
         />
       ) : (
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary">
-          {assignee.initials}
+          {assignee.initials && assignee.initials !== "?"
+            ? assignee.initials
+            : label.slice(0, 2).toUpperCase()}
         </span>
       )}
       <span className="truncate text-xs font-medium text-foreground">
-        {assignee.displayName}
-        {assignee.email && assignee.displayName !== assignee.email ? (
-          <span className="sr-only"> ({assignee.email})</span>
-        ) : null}
+        {label}
       </span>
     </span>
   );

@@ -3,7 +3,7 @@ import type { WorkspaceListItem } from "@/lib/supabase/types";
 
 export type WorkspaceMemberOption = {
   id: string;
-  /** Dropdown etiketi: "Ad Soyad" veya "Ad Soyad (email)" veya email */
+  /** Dropdown / kart: gerçek ad veya e-posta */
   displayName: string;
   email: string | null;
   role: string | null;
@@ -17,17 +17,21 @@ export const PROFILE_SELECT_FIELDS =
 export const PROFILE_SELECT_FIELDS_FALLBACK =
   "id, full_name, email, avatar_url, first_name, last_name";
 
-type NameParts = {
-  name: string | null;
-  email: string | null;
-};
+const PLACEHOLDER_LABELS = new Set([
+  "kullanıcı yükleniyor...",
+  "kullanıcı yükleniyor",
+  "kullanıcı",
+  "hesap",
+  "user",
+  "loading",
+]);
 
 function cleanText(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
-  // Boş ayraç / tire kalıntıları
   if (trimmed === "-" || trimmed === "—" || trimmed === "–") return null;
+  if (PLACEHOLDER_LABELS.has(trimmed.toLowerCase())) return null;
   return trimmed;
 }
 
@@ -38,6 +42,19 @@ export function emailLocalPart(email: string | null | undefined): string | null 
   const local = mail.split("@")[0]?.trim() ?? "";
   return local || null;
 }
+
+/**
+ * Son çare: yalnızca e-posta verisi.
+ * ASLA "Kullanıcı Yükleniyor..." / "Kullanıcı" dönmez.
+ */
+function resolveLabelFallback(email: string | null): string {
+  return emailLocalPart(email) || email || "";
+}
+
+type NameParts = {
+  name: string | null;
+  email: string | null;
+};
 
 /** Profil + e-postadan ad ve e-posta çıkarır. */
 export function extractUserNameParts(
@@ -68,42 +85,8 @@ export function extractUserNameParts(
 }
 
 /**
- * Son çare etiket — asla tek başına "-", "—", null, undefined dönmez.
- */
-function resolveLabelFallback(email: string | null): string {
-  return emailLocalPart(email) || email || "Kullanıcı Yükleniyor...";
-}
-
-/**
- * UI header/menü için kesin fallback zinciri:
- * metadata.full_name → profile.full_name → email local → email → yükleniyor
- */
-export function resolveUiDisplayName(input: {
-  metadataFullName?: string | null;
-  profileFullName?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
-  loading?: boolean;
-}): string {
-  const meta = cleanText(input.metadataFullName);
-  const profile = cleanText(input.profileFullName);
-  const combined = `${cleanText(input.firstName) ?? ""} ${cleanText(input.lastName) ?? ""}`.trim();
-  const local = emailLocalPart(input.email);
-  const mail = cleanText(input.email);
-
-  const resolved = meta || profile || combined || local || mail;
-  if (resolved) return resolved;
-
-  if (input.loading) return "Kullanıcı Yükleniyor...";
-  console.warn("[resolveUiDisplayName] kullanıcı adı çözülemedi", input);
-  return "Kullanıcı Yükleniyor...";
-}
-
-/**
- * Kişi adı (görev kartı / atanan kişi):
- * full_name → first_name + last_name → first_name → e-posta yerel kısmı
- * Kartta "Ali" / "Ali Yılmaz" görünür; mümkünse e-posta basılmaz.
+ * Kişi adı (görev kartı / atanan kişi / tablo):
+ * full_name → first+last → first → email local → email → ""
  */
 export function formatPersonName(
   profile: Record<string, unknown> | null | undefined,
@@ -125,43 +108,40 @@ export function formatPersonName(
   const username = cleanText(profile?.username);
   if (username) return username;
 
-  const mail =
-    cleanText(email) || cleanText(profile?.email) || null;
+  const mail = cleanText(email) || cleanText(profile?.email) || null;
   return emailLocalPart(mail) || mail || "";
 }
 
-
-/**
- * Kompakt etiket (header, kart): Ad Soyad → e-posta → e-posta yerel kısmı.
- */
+/** Header / kompakt: ad → e-posta → e-posta local → "" */
 export function formatUserCompact(
   profile?: Record<string, unknown> | null,
   email?: string | null,
 ): string {
-  const person = formatPersonName(profile, email);
-  if (person) return person;
-  const parts = extractUserNameParts(profile, email);
-  if (parts.email) return parts.email;
-  return resolveLabelFallback(parts.email);
+  return formatPersonName(profile, email);
 }
 
-/** Dropdown: "Ali" veya "Ali Yılmaz" (+ varsa e-posta) */
+/**
+ * Dropdown etiketi: Ad Soyad veya Ad Soyad (email) veya email/@öncesi.
+ * Placeholder metin yok.
+ */
 export function formatMemberOptionLabel(
   profile: Record<string, unknown> | null | undefined,
   email: string | null | undefined,
 ): string {
   const name = formatPersonName(profile, email);
   const mail = cleanText(email) || cleanText(profile?.email) || null;
+  const local = emailLocalPart(mail);
 
-  if (name && mail && name !== mail && name !== emailLocalPart(mail)) {
+  // formatPersonName zaten local döndüyse tekrar (email) ekleme
+  if (name && mail && name !== mail && name !== local) {
     return `${name} (${mail})`;
   }
   if (name) return name;
   if (mail) return mail;
-  return resolveLabelFallback(mail);
+  return "";
 }
 
-/** Auth user_metadata + email → görünen ad (client/header). */
+/** Auth metadata + email → görünen ad */
 export function formatAuthUserLabel(input?: {
   email?: string | null;
   user_metadata?: {
@@ -171,9 +151,7 @@ export function formatAuthUserLabel(input?: {
     display_name?: string;
   } | null;
 } | null): string {
-  if (!input) {
-    return "Kullanıcı Yükleniyor...";
-  }
+  if (!input) return "";
   const meta = input.user_metadata ?? undefined;
   return formatUserCompact(
     {
@@ -181,6 +159,26 @@ export function formatAuthUserLabel(input?: {
       display_name: meta?.display_name,
       first_name: meta?.first_name,
       last_name: meta?.last_name,
+      email: input.email,
+    },
+    input.email,
+  );
+}
+
+/** @deprecated — formatPersonName kullan; loading UI'da skeleton ile ayrılır */
+export function resolveUiDisplayName(input: {
+  metadataFullName?: string | null;
+  profileFullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  loading?: boolean;
+}): string {
+  return formatPersonName(
+    {
+      full_name: input.profileFullName || input.metadataFullName,
+      first_name: input.firstName,
+      last_name: input.lastName,
       email: input.email,
     },
     input.email,
