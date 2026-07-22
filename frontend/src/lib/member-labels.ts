@@ -145,6 +145,21 @@ export function formatUserCompact(
   return resolveLabelFallback(parts.email);
 }
 
+/** Dropdown: "Ali" veya "Ali Yılmaz" (+ varsa e-posta) */
+export function formatMemberOptionLabel(
+  profile: Record<string, unknown> | null | undefined,
+  email: string | null | undefined,
+): string {
+  const name = formatPersonName(profile, email);
+  const mail = cleanText(email) || cleanText(profile?.email) || null;
+
+  if (name && mail && name !== mail && name !== emailLocalPart(mail)) {
+    return `${name} (${mail})`;
+  }
+  if (name) return name;
+  if (mail) return mail;
+  return resolveLabelFallback(mail);
+}
 
 /** Auth user_metadata + email → görünen ad (client/header). */
 export function formatAuthUserLabel(input?: {
