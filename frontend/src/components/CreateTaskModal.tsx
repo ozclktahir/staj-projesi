@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import { createTask } from "@/app/actions/create-task";
 import { getWorkspaceMembers } from "@/app/actions/workspace-members";
 import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
+import { cleanText, emailLocalPart } from "@/lib/member-labels";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -216,10 +217,10 @@ export function CreateTaskModal({
               <option value="">Atanmamış</option>
               {members.map((member) => {
                 const label =
-                  member.fullName?.trim() ||
-                  member.displayName?.trim() ||
-                  member.email?.split("@")[0] ||
-                  member.email ||
+                  cleanText(member.fullName) ||
+                  cleanText(member.displayName) ||
+                  emailLocalPart(member.email) ||
+                  cleanText(member.email) ||
                   "";
                 if (!label) return null;
                 return (

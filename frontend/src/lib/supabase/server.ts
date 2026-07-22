@@ -9,10 +9,11 @@ import type {
   TaskStatus,
 } from "@/lib/supabase/types";
 import {
+  cleanText,
+  emailLocalPart,
   formatPersonName,
   formatUserCompact,
-  PROFILE_SELECT_FIELDS,
-  PROFILE_SELECT_FIELDS_FALLBACK,
+  loadProfilesByIds,
 } from "@/lib/member-labels";
 import {
   getMemberVisibleProjectIds,
@@ -129,24 +130,24 @@ function resolveUserName(user: User, profile?: Record<string, unknown> | null): 
   const merged: Record<string, unknown> = {
     ...(profile ?? {}),
     full_name:
-      (typeof profile?.full_name === "string" && profile.full_name.trim()) ||
-      meta?.full_name ||
+      cleanText(profile?.full_name) ||
+      cleanText(meta?.full_name) ||
       null,
     display_name:
-      (typeof profile?.display_name === "string" && profile.display_name.trim()) ||
-      meta?.display_name ||
+      cleanText(profile?.display_name) ||
+      cleanText(meta?.display_name) ||
       null,
     first_name:
-      (typeof profile?.first_name === "string" && profile.first_name.trim()) ||
-      meta?.first_name ||
+      cleanText(profile?.first_name) ||
+      cleanText(meta?.first_name) ||
       null,
     last_name:
-      (typeof profile?.last_name === "string" && profile.last_name.trim()) ||
-      meta?.last_name ||
+      cleanText(profile?.last_name) ||
+      cleanText(meta?.last_name) ||
       null,
     email:
-      (typeof profile?.email === "string" && profile.email.trim()) ||
-      user.email ||
+      cleanText(profile?.email) ||
+      cleanText(user.email) ||
       null,
   };
 
@@ -168,54 +169,42 @@ export async function getCurrentUserProjects(
 
     const { supabase, user } = auth;
 
-    let profile: Record<string, unknown> | null = null;
-    {
-      const { data } = await supabase
-        .from("profiles")
-        .select(PROFILE_SELECT_FIELDS)
-        .eq("id", user.id)
-        .maybeSingle();
-      if (data) {
-        profile = data as Record<string, unknown>;
-      } else {
-        const { data: fallback } = await supabase
-          .from("profiles")
-          .select(PROFILE_SELECT_FIELDS_FALLBACK)
-          .eq("id", user.id)
-          .maybeSingle();
-        profile = (fallback as Record<string, unknown> | null) ?? null;
-      }
-    }
+    const profileMap = await loadProfilesByIds(supabase, [user.id]);
+    let profile = profileMap.get(user.id) ?? null;
 
     const userName = resolveUserName(user, profile);
 
-    // full_name boşsa metadata'dan profiles'a geri yaz (eski test kullanıcıları)
+    // full_name boş / placeholder ise metadata veya e-posta local ile geri yaz
     try {
       const meta = user.user_metadata as
         | { full_name?: string; first_name?: string; last_name?: string }
         | undefined;
-      const profileFull =
-        typeof profile?.full_name === "string" ? profile.full_name.trim() : "";
+      const profileFull = cleanText(profile?.full_name);
       const metaFull =
-        meta?.full_name?.trim() ||
-        `${meta?.first_name ?? ""} ${meta?.last_name ?? ""}`.trim();
-      if (!profileFull && metaFull) {
-        await supabase.from("profiles").upsert({
+        cleanText(meta?.full_name) ||
+        `${cleanText(meta?.first_name) ?? ""} ${cleanText(meta?.last_name) ?? ""}`.trim() ||
+        null;
+      const local = emailLocalPart(user.email);
+      const nextFull = metaFull || local;
+      if (!profileFull && nextFull) {
+        const payload: Record<string, unknown> = {
           id: user.id,
           email: user.email ?? null,
-          full_name: metaFull,
-          first_name: meta?.first_name?.trim() || null,
-          last_name: meta?.last_name?.trim() || null,
-        });
-      } else if (!profileFull && user.email) {
-        const local = user.email.split("@")[0]?.trim();
-        if (local) {
+          full_name: nextFull,
+        };
+        if (cleanText(meta?.first_name)) payload.first_name = cleanText(meta?.first_name);
+        if (cleanText(meta?.last_name)) payload.last_name = cleanText(meta?.last_name);
+        const { error: upsertError } = await supabase.from("profiles").upsert(payload);
+        if (upsertError) {
+          // first_name sütunu yoksa sade payload
           await supabase.from("profiles").upsert({
             id: user.id,
-            email: user.email,
-            full_name: local,
+            email: user.email ?? null,
+            full_name: nextFull,
           });
         }
+        const refreshed = await loadProfilesByIds(supabase, [user.id]);
+        profile = refreshed.get(user.id) ?? profile;
       }
     } catch (syncError) {
       console.warn("[getCurrentUserProjects] profile sync:", syncError);
@@ -563,36 +552,7 @@ async function enrichTasksWithAssignees(
     return tasks.map((t) => ({ ...t, assignee: null }));
   }
 
-  const profileById = new Map<string, Record<string, unknown>>();
-  const { data: profiles, error } = await supabase
-    .from("profiles")
-    .select(PROFILE_SELECT_FIELDS)
-    .in("id", assigneeIds);
-
-  if (error) {
-    console.warn("[enrichTasksWithAssignees] profiles:", error.message);
-    const { data: fallback } = await supabase
-      .from("profiles")
-      .select(PROFILE_SELECT_FIELDS_FALLBACK)
-      .in("id", assigneeIds);
-    for (const p of fallback ?? []) {
-      if (p && typeof p === "object" && "id" in p) {
-        profileById.set(
-          String((p as { id: string }).id),
-          p as Record<string, unknown>,
-        );
-      }
-    }
-  } else {
-    for (const p of profiles ?? []) {
-      if (p && typeof p === "object" && "id" in p) {
-        profileById.set(
-          String((p as { id: string }).id),
-          p as Record<string, unknown>,
-        );
-      }
-    }
-  }
+  const profileById = await loadProfilesByIds(supabase, assigneeIds);
 
   console.info("[enrichTasksWithAssignees]", {
     assigneeIds,

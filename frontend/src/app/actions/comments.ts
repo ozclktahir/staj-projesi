@@ -7,8 +7,7 @@ import type { TaskComment } from "@/lib/supabase/types";
 import {
   formatAuthUserLabel,
   formatMemberOptionLabel,
-  PROFILE_SELECT_FIELDS,
-  PROFILE_SELECT_FIELDS_FALLBACK,
+  loadProfilesByIds,
 } from "@/lib/member-labels";
 
 export type GetCommentsResult =
@@ -69,29 +68,10 @@ async function enrichComments(
     ),
   ];
 
-  const profileById = new Map<string, Record<string, unknown>>();
-  if (userIds.length > 0) {
-    let { data: profiles, error } = await supabase
-      .from("profiles")
-      .select(PROFILE_SELECT_FIELDS)
-      .in("id", userIds);
-
-    if (error) {
-      ({ data: profiles, error } = await supabase
-        .from("profiles")
-        .select(PROFILE_SELECT_FIELDS_FALLBACK)
-        .in("id", userIds));
-    }
-
-    for (const profile of profiles ?? []) {
-      if (profile && typeof profile === "object" && "id" in profile) {
-        profileById.set(
-          String((profile as { id: string }).id),
-          profile as Record<string, unknown>,
-        );
-      }
-    }
-  }
+  const profileById =
+    userIds.length > 0
+      ? await loadProfilesByIds(supabase, userIds)
+      : new Map<string, Record<string, unknown>>();
 
   return rows.map((row) => {
     const uid = typeof row.user_id === "string" ? row.user_id : null;
@@ -243,17 +223,11 @@ export async function createComment(
     });
 
     // Profil varsa onu tercih et
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select(PROFILE_SELECT_FIELDS_FALLBACK)
-      .eq("id", user.id)
-      .maybeSingle();
+    const profile =
+      (await loadProfilesByIds(supabase, [user.id])).get(user.id) ?? null;
 
     const resolvedAuthor = profile
-      ? formatMemberOptionLabel(
-          profile as Record<string, unknown>,
-          user.email ?? null,
-        )
+      ? formatMemberOptionLabel(profile, user.email ?? null)
       : authorName;
 
     return {

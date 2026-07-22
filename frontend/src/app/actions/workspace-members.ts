@@ -2,9 +2,8 @@
 
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import {
-  formatPersonName,
-  PROFILE_SELECT_FIELDS,
-  PROFILE_SELECT_FIELDS_FALLBACK,
+  loadProfilesByIds,
+  resolveMemberDisplayFields,
 } from "@/lib/member-labels";
 import {
   resolveWorkspaceRole,
@@ -76,77 +75,34 @@ export async function getWorkspaceMembers(
       userIds.push(user.id);
     }
 
-    const profileById = new Map<string, Record<string, unknown>>();
-    if (userIds.length > 0) {
-      const { data: profiles, error: profileError } = await supabase
-        .from("profiles")
-        .select(PROFILE_SELECT_FIELDS)
-        .in("id", userIds);
-
-      // Bazı şemalarda display_name / first_name yok — fallback select
-      if (profileError) {
-        console.warn(
-          "[getWorkspaceMembers] profile select fallback:",
-          profileError.message,
-        );
-        const { data: fallbackProfiles } = await supabase
-          .from("profiles")
-          .select(PROFILE_SELECT_FIELDS_FALLBACK)
-          .in("id", userIds);
-        for (const p of fallbackProfiles ?? []) {
-          if (p && typeof p === "object" && "id" in p) {
-            profileById.set(
-              String((p as { id: string }).id),
-              p as Record<string, unknown>,
-            );
-          }
-        }
-      } else {
-        for (const p of profiles ?? []) {
-          if (p && typeof p === "object" && "id" in p) {
-            profileById.set(
-              String((p as { id: string }).id),
-              p as Record<string, unknown>,
-            );
-          }
-        }
-      }
-    }
+    const profileById = await loadProfilesByIds(supabase, userIds);
 
     const members: WorkspaceMemberOption[] = memberRows.map((row) => {
       const uid = row.user_id as string;
       const profile = profileById.get(uid) ?? null;
-      const email =
-        (profile && typeof profile.email === "string" && profile.email) ||
-        (uid === user.id ? (user.email ?? null) : null);
-      const fullName =
-        (profile &&
-          typeof profile.full_name === "string" &&
-          profile.full_name.trim()) ||
-        null;
-      const avatarUrl =
-        (profile &&
-          typeof profile.avatar_url === "string" &&
-          profile.avatar_url) ||
-        null;
+      const emailHint = uid === user.id ? (user.email ?? null) : null;
+      const fields = resolveMemberDisplayFields(profile, emailHint);
 
-      const personName = formatPersonName(profile, email);
       return {
         id: uid,
-        email,
+        email: fields.email,
         role: (row.role as string | null) ?? null,
-        fullName: personName || fullName,
-        avatarUrl,
-        // Dropdown'da gerçek ad: "Ali" / "Ali Yılmaz" / e-posta local
-        displayName:
-          personName ||
-          (email ? email.split("@")[0] : "") ||
-          email ||
-          "",
+        fullName: fields.fullName,
+        avatarUrl: fields.avatarUrl,
+        displayName: fields.displayName,
       };
     });
 
-    // Member ise yalnızca kendini döndür (assignee kısıtı UI)
+    console.info("[getWorkspaceMembers]", {
+      wsId,
+      count: members.length,
+      labels: members.map((m) => ({
+        id: m.id,
+        displayName: m.displayName,
+        email: m.email,
+      })),
+    });
+
     if (!roleCtx.isAdmin) {
       return {
         success: true,

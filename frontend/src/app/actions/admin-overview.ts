@@ -3,9 +3,8 @@
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { isAdminRole } from "@/lib/rbac";
 import {
-  formatPersonName,
-  PROFILE_SELECT_FIELDS,
-  PROFILE_SELECT_FIELDS_FALLBACK,
+  loadProfilesByIds,
+  resolveMemberDisplayFields,
 } from "@/lib/member-labels";
 import {
   normalizeTaskStatusInput,
@@ -122,26 +121,7 @@ export async function getAdminOverview(
       memberRows.push({ user_id: user.id, role: "OWNER" });
     }
 
-    const profileById = new Map<string, Record<string, unknown>>();
-    if (userIds.length > 0) {
-      let { data: profiles, error: profileError } = await supabase
-        .from("profiles")
-        .select(PROFILE_SELECT_FIELDS)
-        .in("id", userIds);
-
-      if (profileError) {
-        ({ data: profiles } = await supabase
-          .from("profiles")
-          .select(PROFILE_SELECT_FIELDS_FALLBACK)
-          .in("id", userIds));
-      }
-
-      for (const p of profiles ?? []) {
-        if (p && typeof p === "object" && "id" in p) {
-          profileById.set(String((p as { id: string }).id), p as Record<string, unknown>);
-        }
-      }
-    }
+    const profileById = await loadProfilesByIds(supabase, userIds);
 
     const { data: projects } = await supabase
       .from("projects")
@@ -198,9 +178,8 @@ export async function getAdminOverview(
     const overview: AdminMemberOverview[] = memberRows.map((m) => {
       const uid = m.user_id as string;
       const profile = profileById.get(uid) ?? null;
-      const email =
-        (profile && typeof profile.email === "string" && profile.email) ||
-        null;
+      const emailHint = uid === user.id ? (user.email ?? null) : null;
+      const fields = resolveMemberDisplayFields(profile, emailHint);
       const counts = taskCounts.get(uid) ?? {
         done: 0,
         inProgress: 0,
@@ -209,12 +188,8 @@ export async function getAdminOverview(
 
       return {
         userId: uid,
-        email,
-        displayName:
-          formatPersonName(profile, email) ||
-          (email ? email.split("@")[0] : "") ||
-          email ||
-          "",
+        email: fields.email,
+        displayName: fields.displayName,
         role: (m.role as string) ?? "Member",
         projectNames: projectsByUser.get(uid) ?? [],
         tasksDone: counts.done,

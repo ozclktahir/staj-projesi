@@ -16,6 +16,7 @@ import { updateTask } from "@/app/actions/update-task";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { getWorkspaceMembers } from "@/app/actions/workspace-members";
 import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
+import { cleanText, emailLocalPart } from "@/lib/member-labels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -366,10 +367,10 @@ export function TaskDetailSheet({
                   <option value="">Atanmamış</option>
                   {members.map((member) => {
                     const label =
-                      member.fullName?.trim() ||
-                      member.displayName?.trim() ||
-                      member.email?.split("@")[0] ||
-                      member.email ||
+                      cleanText(member.fullName) ||
+                      cleanText(member.displayName) ||
+                      emailLocalPart(member.email) ||
+                      cleanText(member.email) ||
                       "";
                     if (!label) return null;
                     return (

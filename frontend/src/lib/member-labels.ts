@@ -1,5 +1,6 @@
 import { isAdminRole } from "@/lib/rbac";
 import type { WorkspaceListItem } from "@/lib/supabase/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type WorkspaceMemberOption = {
   id: string;
@@ -11,11 +12,18 @@ export type WorkspaceMemberOption = {
   avatarUrl: string | null;
 };
 
-export const PROFILE_SELECT_FIELDS =
-  "id, full_name, display_name, first_name, last_name, email, avatar_url, name, username";
+/** Gerçek şemada kesin olan sütunlar. Önce bunları dene (hızlı başarı). */
+export const PROFILE_SELECT_BASE = "id, email, full_name, avatar_url";
 
-export const PROFILE_SELECT_FIELDS_FALLBACK =
-  "id, full_name, email, avatar_url, first_name, last_name";
+/** first_name / last_name migrate edildiyse */
+export const PROFILE_SELECT_WITH_NAMES =
+  "id, email, full_name, avatar_url, first_name, last_name";
+
+/** @deprecated — PROFILE_SELECT_WITH_NAMES kullan; yoksa loadProfilesByIds fallback eder */
+export const PROFILE_SELECT_FIELDS = PROFILE_SELECT_WITH_NAMES;
+
+/** @deprecated — PROFILE_SELECT_BASE kullan */
+export const PROFILE_SELECT_FIELDS_FALLBACK = PROFILE_SELECT_BASE;
 
 const PLACEHOLDER_LABELS = new Set([
   "kullanıcı yükleniyor...",
@@ -26,7 +34,12 @@ const PLACEHOLDER_LABELS = new Set([
   "loading",
 ]);
 
-function cleanText(value: unknown): string | null {
+export function isPlaceholderLabel(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  return PLACEHOLDER_LABELS.has(value.trim().toLowerCase());
+}
+
+export function cleanText(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -41,14 +54,6 @@ export function emailLocalPart(email: string | null | undefined): string | null 
   if (!mail || !mail.includes("@")) return mail;
   const local = mail.split("@")[0]?.trim() ?? "";
   return local || null;
-}
-
-/**
- * Son çare: yalnızca e-posta verisi.
- * ASLA "Kullanıcı Yükleniyor..." / "Kullanıcı" dönmez.
- */
-function resolveLabelFallback(email: string | null): string {
-  return emailLocalPart(email) || email || "";
 }
 
 type NameParts = {
@@ -132,7 +137,6 @@ export function formatMemberOptionLabel(
   const mail = cleanText(email) || cleanText(profile?.email) || null;
   const local = emailLocalPart(mail);
 
-  // formatPersonName zaten local döndüyse tekrar (email) ekleme
   if (name && mail && name !== mail && name !== local) {
     return `${name} (${mail})`;
   }
@@ -163,6 +167,66 @@ export function formatAuthUserLabel(input?: {
     },
     input.email,
   );
+}
+
+/**
+ * profiles satırlarını güvenli çeker.
+ * Önce first_name/last_name dener; sütun yoksa sadece base kolonlara düşer.
+ * ASLA olmayan display_name / name / username istemez.
+ */
+export async function loadProfilesByIds(
+  supabase: SupabaseClient,
+  userIds: string[],
+): Promise<Map<string, Record<string, unknown>>> {
+  const map = new Map<string, Record<string, unknown>>();
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (ids.length === 0) return map;
+
+  const attempts = [PROFILE_SELECT_BASE, PROFILE_SELECT_WITH_NAMES, "id, email, full_name"];
+
+  for (const select of attempts) {
+    const { data, error } = await supabase.from("profiles").select(select).in("id", ids);
+    if (error) {
+      console.warn("[loadProfilesByIds]", select, error.message);
+      continue;
+    }
+    for (const row of data ?? []) {
+      if (row && typeof row === "object" && "id" in row) {
+        map.set(String((row as { id: string }).id), row as Record<string, unknown>);
+      }
+    }
+    // Select başarılı — satır olmasa bile daha dar select'e gerek yok
+    break;
+  }
+
+  return map;
+}
+
+/** Üye/atanan etiketi — asla ham placeholder full_name kullanma */
+export function resolveMemberDisplayFields(
+  profile: Record<string, unknown> | null | undefined,
+  emailHint?: string | null,
+): {
+  email: string | null;
+  fullName: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+} {
+  const email =
+    cleanText(emailHint) ||
+    cleanText(profile?.email) ||
+    null;
+  const displayName = formatPersonName(profile, email);
+  const avatarUrl =
+    (typeof profile?.avatar_url === "string" && profile.avatar_url.trim()) ||
+    null;
+
+  return {
+    email,
+    fullName: displayName || null,
+    displayName,
+    avatarUrl,
+  };
 }
 
 /** @deprecated — formatPersonName kullan; loading UI'da skeleton ile ayrılır */

@@ -20,6 +20,7 @@ import {
   type TaskAssignee,
   type TaskStatus,
 } from "@/lib/supabase/types";
+import { cleanText, emailLocalPart } from "@/lib/member-labels";
 import { cn } from "@/lib/utils";
 
 type ProjectTaskBoardProps = {
@@ -59,9 +60,9 @@ function AssigneeBadge({ assignee }: { assignee?: TaskAssignee | null }) {
   }
 
   const label =
-    assignee.displayName?.trim() ||
-    assignee.email?.split("@")[0]?.trim() ||
-    assignee.email?.trim() ||
+    cleanText(assignee.displayName) ||
+    emailLocalPart(assignee.email) ||
+    cleanText(assignee.email) ||
     "";
 
   if (!label) {
