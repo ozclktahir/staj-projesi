@@ -42,19 +42,19 @@ export function DashboardHome({
       label: "Toplam Görev",
       value: stats.total,
       icon: ListTodo,
-      accent: "bg-primary/15 text-primary",
+      accent: "border border-primary/30 bg-primary/15 text-primary",
     },
     {
       label: "Devam Eden",
       value: stats.inProgress,
       icon: CircleDashed,
-      accent: "bg-sky-500/15 text-sky-400",
+      accent: "border border-sky-500/30 bg-sky-500/15 text-sky-600 dark:text-sky-400",
     },
     {
       label: "Tamamlanan",
       value: stats.done,
       icon: CheckCircle2,
-      accent: "bg-emerald-500/15 text-emerald-400",
+      accent: "border border-emerald-500/30 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
     },
   ] as const;
 

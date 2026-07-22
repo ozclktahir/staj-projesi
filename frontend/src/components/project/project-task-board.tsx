@@ -144,11 +144,11 @@ function applyColumnPrefs(
 function priorityClass(priority: ProjectTask["priority"]): string {
   switch (priority) {
     case "HIGH":
-      return "bg-red-500/15 text-red-400";
+      return "border border-red-500/30 bg-red-500/15 text-red-600 dark:text-red-400";
     case "LOW":
-      return "bg-emerald-500/15 text-emerald-400";
+      return "border border-emerald-500/30 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
     default:
-      return "bg-primary/15 text-primary";
+      return "border border-amber-500/30 bg-amber-500/15 text-amber-600 dark:text-amber-400";
   }
 }
 
@@ -361,7 +361,7 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
             <section
               key={status}
               className={cn(
-                "flex min-h-[280px] flex-col rounded-lg border border-border border-t-4 bg-muted/40 p-3",
+                "flex min-h-[280px] flex-col rounded-lg border-2 border-border border-t-4 bg-muted/40 p-3 shadow-sm",
                 columnAccent[status],
               )}
             >
@@ -398,7 +398,7 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
                   visible.map((task) => (
                     <div
                       key={task.id}
-                      className="rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/40 hover:shadow-md"
+                      className="rounded-lg border-2 border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/50 hover:shadow-md"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <button

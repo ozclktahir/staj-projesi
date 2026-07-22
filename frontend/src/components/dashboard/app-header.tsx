@@ -58,7 +58,7 @@ function AppHeaderInner({
   }
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b-2 border-border bg-background/80 px-6 backdrop-blur">
       <div>
         <p className="text-sm text-muted-foreground">Genel bakış</p>
         <h1 className="text-base font-semibold tracking-tight text-foreground">
@@ -82,7 +82,7 @@ function AppHeaderInner({
         />
 
         <div
-          className="flex max-w-[240px] items-center gap-2 rounded-[var(--radius)] border border-border bg-card px-2.5 py-1.5"
+          className="flex max-w-[240px] items-center gap-2 rounded-[var(--radius)] border-2 border-border bg-card px-2.5 py-1.5 shadow-sm"
           title={secondary ?? displayName}
         >
           <span
