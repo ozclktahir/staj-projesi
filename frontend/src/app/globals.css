@@ -3,10 +3,37 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Siyah–turuncu marka teması — light/dark aynı palet */
-:root,
-.dark {
+/* Açık Mod — Beyaz / Mavi / Turuncu */
+:root {
   --radius: 0.5rem;
+  --background: 0 0% 100%;
+  --foreground: 222.2 47.4% 11.2%;
+  --card: 210 40% 98%;
+  --card-foreground: 222.2 47.4% 11.2%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47.4% 11.2%;
+  --primary: 24.6 95% 53.1%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 217.2 91.2% 59.8%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 214 95% 93%;
+  --accent-foreground: 224.3 76.3% 40%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 24.6 95% 53.1%;
+  --chart-1: 24.6 95% 53.1%;
+  --chart-2: 217.2 91.2% 59.8%;
+  --chart-3: 160 60% 45%;
+  --chart-4: 30 80% 55%;
+  --chart-5: 340 75% 55%;
+}
+
+/* Koyu Mod — siyah / turuncu */
+.dark {
   --background: 0 0% 4%;
   --foreground: 210 40% 98%;
   --card: 0 0% 7%;
