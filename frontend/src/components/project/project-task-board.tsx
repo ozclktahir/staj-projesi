@@ -1,8 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ListTodo, MoreHorizontal, Trash2, UserRound } from "lucide-react";
+import {
+  ArrowUpDown,
+  Check,
+  ListTodo,
+  MoreHorizontal,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import { toast } from "sonner";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { DeleteTaskModal } from "@/components/delete-task-modal";
@@ -17,6 +24,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -25,6 +34,7 @@ import {
   TASK_STATUS_LABELS,
   type ProjectTask,
   type TaskAssignee,
+  type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
 import { cleanText, emailLocalPart } from "@/lib/member-labels";
@@ -34,11 +44,102 @@ type ProjectTaskBoardProps = {
   tasks: ProjectTask[];
 };
 
+type ColumnSort =
+  | "priority_desc"
+  | "priority_asc"
+  | "date_newest"
+  | "date_oldest";
+
+type ColumnFilter = "ALL" | TaskPriority;
+
+type ColumnPrefs = {
+  sort: ColumnSort;
+  filter: ColumnFilter;
+};
+
+const DEFAULT_COLUMN_PREFS: ColumnPrefs = {
+  sort: "priority_desc",
+  filter: "ALL",
+};
+
 const columnAccent: Record<TaskStatus, string> = {
   TODO: "border-t-muted-foreground/50",
   IN_PROGRESS: "border-t-primary",
   DONE: "border-t-emerald-500",
 };
+
+const SORT_OPTIONS: { value: ColumnSort; label: string }[] = [
+  { value: "priority_desc", label: "Öncelik: Yüksek → Düşük" },
+  { value: "priority_asc", label: "Öncelik: Düşük → Yüksek" },
+  { value: "date_newest", label: "Tarih: En Yeni" },
+  { value: "date_oldest", label: "Tarih: En Eski" },
+];
+
+const FILTER_OPTIONS: { value: ColumnFilter; label: string }[] = [
+  { value: "ALL", label: "Tümü" },
+  { value: "HIGH", label: "Sadece Yüksek" },
+  { value: "MEDIUM", label: "Sadece Orta" },
+  { value: "LOW", label: "Sadece Düşük" },
+];
+
+/** Yüksek=3, Orta=2, Düşük=1, Önceliksiz=0 */
+export function getPriorityWeight(
+  priority: ProjectTask["priority"] | string | null | undefined,
+): number {
+  if (!priority) return 0;
+  const p = String(priority).trim().toUpperCase();
+  if (
+    p === "HIGH" ||
+    p === "YUKSEK" ||
+    p === "YÜKSEK" ||
+    p === "URGENT" ||
+    p === "ACIL"
+  ) {
+    return 3;
+  }
+  if (p === "MEDIUM" || p === "ORTA" || p === "NORMAL") {
+    return 2;
+  }
+  if (p === "LOW" || p === "DUSUK" || p === "DÜŞÜK") {
+    return 1;
+  }
+  if (p === "NONE" || p === "ONCELIKSIZ" || p === "ÖNCELİKSİZ") {
+    return 0;
+  }
+  return 0;
+}
+
+function taskDateMs(task: ProjectTask): number {
+  if (!task.created_at) return 0;
+  const ms = new Date(task.created_at).getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+function applyColumnPrefs(
+  columnTasks: ProjectTask[],
+  prefs: ColumnPrefs,
+): ProjectTask[] {
+  const filtered =
+    prefs.filter === "ALL"
+      ? columnTasks
+      : columnTasks.filter((task) => task.priority === prefs.filter);
+
+  const sorted = [...filtered];
+  sorted.sort((a, b) => {
+    switch (prefs.sort) {
+      case "priority_asc":
+        return getPriorityWeight(a.priority) - getPriorityWeight(b.priority);
+      case "date_newest":
+        return taskDateMs(b) - taskDateMs(a);
+      case "date_oldest":
+        return taskDateMs(a) - taskDateMs(b);
+      case "priority_desc":
+      default:
+        return getPriorityWeight(b.priority) - getPriorityWeight(a.priority);
+    }
+  });
+  return sorted;
+}
 
 function priorityClass(priority: ProjectTask["priority"]): string {
   switch (priority) {
@@ -109,6 +210,69 @@ function AssigneeBadge({ assignee }: { assignee?: TaskAssignee | null }) {
   );
 }
 
+function ColumnSortFilterMenu({
+  prefs,
+  onChange,
+}: {
+  prefs: ColumnPrefs;
+  onChange: (next: ColumnPrefs) => void;
+}) {
+  const isDefault =
+    prefs.sort === DEFAULT_COLUMN_PREFS.sort &&
+    prefs.filter === DEFAULT_COLUMN_PREFS.filter;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Sıralama ve filtre"
+          title="Sıralama / Filtre"
+          className={cn(
+            "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card hover:text-foreground",
+            !isDefault && "bg-primary/10 text-primary",
+          )}
+        >
+          <ArrowUpDown className="size-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Sıralama</DropdownMenuLabel>
+        {SORT_OPTIONS.map((option) => (
+          <DropdownMenuItem
+            key={option.value}
+            onSelect={(event) => {
+              event.preventDefault();
+              onChange({ ...prefs, sort: option.value });
+            }}
+          >
+            <span className="flex-1">{option.label}</span>
+            {prefs.sort === option.value ? (
+              <Check className="size-3.5 text-primary" />
+            ) : null}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Filtre (öncelik)</DropdownMenuLabel>
+        {FILTER_OPTIONS.map((option) => (
+          <DropdownMenuItem
+            key={option.value}
+            onSelect={(event) => {
+              event.preventDefault();
+              onChange({ ...prefs, filter: option.value });
+            }}
+          >
+            <span className="flex-1">{option.label}</span>
+            {prefs.filter === option.value ? (
+              <Check className="size-3.5 text-primary" />
+            ) : null}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps) {
   const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
@@ -118,10 +282,26 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
     id: string;
     title: string;
   } | null>(null);
+  const [columnPrefs, setColumnPrefs] = useState<
+    Record<TaskStatus, ColumnPrefs>
+  >({
+    TODO: { ...DEFAULT_COLUMN_PREFS },
+    IN_PROGRESS: { ...DEFAULT_COLUMN_PREFS },
+    DONE: { ...DEFAULT_COLUMN_PREFS },
+  });
 
   useEffect(() => {
     setTasks(initialTasks);
   }, [initialTasks]);
+
+  const columns = useMemo(() => {
+    return TASK_STATUSES.map((status) => {
+      const raw = tasks.filter((task) => task.status === status);
+      const prefs = columnPrefs[status];
+      const visible = applyColumnPrefs(raw, prefs);
+      return { status, rawCount: raw.length, visible };
+    });
+  }, [tasks, columnPrefs]);
 
   function removeTaskFromBoard(taskId: string) {
     setTasks((prev) => prev.filter((task) => task.id !== taskId));
@@ -174,8 +354,8 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
   return (
     <>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {TASK_STATUSES.map((status) => {
-          const columnTasks = tasks.filter((task) => task.status === status);
+        {columns.map(({ status, rawCount, visible }) => {
+          const prefs = columnPrefs[status];
 
           return (
             <section
@@ -189,18 +369,33 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
                 <h3 className="text-sm font-semibold text-foreground">
                   {TASK_STATUS_LABELS[status]}
                 </h3>
-                <span className="rounded-md bg-card px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm">
-                  {columnTasks.length}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="rounded-md bg-card px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm">
+                    {prefs.filter === "ALL"
+                      ? rawCount
+                      : `${visible.length}/${rawCount}`}
+                  </span>
+                  <ColumnSortFilterMenu
+                    prefs={prefs}
+                    onChange={(next) =>
+                      setColumnPrefs((prev) => ({
+                        ...prev,
+                        [status]: next,
+                      }))
+                    }
+                  />
+                </div>
               </div>
 
               <div className="flex flex-1 flex-col gap-3">
-                {columnTasks.length === 0 ? (
+                {visible.length === 0 ? (
                   <p className="px-1 py-8 text-center text-xs text-muted-foreground">
-                    Bu kolonda görev yok
+                    {rawCount === 0
+                      ? "Bu kolonda görev yok"
+                      : "Filtreye uyan görev yok"}
                   </p>
                 ) : (
-                  columnTasks.map((task) => (
+                  visible.map((task) => (
                     <div
                       key={task.id}
                       className="rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/40 hover:shadow-md"
