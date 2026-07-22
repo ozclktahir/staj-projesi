@@ -280,6 +280,7 @@
 - Görev kartları, üye tablosu ve dropdown menülerindeki sabit "Kullanıcı Yükleniyor..." metinleri kaldırıldı. Profil verileri (Ad Soyad ve e-posta) dinamik olarak bağlandı.
 - `profiles` sorgusundaki olmayan sütunlar (`display_name` vb.) yüzünden profil okumasının tamamen düşmesi düzeltildi; `loadProfilesByIds` ile güvenli select + gerçek ad bağlama sağlandı.
 - Proje ve Görev silme (Delete Project / Delete Task) işlevleri onay modalları (AlertDialog), Toast bildirimleri ve yönlendirme mantıklarıyla birlikte eklendi.
+- Proje silme (Delete Project) işlemindeki veritabanı foreign key (cascade delete) ve RLS yetki engelleri çözüldü; silme sonrası yönlendirme ve state güncellemesi sağlandı.
 
 ### [21 Temmuz 2026] - Auth bağlantı düzeltmeleri ve projects.updated_at şema sync
 - Auth akışındaki bağlantı hataları (port ve exception düzeltmeleri) giderildi.

@@ -40,7 +40,7 @@ export function DeleteProjectModal({
     try {
       const result = await deleteProject(project.id);
       if (!result.success) {
-        console.error("[DeleteProjectModal]", result.error);
+        console.error("[DeleteProjectModal] deleteProject failed:", result.error);
         toast.error(result.error);
         return;
       }
@@ -49,8 +49,11 @@ export function DeleteProjectModal({
       onOpenChange(false);
 
       const workspaceId = result.workspaceId ?? project.workspaceId ?? null;
-      router.push(withWorkspaceQuery("/", workspaceId));
+      const target = withWorkspaceQuery("/", workspaceId);
+
+      // Liste/sidebar anında yenilensin
       router.refresh();
+      window.location.assign(target);
     } catch (error) {
       const message =
         error instanceof Error
