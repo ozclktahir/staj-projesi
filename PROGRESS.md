@@ -289,6 +289,7 @@
 - Keskin kenarlık ve dolgun renk paleti düzenlemeleri sadece Açık Mod (Light Mode) ile sınırlandırıldı. Koyu Mod (Dark Mode) orijinal stiline döndürüldü.
 - Sayfa ve modal geçişlerindeki yavaşlık giderildi. Lazy mounting, React.memo optimizasyonları, paralel veri çekme (Promise.all) ve sorgu caching mantığı entegre edildi.
 - Görev detaylarına Yorum Yapma (Task Comments) ve Dosya Yükleme (File Attachments) özellikleri entegre edildi. Supabase Storage ve ilişkisel veritabanı tabloları bağlandı.
+- Gerçek zamanlı bildirim merkezi (Notification Bell & Realtime) ve Workspace davet kabul/reddetme akışı eklendi.
 
 ### [21 Temmuz 2026] - Auth bağlantı düzeltmeleri ve projects.updated_at şema sync
 - Auth akışındaki bağlantı hataları (port ve exception düzeltmeleri) giderildi.

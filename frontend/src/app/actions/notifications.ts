@@ -74,7 +74,7 @@ export async function getMyPendingInvitations(): Promise<GetPendingInvitationsRe
       .from("workspace_invitations")
       .select("id, workspace_id, email, role, status, created_at")
       .ilike("email", email)
-      .eq("status", "PENDING")
+      .in("status", ["PENDING", "pending"])
       .order("created_at", { ascending: false });
 
     if (query.error?.message?.includes("workspace_invitations")) {
@@ -82,7 +82,7 @@ export async function getMyPendingInvitations(): Promise<GetPendingInvitationsRe
         .from("invitations")
         .select("id, workspace_id, email, role, status, created_at")
         .ilike("email", email)
-        .eq("status", "PENDING")
+        .in("status", ["PENDING", "pending"])
         .order("created_at", { ascending: false });
     }
 
@@ -145,62 +145,117 @@ export type NotificationItem = {
   message: string;
   isRead: boolean;
   createdAt: string | null;
+  link: string | null;
   metadata: Record<string, unknown> | null;
+  payload: Record<string, unknown> | null;
 };
+
+function isInviteType(type: string): boolean {
+  const t = type.trim().toLowerCase();
+  return t === "workspace_invite" || t === "workspace_invitation";
+}
+
+export function isWorkspaceInviteNotification(n: NotificationItem): boolean {
+  return isInviteType(n.type);
+}
+
+function mapNotificationRow(row: Record<string, unknown>): NotificationItem {
+  const metadata =
+    row.metadata && typeof row.metadata === "object"
+      ? (row.metadata as Record<string, unknown>)
+      : null;
+  const payload =
+    row.payload && typeof row.payload === "object"
+      ? (row.payload as Record<string, unknown>)
+      : metadata;
+
+  return {
+    id: row.id as string,
+    workspaceId: (row.workspace_id as string | null) ?? null,
+    type: String(row.type ?? ""),
+    title: String(row.title ?? ""),
+    message: String(row.message ?? ""),
+    isRead: Boolean(row.is_read),
+    createdAt: (row.created_at as string | null) ?? null,
+    link: (row.link as string | null) ?? null,
+    metadata,
+    payload,
+  };
+}
 
 /** Kullanıcının okunmamış / son bildirimleri (invite uyumlu). */
 export async function getMyNotifications(limit = 20): Promise<{
   success: boolean;
   notifications: NotificationItem[];
+  unreadCount: number;
   error?: string;
 }> {
   try {
     const auth = await getAuthenticatedUser();
     if (!auth) {
-      return { success: false, notifications: [], error: "Oturum yok." };
+      return {
+        success: false,
+        notifications: [],
+        unreadCount: 0,
+        error: "Oturum yok.",
+      };
     }
 
-    const { data, error } = await auth.supabase
+    let query = await auth.supabase
       .from("notifications")
       .select(
-        "id, workspace_id, type, title, message, is_read, created_at, metadata",
+        "id, workspace_id, type, title, message, is_read, created_at, metadata, payload, link",
       )
       .eq("user_id", auth.user.id)
       .order("created_at", { ascending: false })
       .limit(limit);
 
+    if (
+      query.error?.message?.includes("payload") ||
+      query.error?.message?.includes("link")
+    ) {
+      query = await auth.supabase
+        .from("notifications")
+        .select(
+          "id, workspace_id, type, title, message, is_read, created_at, metadata",
+        )
+        .eq("user_id", auth.user.id)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+    }
+
+    const { data, error } = query;
+
     if (error) {
-      // Tablo yoksa sessizce boş dön
       if (
         error.message.includes("notifications") ||
         error.code === "42P01" ||
         error.code === "PGRST205"
       ) {
-        return { success: true, notifications: [] };
+        return { success: true, notifications: [], unreadCount: 0 };
       }
-      return { success: false, notifications: [], error: error.message };
+      return {
+        success: false,
+        notifications: [],
+        unreadCount: 0,
+        error: error.message,
+      };
     }
+
+    const notifications = (data ?? []).map((row) =>
+      mapNotificationRow(row as Record<string, unknown>),
+    );
 
     return {
       success: true,
-      notifications: (data ?? []).map((row) => ({
-        id: row.id as string,
-        workspaceId: (row.workspace_id as string | null) ?? null,
-        type: String(row.type ?? ""),
-        title: String(row.title ?? ""),
-        message: String(row.message ?? ""),
-        isRead: Boolean(row.is_read),
-        createdAt: (row.created_at as string | null) ?? null,
-        metadata:
-          row.metadata && typeof row.metadata === "object"
-            ? (row.metadata as Record<string, unknown>)
-            : null,
-      })),
+      notifications,
+      unreadCount: notifications.filter((n) => !n.isRead).length,
     };
   } catch (error) {
     return {
       success: false,
       notifications: [],
+      unreadCount: 0,
       error: error instanceof Error ? error.message : "Bildirimler alınamadı.",
     };
   }
@@ -218,20 +273,46 @@ export async function createInviteNotification(input: {
     const auth = await getAuthenticatedUser();
     if (!auth) return;
 
+    const message = `${input.invitedByName ?? "Bir yönetici"} sizi "${input.workspaceName}" çalışma alanına davet etti.`;
+    const payload = {
+      invitation_id: input.invitationId,
+      invite_id: input.invitationId,
+      workspace_id: input.workspaceId,
+      workspace_name: input.workspaceName,
+    };
+
     const { error } = await auth.supabase.from("notifications").insert({
       workspace_id: input.workspaceId,
       user_id: input.inviteeUserId,
-      type: "WORKSPACE_INVITE",
+      type: "workspace_invite",
       title: "Workspace daveti",
-      message: `${input.invitedByName ?? "Bir yönetici"} sizi "${input.workspaceName}" çalışma alanına davet etti.`,
-      metadata: {
-        invitation_id: input.invitationId,
-        workspace_id: input.workspaceId,
-      },
+      message,
+      metadata: payload,
+      payload,
+      link: `/?workspaceId=${encodeURIComponent(input.workspaceId)}`,
       is_read: false,
     });
 
     if (error) {
+      // Eski şema: payload/link yoksa metadata ile dene
+      if (
+        error.message.includes("payload") ||
+        error.message.includes("link")
+      ) {
+        const fallback = await auth.supabase.from("notifications").insert({
+          workspace_id: input.workspaceId,
+          user_id: input.inviteeUserId,
+          type: "WORKSPACE_INVITE",
+          title: "Workspace daveti",
+          message,
+          metadata: payload,
+          is_read: false,
+        });
+        if (fallback.error) {
+          console.warn("[createInviteNotification]", fallback.error.message);
+        }
+        return;
+      }
       console.warn("[createInviteNotification]", error.message);
     }
   } catch (error) {
@@ -256,5 +337,35 @@ export async function markNotificationRead(
     return { success: true };
   } catch {
     return { success: false };
+  }
+}
+
+export async function markAllNotificationsRead(): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const auth = await getAuthenticatedUser();
+    if (!auth) {
+      return { success: false, error: "Oturum yok." };
+    }
+
+    const { error } = await auth.supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("user_id", auth.user.id)
+      .eq("is_read", false);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "İşlem başarısız.",
+    };
   }
 }

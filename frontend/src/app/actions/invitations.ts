@@ -103,6 +103,12 @@ export async function createInvitation(
 
     console.log("[createInvitation]", { workspaceId, email, role });
 
+    const { data: inviteeProfileEarly } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .ilike("email", email)
+      .maybeSingle();
+
     let { data, error } = await supabase
       .from("workspace_invitations")
       .insert({
@@ -110,10 +116,31 @@ export async function createInvitation(
         email,
         role,
         invited_by: user.id,
-        status: "PENDING",
+        invited_user_id: (inviteeProfileEarly?.id as string) ?? null,
+        status: "pending",
       })
       .select("id")
       .single();
+
+    // invited_user_id sütunu yoksa tekrar dene
+    if (
+      error &&
+      (error.message.includes("invited_user_id") ||
+        error.message.includes("schema cache") ||
+        error.message.includes("column"))
+    ) {
+      ({ data, error } = await supabase
+        .from("workspace_invitations")
+        .insert({
+          workspace_id: workspaceId,
+          email,
+          role,
+          invited_by: user.id,
+          status: "pending",
+        })
+        .select("id")
+        .single());
+    }
 
     // Alternatif tablo adı: invitations
     if (error?.message?.toLowerCase().includes("workspace_invitations")) {
@@ -124,7 +151,7 @@ export async function createInvitation(
           email,
           role,
           invited_by: user.id,
-          status: "PENDING",
+          status: "pending",
         })
         .select("id")
         .single());
@@ -140,19 +167,13 @@ export async function createInvitation(
 
     const invitationId = data.id as string;
 
-    // Workspace adı + davetli kullanıcı (profiles) → bildirim
-    const [{ data: workspace }, { data: inviteeProfile }] = await Promise.all([
-      supabase
-        .from("workspaces")
-        .select("name")
-        .eq("id", workspaceId)
-        .maybeSingle(),
-      supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .ilike("email", email)
-        .maybeSingle(),
-    ]);
+    const { data: workspace } = await supabase
+      .from("workspaces")
+      .select("name")
+      .eq("id", workspaceId)
+      .maybeSingle();
+
+    const inviteeProfile = inviteeProfileEarly;
 
     if (inviteeProfile?.id) {
       const { createInviteNotification } = await import(
@@ -205,14 +226,14 @@ export async function acceptPendingInvitations(): Promise<AcceptInvitationsResul
       .from("workspace_invitations")
       .select("id, workspace_id, email, role, status")
       .ilike("email", email)
-      .eq("status", "PENDING");
+      .in("status", ["PENDING", "pending"]);
 
     if (invitationsQuery.error?.message?.includes("workspace_invitations")) {
       invitationsQuery = await supabase
         .from("invitations")
         .select("id, workspace_id, email, role, status")
         .ilike("email", email)
-        .eq("status", "PENDING");
+        .in("status", ["PENDING", "pending"]);
     }
 
     if (invitationsQuery.error) {
@@ -266,13 +287,13 @@ export async function acceptPendingInvitations(): Promise<AcceptInvitationsResul
 
       let { error: updateError } = await supabase
         .from("workspace_invitations")
-        .update({ status: "ACCEPTED" })
+        .update({ status: "accepted" })
         .eq("id", invitationId);
 
       if (updateError?.message?.includes("workspace_invitations")) {
         ({ error: updateError } = await supabase
           .from("invitations")
-          .update({ status: "ACCEPTED" })
+          .update({ status: "accepted" })
           .eq("id", invitationId));
       }
 
@@ -352,8 +373,12 @@ export async function acceptInvitation(
       };
     }
 
-    if (invitation.status === "ACCEPTED") {
+    const statusUpper = String(invitation.status ?? "").toUpperCase();
+    if (statusUpper === "ACCEPTED") {
       return { success: true, acceptedCount: 0, workspaceIds: [] };
+    }
+    if (statusUpper === "REJECTED" || statusUpper === "DECLINED") {
+      return { success: false, error: "Bu davet reddedilmiş." };
     }
 
     const inviteEmail = String(invitation.email ?? "")
@@ -395,7 +420,7 @@ export async function acceptInvitation(
 
     await supabase
       .from("workspace_invitations")
-      .update({ status: "ACCEPTED" })
+      .update({ status: "accepted" })
       .eq("id", id);
 
     // İlgili invite bildirimlerini okundu yap
@@ -404,10 +429,20 @@ export async function acceptInvitation(
         .from("notifications")
         .update({ is_read: true })
         .eq("user_id", user.id)
-        .eq("type", "WORKSPACE_INVITE")
+        .in("type", ["WORKSPACE_INVITE", "workspace_invite"])
         .contains("metadata", { invitation_id: id });
     } catch {
       // notifications tablosu yoksa yoksay
+    }
+    try {
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", user.id)
+        .in("type", ["WORKSPACE_INVITE", "workspace_invite"])
+        .contains("payload", { invitation_id: id });
+    } catch {
+      // ignore
     }
 
     revalidatePath("/");
@@ -417,6 +452,105 @@ export async function acceptInvitation(
       acceptedCount: 1,
       workspaceIds: [workspaceId],
     };
+  } catch (error) {
+    return { success: false, error: toPlainErrorMessage(error) };
+  }
+}
+
+export type DeclineInvitationResult =
+  | { success: true }
+  | { success: false; error: string };
+
+/** Daveti reddet → status rejected + ilgili bildirim okundu. */
+export async function declineInvitation(
+  invitationId: string,
+): Promise<DeclineInvitationResult> {
+  try {
+    const id = invitationId?.trim() ?? "";
+    if (!id) {
+      return { success: false, error: "Davet kimliği zorunludur." };
+    }
+
+    const auth = await getAuthenticatedUser();
+    if (!auth) {
+      return {
+        success: false,
+        error: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
+      };
+    }
+
+    const { supabase, user } = auth;
+    const email = user.email?.toLowerCase().trim() ?? "";
+
+    let { data: invitation, error } = await supabase
+      .from("workspace_invitations")
+      .select("id, email, status, invited_user_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error?.message?.includes("workspace_invitations")) {
+      ({ data: invitation, error } = await supabase
+        .from("invitations")
+        .select("id, email, status")
+        .eq("id", id)
+        .maybeSingle());
+    }
+
+    if (error || !invitation) {
+      return {
+        success: false,
+        error: toPlainErrorMessage(error ?? "Davet bulunamadı."),
+      };
+    }
+
+    const inviteEmail = String(invitation.email ?? "")
+      .toLowerCase()
+      .trim();
+    const invitedUserId =
+      "invited_user_id" in invitation
+        ? (invitation.invited_user_id as string | null)
+        : null;
+
+    const ownsInvite =
+      (email && inviteEmail && email === inviteEmail) ||
+      invitedUserId === user.id;
+
+    if (!ownsInvite) {
+      return {
+        success: false,
+        error: "Bu davet sizin e-posta adresinize ait değil.",
+      };
+    }
+
+    let { error: updateError } = await supabase
+      .from("workspace_invitations")
+      .update({ status: "rejected" })
+      .eq("id", id);
+
+    if (updateError?.message?.includes("workspace_invitations")) {
+      ({ error: updateError } = await supabase
+        .from("invitations")
+        .update({ status: "rejected" })
+        .eq("id", id));
+    }
+
+    if (updateError) {
+      return { success: false, error: toPlainErrorMessage(updateError) };
+    }
+
+    try {
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", user.id)
+        .in("type", ["WORKSPACE_INVITE", "workspace_invite"])
+        .contains("metadata", { invitation_id: id });
+    } catch {
+      // ignore
+    }
+
+    revalidatePath("/");
+    return { success: true };
   } catch (error) {
     return { success: false, error: toPlainErrorMessage(error) };
   }
