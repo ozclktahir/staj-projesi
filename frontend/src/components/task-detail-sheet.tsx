@@ -22,6 +22,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  getCachedTask,
+  getCachedWorkspaceMembers,
+  invalidateCachedTask,
+  setCachedTask,
+  setCachedWorkspaceMembers,
+} from "@/lib/client-cache";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -45,6 +52,8 @@ type TaskDetailSheetProps = {
   taskId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Karttan gelen anlık seed — sheet veriyi beklemeden açılsın */
+  initialTask?: ProjectTask | null;
   onTaskUpdated?: (task: Partial<ProjectTask> & { id: string }) => void;
   onTaskDeleted?: (taskId: string) => void;
 };
@@ -60,6 +69,7 @@ export function TaskDetailSheet({
   taskId,
   open,
   onOpenChange,
+  initialTask = null,
   onTaskUpdated,
   onTaskDeleted,
 }: TaskDetailSheetProps) {
@@ -82,51 +92,103 @@ export function TaskDetailSheet({
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const loadAll = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
-
-    const [details, subResult, commentResult] = await Promise.all([
-      getTaskDetails(id),
-      getSubtasks(id),
-      getTaskComments(id),
-    ]);
-
-    if (!details.success) {
-      setTask(null);
-      setError(details.error);
-      setLoading(false);
-      return;
-    }
-
-    setTask(details.task);
-    setTitle(details.task.title);
-    setDescription(details.task.description ?? "");
-    setDueDate(toDateInputValue(details.task.due_date));
-    setPriority(details.task.priority);
-    setAssigneeId(details.task.assignee_id ?? "");
-    setSubtasks(subResult.success ? subResult.subtasks : []);
-    setComments(commentResult.success ? commentResult.comments : []);
-    setSubtaskDraft("");
-    setCommentDraft("");
-    setLoading(false);
-
-    if (details.task.workspace_id) {
-      void getWorkspaceMembers(details.task.workspace_id).then((result) => {
-        if (result.success) {
-          setMembers(result.members);
-          setIsAdmin(result.isAdmin);
-        }
-      });
-    }
-
-    if (!subResult.success) {
-      console.error("[TaskDetailSheet] getSubtasks:", subResult.error);
-    }
-    if (!commentResult.success) {
-      console.error("[TaskDetailSheet] getTaskComments:", commentResult.error);
-    }
+  const applyTaskToForm = useCallback((next: ProjectTask) => {
+    setTask(next);
+    setTitle(next.title);
+    setDescription(next.description ?? "");
+    setDueDate(toDateInputValue(next.due_date));
+    setPriority(next.priority);
+    setAssigneeId(next.assignee_id ?? "");
   }, []);
+
+  const loadAll = useCallback(
+    async (id: string) => {
+      setError(null);
+
+      const cached = getCachedTask(id);
+      const seed = cached ?? initialTask;
+      if (seed && seed.id === id) {
+        applyTaskToForm(seed);
+      }
+      setLoading(true);
+
+      const wsHint =
+        (seed?.workspace_id && seed.workspace_id.trim()) ||
+        null;
+      const cachedMembers = wsHint
+        ? getCachedWorkspaceMembers(wsHint)
+        : null;
+      if (cachedMembers) {
+        setMembers(cachedMembers.members);
+        setIsAdmin(cachedMembers.isAdmin);
+      }
+
+      const membersPromise =
+        wsHint && !cachedMembers
+          ? getWorkspaceMembers(wsHint)
+          : Promise.resolve(null);
+
+      const [details, subResult, commentResult, membersResult] =
+        await Promise.all([
+          getTaskDetails(id),
+          getSubtasks(id),
+          getTaskComments(id),
+          membersPromise,
+        ]);
+
+      if (!details.success) {
+        if (!seed) setTask(null);
+        setError(details.error);
+        setLoading(false);
+        return;
+      }
+
+      setCachedTask(details.task);
+      applyTaskToForm(details.task);
+      setSubtasks(subResult.success ? subResult.subtasks : []);
+      setComments(commentResult.success ? commentResult.comments : []);
+      setSubtaskDraft("");
+      setCommentDraft("");
+      setLoading(false);
+
+      if (
+        membersResult &&
+        typeof membersResult === "object" &&
+        "success" in membersResult &&
+        membersResult.success
+      ) {
+        const payload = {
+          members: membersResult.members,
+          isAdmin: membersResult.isAdmin,
+        };
+        if (wsHint) setCachedWorkspaceMembers(wsHint, payload);
+        setMembers(payload.members);
+        setIsAdmin(payload.isAdmin);
+      }
+
+      const wsId = details.task.workspace_id?.trim() || wsHint;
+      if (wsId && !getCachedWorkspaceMembers(wsId) && wsId !== wsHint) {
+        void getWorkspaceMembers(wsId).then((result) => {
+          if (!result.success) return;
+          const payload = {
+            members: result.members,
+            isAdmin: result.isAdmin,
+          };
+          setCachedWorkspaceMembers(wsId, payload);
+          setMembers(payload.members);
+          setIsAdmin(payload.isAdmin);
+        });
+      }
+
+      if (!subResult.success) {
+        console.error("[TaskDetailSheet] getSubtasks:", subResult.error);
+      }
+      if (!commentResult.success) {
+        console.error("[TaskDetailSheet] getTaskComments:", commentResult.error);
+      }
+    },
+    [applyTaskToForm, initialTask],
+  );
 
   useEffect(() => {
     if (!open || !taskId) return;
@@ -181,12 +243,8 @@ export function TaskDetailSheet({
       return;
     }
 
-    setTask(result.task);
-    setTitle(result.task.title);
-    setDescription(result.task.description ?? "");
-    setDueDate(toDateInputValue(result.task.due_date));
-    setPriority(result.task.priority);
-    setAssigneeId(result.task.assignee_id ?? "");
+    setCachedTask(result.task);
+    applyTaskToForm(result.task);
     toast.success("Görev kaydedildi");
     onTaskUpdated?.({
       id: result.task.id,
@@ -257,23 +315,38 @@ export function TaskDetailSheet({
   }
 
   const doneCount = subtasks.filter((s) => s.done).length;
+  const showSkeleton = loading && !task;
+
+  if (!open) return null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="gap-0 overflow-y-auto p-0 sm:max-w-md"
+        className="gap-0 overflow-y-auto p-0 duration-150 data-[state=open]:duration-150 sm:max-w-md"
       >
         <SheetHeader className="border-b border-border">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Görev detayı
+            {loading && task ? (
+              <span className="ml-2 font-normal normal-case tracking-normal text-muted-foreground/70">
+                güncelleniyor…
+              </span>
+            ) : null}
           </p>
-          {loading ? (
+          {showSkeleton ? (
             <>
-              <SheetTitle className="text-foreground">Yükleniyor…</SheetTitle>
-              <SheetDescription>Görev bilgileri getiriliyor.</SheetDescription>
+              <SheetTitle className="sr-only">Yükleniyor</SheetTitle>
+              <SheetDescription className="sr-only">
+                Görev bilgileri getiriliyor
+              </SheetDescription>
+              <div className="mt-2 space-y-3 animate-pulse">
+                <div className="h-7 w-3/4 rounded-md bg-muted" />
+                <div className="h-9 w-full rounded-md bg-muted" />
+                <div className="h-9 w-full rounded-md bg-muted" />
+              </div>
             </>
-          ) : error ? (
+          ) : error && !task ? (
             <>
               <SheetTitle className="text-foreground">Hata</SheetTitle>
               <SheetDescription>{error}</SheetDescription>
@@ -320,7 +393,7 @@ export function TaskDetailSheet({
           )}
         </SheetHeader>
 
-        {!loading && !error && task ? (
+        {task && !error ? (
           <div className="flex flex-1 flex-col gap-6 px-4 py-5">
             <section className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -563,6 +636,7 @@ export function TaskDetailSheet({
         onOpenChange={setDeleteOpen}
         task={task ? { id: task.id, title: task.title } : null}
         onDeleted={(deletedId) => {
+          invalidateCachedTask(deletedId);
           onOpenChange(false);
           onTaskDeleted?.(deletedId);
           router.refresh();

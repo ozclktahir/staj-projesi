@@ -638,7 +638,7 @@ export async function getProjectTasks(
     }
 
     const selectFull =
-      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to, assignee:profiles!assignee_id(*)";
+      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to, assignee:profiles!assignee_id(id, email, full_name, avatar_url)";
     const selectFullNoJoin =
       "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to";
 

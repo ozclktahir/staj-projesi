@@ -7,6 +7,10 @@ import { Plus } from "lucide-react";
 import { createTask } from "@/app/actions/create-task";
 import { getWorkspaceMembers } from "@/app/actions/workspace-members";
 import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
+import {
+  getCachedWorkspaceMembers,
+  setCachedWorkspaceMembers,
+} from "@/lib/client-cache";
 import { cleanText, emailLocalPart } from "@/lib/member-labels";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,11 +61,26 @@ export function CreateTaskModal({
 
   useEffect(() => {
     if (!open || !workspaceId) return;
+
+    const cached = getCachedWorkspaceMembers(workspaceId);
+    if (cached) {
+      setMembers(cached.members);
+      setIsAdmin(cached.isAdmin);
+      if (!cached.isAdmin && cached.members[0]) {
+        setAssigneeId(cached.members[0].id);
+      }
+      return;
+    }
+
     void getWorkspaceMembers(workspaceId).then((result) => {
       if (!result.success) {
         console.error("[CreateTaskModal] members:", result.error);
         return;
       }
+      setCachedWorkspaceMembers(workspaceId, {
+        members: result.members,
+        isAdmin: result.isAdmin,
+      });
       setMembers(result.members);
       setIsAdmin(result.isAdmin);
       if (!result.isAdmin && result.members[0]) {
@@ -130,128 +149,130 @@ export function CreateTaskModal({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-foreground">Yeni Görev</DialogTitle>
-          <DialogDescription>
-            Başlık zorunludur. İsterseniz bir üyeye atayın.
-          </DialogDescription>
-        </DialogHeader>
+      {open ? (
+        <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Yeni Görev</DialogTitle>
+            <DialogDescription>
+              Başlık zorunludur. İsterseniz bir üyeye atayın.
+            </DialogDescription>
+          </DialogHeader>
 
-        <form className="space-y-4" onSubmit={onSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="task-title">Başlık</Label>
-            <Input
-              id="task-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Örn: API entegrasyonunu tamamla"
-              required
-              className={fieldClassName}
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="task-description">Açıklama</Label>
-            <textarea
-              id="task-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="İsteğe bağlı açıklama"
-              rows={3}
-              disabled={isSubmitting}
-              className={textareaClassName}
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
+          <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="task-status">Durum</Label>
-              <select
-                id="task-status"
-                value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value as TaskStatus)
-                }
-                disabled={isSubmitting}
+              <Label htmlFor="task-title">Başlık</Label>
+              <Input
+                id="task-title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Örn: API entegrasyonunu tamamla"
+                required
                 className={fieldClassName}
-              >
-                {TASK_STATUSES.map((value) => (
-                  <option key={value} value={value}>
-                    {TASK_STATUS_LABELS[value]}
-                  </option>
-                ))}
-              </select>
+                disabled={isSubmitting}
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="task-priority">Öncelik</Label>
-              <select
-                id="task-priority"
-                value={priority}
-                onChange={(event) =>
-                  setPriority(event.target.value as TaskPriority)
-                }
+              <Label htmlFor="task-description">Açıklama</Label>
+              <textarea
+                id="task-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="İsteğe bağlı açıklama"
+                rows={3}
                 disabled={isSubmitting}
+                className={textareaClassName}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="task-status">Durum</Label>
+                <select
+                  id="task-status"
+                  value={status}
+                  onChange={(event) =>
+                    setStatus(event.target.value as TaskStatus)
+                  }
+                  disabled={isSubmitting}
+                  className={fieldClassName}
+                >
+                  {TASK_STATUSES.map((value) => (
+                    <option key={value} value={value}>
+                      {TASK_STATUS_LABELS[value]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="task-priority">Öncelik</Label>
+                <select
+                  id="task-priority"
+                  value={priority}
+                  onChange={(event) =>
+                    setPriority(event.target.value as TaskPriority)
+                  }
+                  disabled={isSubmitting}
+                  className={fieldClassName}
+                >
+                  {TASK_PRIORITIES.map((value) => (
+                    <option key={value} value={value}>
+                      {TASK_PRIORITY_LABELS[value]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="task-assignee">Atanan Kişi</Label>
+              <select
+                id="task-assignee"
+                value={assigneeId}
+                onChange={(event) => setAssigneeId(event.target.value)}
+                disabled={isSubmitting || (!isAdmin && members.length <= 1)}
                 className={fieldClassName}
               >
-                {TASK_PRIORITIES.map((value) => (
-                  <option key={value} value={value}>
-                    {TASK_PRIORITY_LABELS[value]}
-                  </option>
-                ))}
+                <option value="">Atanmamış</option>
+                {members.map((member) => {
+                  const label =
+                    cleanText(member.fullName) ||
+                    cleanText(member.displayName) ||
+                    emailLocalPart(member.email) ||
+                    cleanText(member.email) ||
+                    "";
+                  if (!label) return null;
+                  return (
+                    <option key={member.id} value={member.id}>
+                      {label}
+                    </option>
+                  );
+                })}
               </select>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="task-assignee">Atanan Kişi</Label>
-            <select
-              id="task-assignee"
-              value={assigneeId}
-              onChange={(event) => setAssigneeId(event.target.value)}
-              disabled={isSubmitting || (!isAdmin && members.length <= 1)}
-              className={fieldClassName}
-            >
-              <option value="">Atanmamış</option>
-              {members.map((member) => {
-                const label =
-                  cleanText(member.fullName) ||
-                  cleanText(member.displayName) ||
-                  emailLocalPart(member.email) ||
-                  cleanText(member.email) ||
-                  "";
-                if (!label) return null;
-                return (
-                  <option key={member.id} value={member.id}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-lg border-border"
-              disabled={isSubmitting}
-              onClick={() => setOpen(false)}
-            >
-              İptal
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || !title.trim()}
-              className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {isSubmitting ? "Oluşturuluyor..." : "Oluştur"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-lg border-border"
+                disabled={isSubmitting}
+                onClick={() => setOpen(false)}
+              >
+                İptal
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting || !title.trim()}
+                className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {isSubmitting ? "Oluşturuluyor..." : "Oluştur"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      ) : null}
     </Dialog>
   );
 }

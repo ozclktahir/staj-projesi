@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowUpDown,
@@ -152,7 +159,11 @@ function priorityClass(priority: ProjectTask["priority"]): string {
   }
 }
 
-function AssigneeBadge({ assignee }: { assignee?: TaskAssignee | null }) {
+const AssigneeBadge = memo(function AssigneeBadge({
+  assignee,
+}: {
+  assignee?: TaskAssignee | null;
+}) {
   if (!assignee) {
     return (
       <span
@@ -208,9 +219,9 @@ function AssigneeBadge({ assignee }: { assignee?: TaskAssignee | null }) {
       </span>
     </span>
   );
-}
+});
 
-function ColumnSortFilterMenu({
+const ColumnSortFilterMenu = memo(function ColumnSortFilterMenu({
   prefs,
   onChange,
 }: {
@@ -271,7 +282,174 @@ function ColumnSortFilterMenu({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});
+
+type TaskCardProps = {
+  task: ProjectTask;
+  updating: boolean;
+  onOpen: (taskId: string) => void;
+  onStatusChange: (taskId: string, status: TaskStatus) => void;
+  onDeleteRequest: (task: { id: string; title: string }) => void;
+};
+
+const TaskCard = memo(function TaskCard({
+  task,
+  updating,
+  onOpen,
+  onStatusChange,
+  onDeleteRequest,
+}: TaskCardProps) {
+  return (
+    <div className="rounded-lg border-2 border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/50 hover:shadow-md dark:border dark:hover:border-primary/40">
+      <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => onOpen(task.id)}
+          className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <p className="text-sm font-semibold leading-snug text-foreground">
+            {task.title}
+          </p>
+          {task.description?.trim() ? (
+            <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+              {task.description}
+            </p>
+          ) : null}
+          {(task.subtask_total ?? 0) > 0 ? (
+            <p className="mt-2 text-xs font-medium text-muted-foreground">
+              {task.subtask_done ?? 0}/{task.subtask_total} Alt Görev
+            </p>
+          ) : null}
+        </button>
+        <div className="flex shrink-0 items-start gap-1 pt-0.5">
+          <AssigneeBadge assignee={task.assignee} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Görev menüsü"
+                onClick={(event: MouseEvent) => event.stopPropagation()}
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <MoreHorizontal className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                onSelect={(event) => {
+                  event.preventDefault();
+                  onDeleteRequest({ id: task.id, title: task.title });
+                }}
+              >
+                <Trash2 className="size-3.5" />
+                Görevi Sil
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <span
+          className={cn(
+            "rounded-md px-2 py-0.5 text-xs font-medium",
+            priorityClass(task.priority),
+          )}
+        >
+          {TASK_PRIORITY_LABELS[task.priority] ?? TASK_PRIORITY_LABELS.MEDIUM}
+        </span>
+        <select
+          aria-label="Görev durumu"
+          value={task.status}
+          disabled={updating}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => {
+            onStatusChange(task.id, event.target.value as TaskStatus);
+          }}
+          className="h-8 max-w-[140px] rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+        >
+          {TASK_STATUSES.map((value) => (
+            <option key={value} value={value}>
+              {TASK_STATUS_LABELS[value]}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+});
+
+type KanbanColumnProps = {
+  status: TaskStatus;
+  rawCount: number;
+  visible: ProjectTask[];
+  prefs: ColumnPrefs;
+  updatingId: string | null;
+  onPrefsChange: (status: TaskStatus, next: ColumnPrefs) => void;
+  onOpenTask: (taskId: string) => void;
+  onStatusChange: (taskId: string, status: TaskStatus) => void;
+  onDeleteRequest: (task: { id: string; title: string }) => void;
+};
+
+const KanbanColumn = memo(function KanbanColumn({
+  status,
+  rawCount,
+  visible,
+  prefs,
+  updatingId,
+  onPrefsChange,
+  onOpenTask,
+  onStatusChange,
+  onDeleteRequest,
+}: KanbanColumnProps) {
+  return (
+    <section
+      className={cn(
+        "flex min-h-[280px] flex-col rounded-lg border-2 border-border border-t-4 bg-muted/40 p-3 shadow-sm dark:border dark:shadow-none",
+        columnAccent[status],
+      )}
+    >
+      <div className="mb-3 flex items-center justify-between gap-2 px-1">
+        <h3 className="text-sm font-semibold text-foreground">
+          {TASK_STATUS_LABELS[status]}
+        </h3>
+        <div className="flex items-center gap-1">
+          <span className="rounded-md bg-card px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm">
+            {prefs.filter === "ALL"
+              ? rawCount
+              : `${visible.length}/${rawCount}`}
+          </span>
+          <ColumnSortFilterMenu
+            prefs={prefs}
+            onChange={(next) => onPrefsChange(status, next)}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-3">
+        {visible.length === 0 ? (
+          <p className="px-1 py-8 text-center text-xs text-muted-foreground">
+            {rawCount === 0
+              ? "Bu kolonda görev yok"
+              : "Filtreye uyan görev yok"}
+          </p>
+        ) : (
+          visible.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              updating={updatingId === task.id}
+              onOpen={onOpenTask}
+              onStatusChange={onStatusChange}
+              onDeleteRequest={onDeleteRequest}
+            />
+          ))
+        )}
+      </div>
+    </section>
+  );
+});
 
 export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps) {
   const router = useRouter();
@@ -303,34 +481,81 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
     });
   }, [tasks, columnPrefs]);
 
-  function removeTaskFromBoard(taskId: string) {
-    setTasks((prev) => prev.filter((task) => task.id !== taskId));
-    if (selectedTaskId === taskId) {
-      setSelectedTaskId(null);
-    }
-    router.refresh();
-  }
+  const selectedTask = useMemo(
+    () => tasks.find((task) => task.id === selectedTaskId) ?? null,
+    [tasks, selectedTaskId],
+  );
 
-  async function handleStatusChange(taskId: string, status: TaskStatus) {
-    const previous = tasks;
-    setTasks((prev) =>
-      prev.map((task) => (task.id === taskId ? { ...task, status } : task)),
-    );
-    setUpdatingId(taskId);
+  const removeTaskFromBoard = useCallback(
+    (taskId: string) => {
+      setTasks((prev) => prev.filter((task) => task.id !== taskId));
+      if (selectedTaskId === taskId) {
+        setSelectedTaskId(null);
+      }
+      router.refresh();
+    },
+    [router, selectedTaskId],
+  );
 
-    const result = await updateTaskStatus(taskId, status);
-    setUpdatingId(null);
+  const handleStatusChange = useCallback(
+    async (taskId: string, status: TaskStatus) => {
+      let previous: ProjectTask[] = [];
+      setTasks((prev) => {
+        previous = prev;
+        return prev.map((task) =>
+          task.id === taskId ? { ...task, status } : task,
+        );
+      });
+      setUpdatingId(taskId);
 
-    if (!result.success) {
-      setTasks(previous);
-      console.error("[ProjectTaskBoard] updateTaskStatus failed:", result.error);
-      toast.error(result.error);
-      return;
-    }
+      const result = await updateTaskStatus(taskId, status);
+      setUpdatingId(null);
 
-    toast.success("Durum güncellendi");
-    router.refresh();
-  }
+      if (!result.success) {
+        setTasks(previous);
+        console.error(
+          "[ProjectTaskBoard] updateTaskStatus failed:",
+          result.error,
+        );
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Durum güncellendi");
+      router.refresh();
+    },
+    [router],
+  );
+
+  const handleOpenTask = useCallback((taskId: string) => {
+    setSelectedTaskId(taskId);
+  }, []);
+
+  const handleDeleteRequest = useCallback(
+    (task: { id: string; title: string }) => {
+      setTaskToDelete(task);
+    },
+    [],
+  );
+
+  const handlePrefsChange = useCallback(
+    (status: TaskStatus, next: ColumnPrefs) => {
+      setColumnPrefs((prev) => ({ ...prev, [status]: next }));
+    },
+    [],
+  );
+
+  const handleTaskUpdated = useCallback(
+    (partial: Partial<ProjectTask> & { id: string }) => {
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === partial.id ? { ...task, ...partial } : task,
+        ),
+      );
+      router.refresh();
+    },
+    [router],
+  );
 
   if (tasks.length === 0) {
     return (
@@ -354,169 +579,45 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
   return (
     <>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {columns.map(({ status, rawCount, visible }) => {
-          const prefs = columnPrefs[status];
-
-          return (
-            <section
-              key={status}
-              className={cn(
-                "flex min-h-[280px] flex-col rounded-lg border-2 border-border border-t-4 bg-muted/40 p-3 shadow-sm dark:border dark:shadow-none",
-                columnAccent[status],
-              )}
-            >
-              <div className="mb-3 flex items-center justify-between gap-2 px-1">
-                <h3 className="text-sm font-semibold text-foreground">
-                  {TASK_STATUS_LABELS[status]}
-                </h3>
-                <div className="flex items-center gap-1">
-                  <span className="rounded-md bg-card px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm">
-                    {prefs.filter === "ALL"
-                      ? rawCount
-                      : `${visible.length}/${rawCount}`}
-                  </span>
-                  <ColumnSortFilterMenu
-                    prefs={prefs}
-                    onChange={(next) =>
-                      setColumnPrefs((prev) => ({
-                        ...prev,
-                        [status]: next,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-1 flex-col gap-3">
-                {visible.length === 0 ? (
-                  <p className="px-1 py-8 text-center text-xs text-muted-foreground">
-                    {rawCount === 0
-                      ? "Bu kolonda görev yok"
-                      : "Filtreye uyan görev yok"}
-                  </p>
-                ) : (
-                  visible.map((task) => (
-                    <div
-                      key={task.id}
-                      className="rounded-lg border-2 border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/50 hover:shadow-md dark:border dark:hover:border-primary/40"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedTaskId(task.id)}
-                          className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        >
-                          <p className="text-sm font-semibold leading-snug text-foreground">
-                            {task.title}
-                          </p>
-                          {task.description?.trim() ? (
-                            <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
-                              {task.description}
-                            </p>
-                          ) : null}
-                          {(task.subtask_total ?? 0) > 0 ? (
-                            <p className="mt-2 text-xs font-medium text-muted-foreground">
-                              {task.subtask_done ?? 0}/{task.subtask_total} Alt
-                              Görev
-                            </p>
-                          ) : null}
-                        </button>
-                        <div className="flex shrink-0 items-start gap-1 pt-0.5">
-                          <AssigneeBadge assignee={task.assignee} />
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                type="button"
-                                aria-label="Görev menüsü"
-                                onClick={(event) => event.stopPropagation()}
-                                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                              >
-                                <MoreHorizontal className="size-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
-                              <DropdownMenuItem
-                                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                onSelect={(event) => {
-                                  event.preventDefault();
-                                  setTaskToDelete({
-                                    id: task.id,
-                                    title: task.title,
-                                  });
-                                }}
-                              >
-                                <Trash2 className="size-3.5" />
-                                Görevi Sil
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                        <span
-                          className={cn(
-                            "rounded-md px-2 py-0.5 text-xs font-medium",
-                            priorityClass(task.priority),
-                          )}
-                        >
-                          {TASK_PRIORITY_LABELS[task.priority] ??
-                            TASK_PRIORITY_LABELS.MEDIUM}
-                        </span>
-                        <select
-                          aria-label="Görev durumu"
-                          value={task.status}
-                          disabled={updatingId === task.id}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={(event) => {
-                            void handleStatusChange(
-                              task.id,
-                              event.target.value as TaskStatus,
-                            );
-                          }}
-                          className="h-8 max-w-[140px] rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
-                        >
-                          {TASK_STATUSES.map((value) => (
-                            <option key={value} value={value}>
-                              {TASK_STATUS_LABELS[value]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
-          );
-        })}
+        {columns.map(({ status, rawCount, visible }) => (
+          <KanbanColumn
+            key={status}
+            status={status}
+            rawCount={rawCount}
+            visible={visible}
+            prefs={columnPrefs[status]}
+            updatingId={updatingId}
+            onPrefsChange={handlePrefsChange}
+            onOpenTask={handleOpenTask}
+            onStatusChange={handleStatusChange}
+            onDeleteRequest={handleDeleteRequest}
+          />
+        ))}
       </div>
 
-      <TaskDetailSheet
-        taskId={selectedTaskId}
-        open={Boolean(selectedTaskId)}
-        onOpenChange={(next) => {
-          if (!next) setSelectedTaskId(null);
-        }}
-        onTaskUpdated={(partial) => {
-          setTasks((prev) =>
-            prev.map((task) =>
-              task.id === partial.id ? { ...task, ...partial } : task,
-            ),
-          );
-          router.refresh();
-        }}
-        onTaskDeleted={removeTaskFromBoard}
-      />
+      {selectedTaskId ? (
+        <TaskDetailSheet
+          taskId={selectedTaskId}
+          initialTask={selectedTask}
+          open
+          onOpenChange={(next) => {
+            if (!next) setSelectedTaskId(null);
+          }}
+          onTaskUpdated={handleTaskUpdated}
+          onTaskDeleted={removeTaskFromBoard}
+        />
+      ) : null}
 
-      <DeleteTaskModal
-        open={Boolean(taskToDelete)}
-        onOpenChange={(next) => {
-          if (!next) setTaskToDelete(null);
-        }}
-        task={taskToDelete}
-        onDeleted={removeTaskFromBoard}
-      />
+      {taskToDelete ? (
+        <DeleteTaskModal
+          open
+          onOpenChange={(next) => {
+            if (!next) setTaskToDelete(null);
+          }}
+          task={taskToDelete}
+          onDeleted={removeTaskFromBoard}
+        />
+      ) : null}
     </>
   );
 }

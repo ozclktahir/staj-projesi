@@ -22,10 +22,13 @@ export default async function ProjectDetailPage({
   params,
   searchParams,
 }: ProjectDetailPageProps) {
-  const { id } = await params;
-  const sp = await searchParams;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const workspaceId = await resolveActiveWorkspaceId(sp.workspaceId ?? null);
-  const project = await getProjectById(id);
+
+  const [project, auth] = await Promise.all([
+    getProjectById(id),
+    getAuthenticatedUser(),
+  ]);
 
   if (!project) {
     notFound();
@@ -40,20 +43,18 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const tasks = await getProjectTasks(project.id, effectiveWorkspaceId);
+  const [tasks, roleCtx] = await Promise.all([
+    getProjectTasks(project.id, effectiveWorkspaceId),
+    effectiveWorkspaceId && auth
+      ? resolveWorkspaceRole(
+          auth.supabase,
+          effectiveWorkspaceId,
+          auth.user.id,
+        )
+      : Promise.resolve(null),
+  ]);
 
-  let canDeleteProject = false;
-  if (effectiveWorkspaceId) {
-    const auth = await getAuthenticatedUser();
-    if (auth) {
-      const roleCtx = await resolveWorkspaceRole(
-        auth.supabase,
-        effectiveWorkspaceId,
-        auth.user.id,
-      );
-      canDeleteProject = roleCtx.isAdmin;
-    }
-  }
+  const canDeleteProject = Boolean(roleCtx?.isAdmin);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
