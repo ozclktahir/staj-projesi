@@ -18,7 +18,8 @@ export async function resolvePostLoginRedirect(): Promise<{
   try {
     const auth = await getAuthenticatedUser();
     if (!auth) {
-      return { href: "/login", workspaceId: null };
+      // Cookie henüz Server Action'a yansımamış olabilir — login'e geri atma
+      return { href: "/", workspaceId: null };
     }
 
     const result = await getWorkspaces();

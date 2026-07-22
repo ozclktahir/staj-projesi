@@ -45,46 +45,74 @@ export default function RegisterPage() {
       const email = values.email.trim().toLowerCase();
       const password = values.password;
 
-      await apiClient.post("/auth/register", {
-        firstName: values.firstName.trim(),
-        lastName: values.lastName.trim(),
-        email,
-        password,
-      });
+      try {
+        await apiClient.post("/auth/register", {
+          firstName: values.firstName.trim(),
+          lastName: values.lastName.trim(),
+          email,
+          password,
+        });
+      } catch (error) {
+        const message = isAxiosError(error)
+          ? (error.response?.data?.message ?? "Kayıt işlemi başarısız oldu")
+          : "Kayıt işlemi başarısız oldu";
+        toast.error(formatAuthApiError(message, "Kayıt işlemi başarısız oldu"));
+        return;
+      }
 
-      // Anlık oturum: kayıt sonrası otomatik giriş — çıkış/giriş döngüsü yok
-      const { data } = await apiClient.post<{
-        access_token?: string;
-        refresh_token?: string;
-        user?: unknown;
-      }>("/auth/login", { email, password });
+      // Anlık oturum: kayıt sonrası otomatik giriş
+      let accessToken: string;
+      let refreshToken: string | null | undefined;
+      let user: unknown;
+      try {
+        const { data } = await apiClient.post<{
+          access_token?: string;
+          refresh_token?: string;
+          user?: unknown;
+        }>("/auth/login", { email, password });
 
-      if (!data.access_token) {
-        toast.success("Kayıt başarılı. Giriş yapabilirsiniz.");
+        if (!data.access_token) {
+          toast.success("Kayıt başarılı. Giriş yapabilirsiniz.");
+          window.location.assign("/login");
+          return;
+        }
+        accessToken = data.access_token;
+        refreshToken = data.refresh_token;
+        user = data.user;
+      } catch (error) {
+        const message = isAxiosError(error)
+          ? (error.response?.data?.message ?? "Kayıt başarılı; otomatik giriş başarısız")
+          : "Kayıt başarılı; otomatik giriş başarısız";
+        toast.error(formatAuthApiError(message, "Kayıt başarılı; lütfen giriş yapın."));
         window.location.assign("/login");
         return;
       }
 
-      await persistAuthSession(
-        data.access_token,
-        data.user,
-        data.refresh_token,
-      );
+      try {
+        await persistAuthSession(accessToken, user, refreshToken);
+      } catch (persistError) {
+        console.error("[register] persistAuthSession:", persistError);
+      }
 
-      const redirect = await resolvePostLoginRedirect();
-      if (redirect.workspaceId) {
-        writeActiveWorkspaceId(redirect.workspaceId);
+      let href = "/onboarding";
+      try {
+        const redirect = await resolvePostLoginRedirect();
+        href =
+          !redirect.href ||
+          redirect.href === "/login" ||
+          redirect.href.startsWith("/login?")
+            ? "/onboarding"
+            : redirect.href;
+        if (redirect.workspaceId) {
+          writeActiveWorkspaceId(redirect.workspaceId);
+        }
+      } catch (redirectError) {
+        console.error("[register] post-login redirect:", redirectError);
+        href = "/onboarding";
       }
 
       toast.success("Kayıt başarılı — çalışma alanına yönlendiriliyorsun");
-      window.location.assign(redirect.href);
-      return;
-    } catch (error) {
-      const message = isAxiosError(error)
-        ? (error.response?.data?.message ?? "Kayıt işlemi başarısız oldu")
-        : "Kayıt işlemi başarısız oldu";
-
-      toast.error(formatAuthApiError(message, "Kayıt işlemi başarısız oldu"));
+      window.location.assign(href);
     } finally {
       setIsSubmitting(false);
     }

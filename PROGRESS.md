@@ -271,6 +271,9 @@
 - Shadcn/UI (New York / Slate), turuncu–siyah tema (`--primary: 24 100% 50%`, `--radius: 0.5rem`) ve `next-themes` ile aydınlık/karanlık mod altyapısı tamamlandı.
 - Login/Register sayfaları Split Screen mimarisiyle tasarlandı (`(auth)/login`, `(auth)/register`); Shadcn Card/Input/Label/Button kullanıldı (UI-only).
 
+### [22 Temmuz 2026] - Login auth / yönlendirme hata ayrımı
+- Giriş (Login) akışında auth hatası ile login sonrası workspace/profil yönlendirme hataları ayrıştırıldı. Hatalı "Şifre veya e-posta yanlış" uyarısı ve sayfa yenileme gereksinimi düzeltildi.
+
 ### [21 Temmuz 2026] - Auth bağlantı düzeltmeleri ve projects.updated_at şema sync
 - Auth akışındaki bağlantı hataları (port ve exception düzeltmeleri) giderildi.
 - `projects` tablosundaki eksik `updated_at` şema hatası giderildi ve `getCurrentUserProjects` sorgusu güncellendi.
