@@ -77,6 +77,23 @@ export type TaskComment = {
   content: string;
   user_id: string | null;
   author_name: string;
+  author_avatar_url?: string | null;
+  author_email?: string | null;
+  /** Oturum açmış kullanıcıya ait mi (silme menüsü) */
+  is_own?: boolean;
+  created_at: string | null;
+};
+
+export type TaskAttachment = {
+  id: string;
+  task_id: string;
+  user_id: string | null;
+  file_name: string;
+  file_url: string;
+  file_size: string | null;
+  storage_path?: string | null;
+  uploader_name?: string;
+  is_own?: boolean;
   created_at: string | null;
 };
 

@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckSquare, MessageSquare, Trash2 } from "lucide-react";
+import { CheckSquare, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { createComment, getTaskComments } from "@/app/actions/comments";
+import { getTaskAttachments } from "@/app/actions/attachments";
+import { getTaskComments } from "@/app/actions/comments";
 import { getTaskDetails } from "@/app/actions/get-task-details";
 import {
   createSubtask,
@@ -18,6 +19,8 @@ import { getWorkspaceMembers } from "@/app/actions/workspace-members";
 import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
 import { cleanText, emailLocalPart } from "@/lib/member-labels";
 import { DeleteTaskModal } from "@/components/delete-task-modal";
+import { TaskAttachments } from "@/components/task/task-attachments";
+import { TaskComments } from "@/components/task/task-comments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +45,7 @@ import {
   TASK_STATUS_LABELS,
   type ProjectTask,
   type Subtask,
+  type TaskAttachment,
   type TaskComment,
   type TaskPriority,
   type TaskStatus,
@@ -85,7 +89,7 @@ export function TaskDetailSheet({
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [comments, setComments] = useState<TaskComment[]>([]);
-  const [commentDraft, setCommentDraft] = useState("");
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
@@ -128,11 +132,12 @@ export function TaskDetailSheet({
           ? getWorkspaceMembers(wsHint)
           : Promise.resolve(null);
 
-      const [details, subResult, commentResult, membersResult] =
+      const [details, subResult, commentResult, attachmentResult, membersResult] =
         await Promise.all([
           getTaskDetails(id),
           getSubtasks(id),
           getTaskComments(id),
+          getTaskAttachments(id),
           membersPromise,
         ]);
 
@@ -147,8 +152,9 @@ export function TaskDetailSheet({
       applyTaskToForm(details.task);
       setSubtasks(subResult.success ? subResult.subtasks : []);
       setComments(commentResult.success ? commentResult.comments : []);
-      setSubtaskDraft("");
-      setCommentDraft("");
+      setAttachments(
+        attachmentResult.success ? attachmentResult.attachments : [],
+      );
       setLoading(false);
 
       if (
@@ -185,6 +191,12 @@ export function TaskDetailSheet({
       }
       if (!commentResult.success) {
         console.error("[TaskDetailSheet] getTaskComments:", commentResult.error);
+      }
+      if (!attachmentResult.success) {
+        console.error(
+          "[TaskDetailSheet] getTaskAttachments:",
+          attachmentResult.error,
+        );
       }
     },
     [applyTaskToForm, initialTask],
@@ -299,19 +311,6 @@ export function TaskDetailSheet({
     setSubtasks((prev) => prev.filter((s) => s.id !== id));
     toast.success("Alt görev silindi");
     router.refresh();
-  }
-
-  async function handleAddComment() {
-    if (!task || !commentDraft.trim()) return;
-    const result = await createComment(task.id, commentDraft);
-    if (!result.success) {
-      console.error("[TaskDetailSheet] createComment:", result.error);
-      toast.error(result.error);
-      return;
-    }
-    setComments((prev) => [...prev, result.comment]);
-    setCommentDraft("");
-    toast.success("Yorum eklendi");
   }
 
   const doneCount = subtasks.filter((s) => s.done).length;
@@ -571,62 +570,17 @@ export function TaskDetailSheet({
               )}
             </section>
 
-            <section className="space-y-3">
-              <div className="flex items-center gap-2 text-foreground">
-                <MessageSquare className="size-4 text-primary" />
-                <h3 className="text-sm font-semibold">Yorumlar</h3>
-              </div>
+            <TaskAttachments
+              taskId={task.id}
+              attachments={attachments}
+              onChange={setAttachments}
+            />
 
-              <div className="space-y-2">
-                <textarea
-                  value={commentDraft}
-                  onChange={(event) => setCommentDraft(event.target.value)}
-                  rows={2}
-                  placeholder="Yorum yaz…"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
-                  disabled={!commentDraft.trim()}
-                  onClick={() => void handleAddComment()}
-                >
-                  Yorum ekle
-                </Button>
-              </div>
-
-              {comments.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
-                  Henüz yorum yok. İlk yorumunu ekle.
-                </div>
-              ) : (
-                <ul className="space-y-3">
-                  {comments.map((comment) => (
-                    <li
-                      key={comment.id}
-                      className="rounded-lg border border-border bg-card px-3 py-2"
-                    >
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium text-primary">
-                          {comment.author_name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {comment.created_at
-                            ? new Date(comment.created_at).toLocaleString(
-                                "tr-TR",
-                              )
-                            : ""}
-                        </span>
-                      </div>
-                      <p className="text-sm text-foreground">
-                        {comment.content}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+            <TaskComments
+              taskId={task.id}
+              comments={comments}
+              onChange={setComments}
+            />
           </div>
         ) : null}
       </SheetContent>
