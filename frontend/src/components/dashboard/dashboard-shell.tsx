@@ -4,18 +4,14 @@ import { useEffect, useState } from "react";
 import { getCurrentUserDisplayLabel } from "@/app/actions/current-user";
 import { AppHeader } from "@/components/dashboard/app-header";
 import { Sidebar } from "@/components/sidebar";
-import {
-  readStoredUser,
-  syncAuthCookiesFromStorage,
-} from "@/lib/auth-session";
-import { resolveUiDisplayName } from "@/lib/member-labels";
+import { syncAuthCookiesFromStorage } from "@/lib/auth-session";
 
 export function DashboardShell({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [userName, setUserName] = useState("Kullanıcı Yükleniyor...");
+  const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
 
@@ -27,57 +23,22 @@ export function DashboardShell({
       try {
         await syncAuthCookiesFromStorage();
 
-        const stored = readStoredUser();
-        const quick = resolveUiDisplayName({
-          metadataFullName: stored?.user_metadata?.full_name,
-          firstName: stored?.user_metadata?.first_name,
-          lastName: stored?.user_metadata?.last_name,
-          email: stored?.email,
-          loading: true,
-        });
-
-        if (!cancelled) {
-          setUserName(quick);
-          setUserEmail(stored?.email ?? null);
-          console.info("[DashboardShell] stored user label", {
-            quick,
-            email: stored?.email ?? null,
-            meta: stored?.user_metadata ?? null,
-          });
-        }
-
+        // Veritabanından gerçek ad-soyad
         const result = await getCurrentUserDisplayLabel();
         if (cancelled) return;
 
-        const nextName = resolveUiDisplayName({
-          metadataFullName: stored?.user_metadata?.full_name,
-          profileFullName: result.displayName,
-          firstName: stored?.user_metadata?.first_name,
-          lastName: stored?.user_metadata?.last_name,
-          email: result.email ?? stored?.email,
-          loading: false,
-        });
-
-        console.info("[DashboardShell] server user label", {
-          nextName,
-          serverDisplayName: result.displayName,
-          email: result.email,
-        });
-
-        setUserName(nextName);
-        setUserEmail(result.email ?? stored?.email ?? null);
-      } catch (error) {
-        console.error("[DashboardShell] user label load failed:", error);
-        if (!cancelled) {
-          const stored = readStoredUser();
-          setUserName(
-            resolveUiDisplayName({
-              metadataFullName: stored?.user_metadata?.full_name,
-              email: stored?.email,
-              loading: false,
-            }),
+        const name = result.displayName.trim();
+        if (!name) {
+          console.warn(
+            "[DashboardShell] profiles'ta ad-soyad yok:",
+            result,
           );
         }
+
+        setUserName(name);
+        setUserEmail(result.email);
+      } catch (error) {
+        console.error("[DashboardShell] profil okunamadı:", error);
       } finally {
         if (!cancelled) setIsLoadingUser(false);
       }

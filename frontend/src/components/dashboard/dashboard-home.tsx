@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/card";
 import type { DashboardProject, DashboardTaskStats } from "@/lib/supabase/types";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
-import { resolveUiDisplayName } from "@/lib/member-labels";
 
 type DashboardHomeProps = {
   userName: string;
@@ -36,10 +35,7 @@ export function DashboardHome({
   canCreateProject = false,
 }: DashboardHomeProps) {
   const hasProjects = projects.length > 0;
-  const welcomeName = resolveUiDisplayName({
-    profileFullName: userName,
-    loading: !userName?.trim(),
-  });
+  const welcomeName = userName?.trim() || "";
 
   const summary = [
     {
@@ -70,7 +66,12 @@ export function DashboardHome({
             Dashboard
           </CardDescription>
           <CardTitle className="text-3xl font-semibold tracking-tight text-foreground">
-            Hoş geldin, <span className="text-primary">{welcomeName}</span>
+            Hoş geldin
+            {welcomeName ? (
+              <>
+                , <span className="text-primary">{welcomeName}</span>
+              </>
+            ) : null}
           </CardTitle>
           <p className="max-w-xl text-sm text-muted-foreground">
             Projelerini buradan yönet, ilerlemeyi takip et ve ekibinle

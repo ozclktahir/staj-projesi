@@ -2,92 +2,148 @@
 
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import {
-  formatAuthUserLabel,
-  formatUserCompact,
   PROFILE_SELECT_FIELDS,
   PROFILE_SELECT_FIELDS_FALLBACK,
 } from "@/lib/member-labels";
 
+function clean(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const t = value.trim();
+  return t || null;
+}
+
+/** profiles satırından Ad Soyad üretir. */
+function nameFromProfile(
+  profile: Record<string, unknown> | null,
+): string | null {
+  if (!profile) return null;
+  const full = clean(profile.full_name);
+  if (full) return full;
+  const first = clean(profile.first_name) ?? "";
+  const last = clean(profile.last_name) ?? "";
+  const combined = `${first} ${last}`.trim();
+  return combined || null;
+}
+
 /**
- * Header / profil alanı için görünen ad.
- * profiles.full_name → metadata → e-posta → e-posta yerel kısmı.
+ * Header için: profiles tablosundan gerçek ad-soyad.
+ * Yoksa auth metadata'dan profiles'a yazar ve tekrar okur.
  */
 export async function getCurrentUserDisplayLabel(): Promise<{
   displayName: string;
   email: string | null;
+  firstName: string | null;
+  lastName: string | null;
 }> {
   try {
     const auth = await getAuthenticatedUser();
     if (!auth) {
-      return { displayName: "Kullanıcı Yükleniyor...", email: null };
+      console.warn("[getCurrentUserDisplayLabel] oturum yok");
+      return {
+        displayName: "",
+        email: null,
+        firstName: null,
+        lastName: null,
+      };
     }
 
     const { supabase, user } = auth;
-    let profile: Record<string, unknown> | null = null;
-
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(PROFILE_SELECT_FIELDS)
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (!error && data) {
-      profile = data as Record<string, unknown>;
-    } else {
-      const { data: fallback } = await supabase
-        .from("profiles")
-        .select(PROFILE_SELECT_FIELDS_FALLBACK)
-        .eq("id", user.id)
-        .maybeSingle();
-      profile = (fallback as Record<string, unknown> | null) ?? null;
-    }
-
     const meta = user.user_metadata as
       | {
           full_name?: string;
-          display_name?: string;
           first_name?: string;
           last_name?: string;
         }
       | undefined;
 
-    const merged: Record<string, unknown> = {
-      ...(profile ?? {}),
-      full_name:
-        (typeof profile?.full_name === "string" && profile.full_name.trim()) ||
-        meta?.full_name ||
-        null,
-      display_name:
-        (typeof profile?.display_name === "string" &&
-          profile.display_name.trim()) ||
-        meta?.display_name ||
-        null,
-      first_name:
-        (typeof profile?.first_name === "string" && profile.first_name.trim()) ||
-        meta?.first_name ||
-        null,
-      last_name:
-        (typeof profile?.last_name === "string" && profile.last_name.trim()) ||
-        meta?.last_name ||
-        null,
-      email:
-        (typeof profile?.email === "string" && profile.email.trim()) ||
-        user.email ||
-        null,
-    };
+    async function fetchProfile(): Promise<Record<string, unknown> | null> {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(PROFILE_SELECT_FIELDS)
+        .eq("id", user.id)
+        .maybeSingle();
 
-    const displayName = formatUserCompact(merged, user.email);
-    const fromAuth = formatAuthUserLabel({
-      email: user.email,
-      user_metadata: meta,
+      if (!error && data) return data as Record<string, unknown>;
+
+      if (error) {
+        console.warn(
+          "[getCurrentUserDisplayLabel] profile select:",
+          error.message,
+        );
+      }
+
+      const { data: fallback } = await supabase
+        .from("profiles")
+        .select(PROFILE_SELECT_FIELDS_FALLBACK)
+        .eq("id", user.id)
+        .maybeSingle();
+
+      return (fallback as Record<string, unknown> | null) ?? null;
+    }
+
+    let profile = await fetchProfile();
+    let displayName = nameFromProfile(profile);
+
+    // DB boşsa metadata'dan profiles'a yaz (kayıt sırasında yazılmamışsa)
+    if (!displayName) {
+      const metaFull =
+        clean(meta?.full_name) ||
+        `${clean(meta?.first_name) ?? ""} ${clean(meta?.last_name) ?? ""}`.trim();
+
+      if (metaFull || user.email) {
+        const payload = {
+          id: user.id,
+          email: user.email ?? null,
+          full_name: metaFull || null,
+          first_name: clean(meta?.first_name),
+          last_name: clean(meta?.last_name),
+        };
+        console.info(
+          "[getCurrentUserDisplayLabel] profiles upsert from metadata",
+          payload,
+        );
+        const { error: upsertError } = await supabase
+          .from("profiles")
+          .upsert(payload);
+        if (upsertError) {
+          console.error(
+            "[getCurrentUserDisplayLabel] upsert:",
+            upsertError.message,
+          );
+        } else {
+          profile = await fetchProfile();
+          displayName = nameFromProfile(profile);
+        }
+      }
+    }
+
+    // Hâlâ yoksa metadata'yı doğrudan göster (UI boş kalmasın)
+    if (!displayName) {
+      displayName =
+        clean(meta?.full_name) ||
+        `${clean(meta?.first_name) ?? ""} ${clean(meta?.last_name) ?? ""}`.trim() ||
+        "";
+    }
+
+    console.info("[getCurrentUserDisplayLabel] sonuç", {
+      userId: user.id,
+      displayName,
+      profile,
     });
 
     return {
-      displayName: displayName || fromAuth || user.email?.split("@")[0] || user.email || "Kullanıcı Yükleniyor...",
-      email: user.email ?? null,
+      displayName,
+      email: user.email ?? clean(profile?.email) ?? null,
+      firstName: clean(profile?.first_name) ?? clean(meta?.first_name),
+      lastName: clean(profile?.last_name) ?? clean(meta?.last_name),
     };
   } catch (error) {
     console.error("[getCurrentUserDisplayLabel]", error);
-    return { displayName: "Kullanıcı Yükleniyor...", email: null };
+    return {
+      displayName: "",
+      email: null,
+      firstName: null,
+      lastName: null,
+    };
   }
 }

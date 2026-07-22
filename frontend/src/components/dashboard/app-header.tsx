@@ -8,7 +8,6 @@ import { InviteNotificationsMenu } from "@/components/invite-notifications-menu"
 import { Button } from "@/components/ui/button";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { clearAuthSession } from "@/lib/auth-session";
-import { resolveUiDisplayName } from "@/lib/member-labels";
 import { isAdminRole } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 
@@ -36,17 +35,12 @@ function AppHeaderInner({
   const { activeWorkspace, activeWorkspaceId, refresh } = useWorkspaces();
   const canCreateProject = isAdminRole(activeWorkspace?.role);
 
-  const displayName = resolveUiDisplayName({
-    profileFullName: userName,
-    email: userEmail,
-    loading: isLoadingUser,
-  });
-
+  // DB'den gelen ad-soyad olduğu gibi; boşsa e-posta
+  const displayName = userName.trim() || userEmail?.trim() || "";
   const secondary =
     userEmail &&
     displayName &&
-    userEmail.toLowerCase() !== displayName.toLowerCase() &&
-    displayName !== "Kullanıcı Yükleniyor..."
+    userEmail.toLowerCase() !== displayName.toLowerCase()
       ? userEmail
       : null;
 
@@ -99,7 +93,7 @@ function AppHeaderInner({
           >
             <UserRound className="size-4" />
           </span>
-          {isLoadingUser && !userName.trim() ? (
+          {isLoadingUser ? (
             <UserNameSkeleton />
           ) : (
             <div className="hidden min-w-0 sm:block">
