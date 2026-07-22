@@ -6,8 +6,8 @@ type AuthSplitShellProps = {
 
 export function AuthSplitShell({ children }: AuthSplitShellProps) {
   return (
-    <div className="grid min-h-screen grid-cols-1 md:grid-cols-2">
-      <aside className="relative flex min-h-[220px] items-center justify-center overflow-hidden bg-black px-8 py-12 text-center md:min-h-screen">
+    <div className="grid min-h-screen grid-cols-1 bg-background md:grid-cols-2">
+      <aside className="relative flex min-h-[220px] items-center justify-center overflow-hidden bg-zinc-950 px-8 py-12 text-center text-zinc-50 md:min-h-screen">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-50"
@@ -20,11 +20,10 @@ export function AuthSplitShell({ children }: AuthSplitShellProps) {
           <p className="text-sm font-medium tracking-[0.25em] text-primary uppercase">
             staj-projesi
           </p>
-          <h1 className="text-4xl font-semibold tracking-tight text-neutral-100 md:text-5xl">
-            Task{" "}
-            <span className="text-primary">Management</span>
+          <h1 className="text-4xl font-semibold tracking-tight text-zinc-50 md:text-5xl">
+            Task <span className="text-primary">Management</span>
           </h1>
-          <p className="max-w-sm text-sm leading-relaxed text-neutral-300 md:text-base">
+          <p className="max-w-sm text-sm leading-relaxed text-zinc-300 md:text-base">
             Ekiplerin için net, hızlı ve odaklı görev yönetimi.
           </p>
           <div className="mt-2 h-1 w-16 rounded-[var(--radius)] bg-primary" />

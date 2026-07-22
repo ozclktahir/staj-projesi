@@ -70,7 +70,7 @@ export function DeleteProjectModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-red-600 dark:text-red-400">
+          <DialogTitle className="text-destructive">
             Projeyi Sil
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -101,7 +101,7 @@ export function DeleteProjectModal({
             type="button"
             disabled={isDeleting || !project?.id}
             onClick={() => void onConfirm()}
-            className="rounded-lg bg-red-600 text-white hover:bg-red-700"
+            className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isDeleting ? "Siliniyor..." : "Evet, Projeyi Sil"}
           </Button>

@@ -410,7 +410,7 @@ export function TaskDetailSheet({
                 {saving ? "Kaydediliyor…" : "Kaydet"}
               </Button>
 
-              <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
                 <p className="mb-2 text-xs text-muted-foreground">
                   Görevi kalıcı olarak kaldırmak için silme işlemini kullanın.
                 </p>
@@ -419,7 +419,7 @@ export function TaskDetailSheet({
                   size="sm"
                   variant="outline"
                   onClick={() => setDeleteOpen(true)}
-                  className="rounded-lg border-red-500/40 text-red-600 hover:bg-red-500/10 hover:text-red-700"
+                  className="rounded-lg border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
                   <Trash2 className="size-3.5" />
                   Görevi Sil
@@ -488,7 +488,7 @@ export function TaskDetailSheet({
                         type="button"
                         aria-label="Alt görevi sil"
                         onClick={() => void handleDeleteSubtask(item.id)}
-                        className="rounded p-1 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                       >
                         <Trash2 className="size-3.5" />
                       </button>

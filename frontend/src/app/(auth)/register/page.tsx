@@ -120,9 +120,9 @@ export default function RegisterPage() {
 
   return (
     <AuthSplitShell>
-      <Card className="rounded-[var(--radius)] border border-neutral-800 shadow-xl">
+      <Card className="rounded-[var(--radius)] border border-border bg-card shadow-xl">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl text-neutral-800 dark:text-neutral-200">
+          <CardTitle className="text-2xl text-foreground">
             Kayıt Ol
           </CardTitle>
           <CardDescription>

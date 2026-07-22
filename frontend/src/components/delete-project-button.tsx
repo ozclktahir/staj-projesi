@@ -23,7 +23,7 @@ export function DeleteProjectButton({ project }: DeleteProjectButtonProps) {
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
-        className="rounded-lg border-red-500/40 text-red-600 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400"
+        className="rounded-lg border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
       >
         <Trash2 className="size-3.5" />
         Projeyi Sil

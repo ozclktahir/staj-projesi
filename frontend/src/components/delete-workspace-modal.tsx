@@ -66,13 +66,13 @@ export function DeleteWorkspaceModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-lg border border-slate-200 bg-slate-50 sm:max-w-md dark:border-slate-700 dark:bg-slate-900">
+      <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-red-600 dark:text-red-400">
+          <DialogTitle className="text-destructive">
             Workspace&apos;i Sil
           </DialogTitle>
-          <DialogDescription className="text-slate-500 dark:text-slate-400">
-            <span className="font-medium text-slate-800 dark:text-slate-200">
+          <DialogDescription className="text-muted-foreground">
+            <span className="font-medium text-foreground">
               {workspace?.name ?? "Bu workspace"}
             </span>{" "}
             kalıcı olarak silinecek. İlişkili projeler ve görevler de
@@ -84,7 +84,7 @@ export function DeleteWorkspaceModal({
           <Button
             type="button"
             variant="outline"
-            className="rounded-lg border-slate-200 dark:border-slate-700"
+            className="rounded-lg border-border"
             disabled={isDeleting}
             onClick={() => onOpenChange(false)}
           >
@@ -94,7 +94,7 @@ export function DeleteWorkspaceModal({
             type="button"
             disabled={isDeleting || !workspace?.id}
             onClick={() => void onConfirm()}
-            className="rounded-lg bg-red-600 text-white hover:bg-red-700"
+            className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isDeleting ? "Siliniyor..." : "Evet, Sil"}
           </Button>

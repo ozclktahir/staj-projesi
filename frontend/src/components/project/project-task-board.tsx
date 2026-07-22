@@ -436,7 +436,7 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-44">
                               <DropdownMenuItem
-                                className="text-red-600 focus:text-red-600"
+                                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                                 onSelect={(event) => {
                                   event.preventDefault();
                                   setTaskToDelete({

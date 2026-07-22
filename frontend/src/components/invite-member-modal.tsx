@@ -70,12 +70,10 @@ export function InviteMemberModal({
         if (!next) setEmail("");
       }}
     >
-      <DialogContent className="rounded-lg border border-slate-200 bg-slate-50 sm:max-w-md dark:border-slate-700 dark:bg-slate-900">
+      <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-slate-900 dark:text-slate-100">
-            Üye Davet Et
-          </DialogTitle>
-          <DialogDescription className="text-slate-500 dark:text-slate-400">
+          <DialogTitle className="text-foreground">Üye Davet Et</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
             {workspaceName
               ? `"${workspaceName}" çalışma alanına e-posta ile davet gönder.`
               : "Çalışma alanına e-posta ile davet gönder."}

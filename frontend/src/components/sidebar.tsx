@@ -58,40 +58,37 @@ function SidebarInner() {
   const canInvite = isAdminRole(activeWorkspace?.role);
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950">
-      <div className="border-b border-slate-200 p-3 dark:border-slate-800">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-card">
+      <div className="border-b border-border p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+              className="flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
                 {(activeWorkspace?.name ?? "İY").slice(0, 2).toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                <p className="truncate text-sm font-semibold text-foreground">
                   {loading
                     ? "Yükleniyor…"
                     : (activeWorkspace?.name ?? "Workspace seç")}
                 </p>
-                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                <p className="truncate text-xs text-muted-foreground">
                   {activeWorkspace?.role
                     ? `Rol: ${activeWorkspace.role}`
                     : "Çalışma alanı"}
                 </p>
               </div>
-              <ChevronsUpDown className="size-4 shrink-0 text-slate-400" />
+              <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent
-            align="start"
-            className="w-56 border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
-          >
+          <DropdownMenuContent align="start" className="w-56">
             <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
             {workspaces.length === 0 ? (
-              <DropdownMenuItem disabled className="text-slate-500">
+              <DropdownMenuItem disabled className="text-muted-foreground">
                 Henüz workspace yok
               </DropdownMenuItem>
             ) : (
@@ -111,14 +108,14 @@ function SidebarInner() {
                         "bg-primary/10 font-medium text-primary focus:bg-primary/15 focus:text-primary",
                     )}
                   >
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-slate-200 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] font-semibold text-foreground">
                       {workspace.name.slice(0, 2).toUpperCase()}
                     </span>
                     <span className="min-w-0 flex-1 truncate">
                       {workspace.name}
                     </span>
                     {workspace.role ? (
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-[10px] text-muted-foreground">
                         {workspace.role}
                       </span>
                     ) : null}
@@ -154,7 +151,7 @@ function SidebarInner() {
               Create New Workspace
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="cursor-pointer gap-2 text-red-600 focus:bg-red-500/10 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+              className="cursor-pointer gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
               disabled={!activeWorkspace || !canInvite}
               onSelect={(event) => {
                 event.preventDefault();
@@ -184,13 +181,13 @@ function SidebarInner() {
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
                   ? "bg-primary/15 text-primary"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100",
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               <Icon
                 className={cn(
                   "size-4 shrink-0",
-                  isActive ? "text-primary" : "text-slate-400",
+                  isActive ? "text-primary" : "text-muted-foreground",
                 )}
               />
               {label}
@@ -199,10 +196,8 @@ function SidebarInner() {
         })}
       </nav>
 
-      <div className="border-t border-slate-200 p-4 dark:border-slate-800">
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Workspace yönetimi
-        </p>
+      <div className="border-t border-border p-4">
+        <p className="text-xs text-muted-foreground">Workspace yönetimi</p>
       </div>
 
       <CreateWorkspaceModal

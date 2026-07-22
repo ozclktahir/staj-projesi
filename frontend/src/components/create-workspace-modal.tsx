@@ -80,19 +80,19 @@ export function CreateWorkspaceModal({
         if (!next) resetForm();
       }}
     >
-      <DialogContent className="rounded-lg border border-slate-200 bg-slate-50 sm:max-w-md dark:border-slate-700 dark:bg-slate-900">
+      <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-slate-900 dark:text-slate-100">
+          <DialogTitle className="text-foreground">
             Create New Workspace
           </DialogTitle>
-          <DialogDescription className="text-slate-500 dark:text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             Yeni bir çalışma alanı oluştur. Ad zorunludur.
           </DialogDescription>
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="space-y-2">
-            <Label htmlFor="workspace-name" className="text-slate-700 dark:text-slate-300">
+            <Label htmlFor="workspace-name" className="text-foreground">
               Workspace Name
             </Label>
             <Input
@@ -102,14 +102,14 @@ export function CreateWorkspaceModal({
               placeholder="Örn: Pazarlama Ekibi"
               required
               disabled={isSubmitting}
-              className="rounded-lg border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950"
+              className="rounded-lg border-border bg-background"
             />
           </div>
 
           <div className="space-y-2">
             <Label
               htmlFor="workspace-description"
-              className="text-slate-700 dark:text-slate-300"
+              className="text-foreground"
             >
               Description
             </Label>
@@ -120,7 +120,7 @@ export function CreateWorkspaceModal({
               placeholder="İsteğe bağlı açıklama"
               rows={3}
               disabled={isSubmitting}
-              className="flex w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="flex w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
@@ -128,7 +128,7 @@ export function CreateWorkspaceModal({
             <Button
               type="button"
               variant="outline"
-              className="rounded-lg border-slate-200 dark:border-slate-700"
+              className="rounded-lg border-border"
               disabled={isSubmitting}
               onClick={() => onOpenChange(false)}
             >
