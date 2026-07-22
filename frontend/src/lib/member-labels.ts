@@ -71,7 +71,33 @@ export function extractUserNameParts(
  * Son çare etiket — asla tek başına "-", "—", null, undefined dönmez.
  */
 function resolveLabelFallback(email: string | null): string {
-  return emailLocalPart(email) || email || "";
+  return emailLocalPart(email) || email || "Kullanıcı Yükleniyor...";
+}
+
+/**
+ * UI header/menü için kesin fallback zinciri:
+ * metadata.full_name → profile.full_name → email local → email → yükleniyor
+ */
+export function resolveUiDisplayName(input: {
+  metadataFullName?: string | null;
+  profileFullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  loading?: boolean;
+}): string {
+  const meta = cleanText(input.metadataFullName);
+  const profile = cleanText(input.profileFullName);
+  const combined = `${cleanText(input.firstName) ?? ""} ${cleanText(input.lastName) ?? ""}`.trim();
+  const local = emailLocalPart(input.email);
+  const mail = cleanText(input.email);
+
+  const resolved = meta || profile || combined || local || mail;
+  if (resolved) return resolved;
+
+  if (input.loading) return "Kullanıcı Yükleniyor...";
+  console.warn("[resolveUiDisplayName] kullanıcı adı çözülemedi", input);
+  return "Kullanıcı Yükleniyor...";
 }
 
 /**
@@ -116,7 +142,7 @@ export function formatAuthUserLabel(input?: {
   } | null;
 } | null): string {
   if (!input) {
-    return "";
+    return "Kullanıcı Yükleniyor...";
   }
   const meta = input.user_metadata ?? undefined;
   return formatUserCompact(

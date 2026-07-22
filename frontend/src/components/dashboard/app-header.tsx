@@ -8,26 +8,45 @@ import { InviteNotificationsMenu } from "@/components/invite-notifications-menu"
 import { Button } from "@/components/ui/button";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { clearAuthSession } from "@/lib/auth-session";
+import { resolveUiDisplayName } from "@/lib/member-labels";
 import { isAdminRole } from "@/lib/rbac";
+import { cn } from "@/lib/utils";
 
 type AppHeaderProps = {
   userName?: string;
   userEmail?: string | null;
+  isLoadingUser?: boolean;
 };
+
+function UserNameSkeleton() {
+  return (
+    <div className="hidden min-w-0 space-y-1.5 sm:block" aria-hidden>
+      <div className="h-3.5 w-28 animate-pulse rounded bg-muted" />
+      <div className="h-2.5 w-20 animate-pulse rounded bg-muted/70" />
+    </div>
+  );
+}
 
 function AppHeaderInner({
   userName = "",
   userEmail = null,
+  isLoadingUser = false,
 }: AppHeaderProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { activeWorkspace, activeWorkspaceId, refresh } = useWorkspaces();
   const canCreateProject = isAdminRole(activeWorkspace?.role);
 
-  const displayName = userName.trim();
+  const displayName = resolveUiDisplayName({
+    profileFullName: userName,
+    email: userEmail,
+    loading: isLoadingUser,
+  });
+
   const secondary =
     userEmail &&
     displayName &&
-    userEmail.toLowerCase() !== displayName.toLowerCase()
+    userEmail.toLowerCase() !== displayName.toLowerCase() &&
+    displayName !== "Kullanıcı Yükleniyor..."
       ? userEmail
       : null;
 
@@ -69,22 +88,31 @@ function AppHeaderInner({
         />
 
         <div
-          className="flex max-w-[220px] items-center gap-2 rounded-[var(--radius)] border border-border bg-card px-2.5 py-1.5"
+          className="flex max-w-[240px] items-center gap-2 rounded-[var(--radius)] border border-border bg-card px-2.5 py-1.5"
           title={secondary ?? displayName}
         >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+          <span
+            className={cn(
+              "flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary",
+              isLoadingUser && "animate-pulse",
+            )}
+          >
             <UserRound className="size-4" />
           </span>
-          <div className="hidden min-w-0 sm:block">
-            <p className="truncate text-sm font-medium text-foreground">
-              {displayName || secondary || "…"}
-            </p>
-            {secondary ? (
-              <p className="truncate text-xs text-muted-foreground">
-                {secondary}
+          {isLoadingUser && !userName.trim() ? (
+            <UserNameSkeleton />
+          ) : (
+            <div className="hidden min-w-0 sm:block">
+              <p className="truncate text-sm font-medium text-foreground">
+                {displayName}
               </p>
-            ) : null}
-          </div>
+              {secondary ? (
+                <p className="truncate text-xs text-muted-foreground">
+                  {secondary}
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
 
         <Button

@@ -19,7 +19,7 @@ export async function getCurrentUserDisplayLabel(): Promise<{
   try {
     const auth = await getAuthenticatedUser();
     if (!auth) {
-      return { displayName: "", email: null };
+      return { displayName: "Kullanıcı Yükleniyor...", email: null };
     }
 
     const { supabase, user } = auth;
@@ -83,11 +83,11 @@ export async function getCurrentUserDisplayLabel(): Promise<{
     });
 
     return {
-      displayName: displayName || fromAuth || user.email || "",
+      displayName: displayName || fromAuth || user.email?.split("@")[0] || user.email || "Kullanıcı Yükleniyor...",
       email: user.email ?? null,
     };
   } catch (error) {
     console.error("[getCurrentUserDisplayLabel]", error);
-    return { displayName: "", email: null };
+    return { displayName: "Kullanıcı Yükleniyor...", email: null };
   }
 }
