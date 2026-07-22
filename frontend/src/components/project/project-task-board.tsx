@@ -77,6 +77,9 @@ function AssigneeBadge({ assignee }: { assignee?: TaskAssignee | null }) {
       )}
       <span className="truncate text-xs font-medium text-foreground">
         {assignee.displayName}
+        {assignee.email && assignee.displayName !== assignee.email ? (
+          <span className="sr-only"> ({assignee.email})</span>
+        ) : null}
       </span>
     </span>
   );

@@ -14,7 +14,7 @@ export function DashboardShell({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [userName, setUserName] = useState("Kullanıcı");
+  const [userName, setUserName] = useState("—");
 
   useEffect(() => {
     void syncAuthCookiesFromStorage().then(() => {

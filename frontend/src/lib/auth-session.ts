@@ -48,7 +48,7 @@ export function resolveUserDisplayName(
   user?: StoredAuthUser | null,
 ): string {
   if (!user) {
-    return "Kullanıcı";
+    return "—";
   }
 
   try {
@@ -64,14 +64,14 @@ export function resolveUserDisplayName(
       return combined;
     }
 
-    if (user.email) {
-      return user.email.split("@")[0] ?? "Kullanıcı";
+    if (user.email?.trim()) {
+      return user.email.trim();
     }
   } catch {
-    return "Kullanıcı";
+    return user.email?.trim() || "—";
   }
 
-  return "Kullanıcı";
+  return "—";
 }
 
 export function readStoredUser(): StoredAuthUser | null {

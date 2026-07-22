@@ -3,6 +3,11 @@
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { isAdminRole } from "@/lib/rbac";
 import {
+  formatMemberOptionLabel,
+  PROFILE_SELECT_FIELDS,
+  PROFILE_SELECT_FIELDS_FALLBACK,
+} from "@/lib/member-labels";
+import {
   normalizeTaskStatusInput,
   type TaskStatus,
 } from "@/lib/supabase/types";
@@ -42,21 +47,6 @@ function toPlainErrorMessage(error: unknown): string {
   } catch {
     return "Admin özeti alınamadı.";
   }
-}
-
-function displayNameFromProfile(
-  profile: Record<string, unknown> | null | undefined,
-  email: string | null,
-): string {
-  if (profile) {
-    const name =
-      (typeof profile.full_name === "string" && profile.full_name) ||
-      (typeof profile.name === "string" && profile.name) ||
-      (typeof profile.username === "string" && profile.username);
-    if (name) return name;
-  }
-  if (email) return email.split("@")[0] ?? email;
-  return "Kullanıcı";
 }
 
 export async function getAdminOverview(
@@ -134,10 +124,18 @@ export async function getAdminOverview(
 
     const profileById = new Map<string, Record<string, unknown>>();
     if (userIds.length > 0) {
-      const { data: profiles } = await supabase
+      let { data: profiles, error: profileError } = await supabase
         .from("profiles")
-        .select("*")
+        .select(PROFILE_SELECT_FIELDS)
         .in("id", userIds);
+
+      if (profileError) {
+        ({ data: profiles } = await supabase
+          .from("profiles")
+          .select(PROFILE_SELECT_FIELDS_FALLBACK)
+          .in("id", userIds));
+      }
+
       for (const p of profiles ?? []) {
         if (p && typeof p === "object" && "id" in p) {
           profileById.set(String((p as { id: string }).id), p as Record<string, unknown>);
@@ -212,7 +210,7 @@ export async function getAdminOverview(
       return {
         userId: uid,
         email,
-        displayName: displayNameFromProfile(profile, email),
+        displayName: formatMemberOptionLabel(profile, email),
         role: (m.role as string) ?? "Member",
         projectNames: projectsByUser.get(uid) ?? [],
         tasksDone: counts.done,

@@ -14,7 +14,7 @@ type AppHeaderProps = {
   userName?: string;
 };
 
-function AppHeaderInner({ userName = "Kullanıcı" }: AppHeaderProps) {
+function AppHeaderInner({ userName = "—" }: AppHeaderProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { activeWorkspace, activeWorkspaceId, refresh } = useWorkspaces();
   const canCreateProject = isAdminRole(activeWorkspace?.role);
@@ -64,7 +64,7 @@ function AppHeaderInner({ userName = "Kullanıcı" }: AppHeaderProps) {
             <p className="truncate text-sm font-medium text-foreground">
               {userName}
             </p>
-            <p className="text-xs text-muted-foreground">Profil</p>
+      <p className="text-xs text-muted-foreground">Profil</p>
           </div>
         </div>
 

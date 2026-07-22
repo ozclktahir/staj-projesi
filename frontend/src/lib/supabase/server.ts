@@ -9,6 +9,11 @@ import type {
   TaskStatus,
 } from "@/lib/supabase/types";
 import {
+  formatUserCompact,
+  PROFILE_SELECT_FIELDS,
+  PROFILE_SELECT_FIELDS_FALLBACK,
+} from "@/lib/member-labels";
+import {
   getMemberVisibleProjectIds,
   resolveWorkspaceRole,
 } from "@/lib/workspace-permissions";
@@ -109,18 +114,30 @@ export async function createSupabaseServerClient(): Promise<SupabaseClient | nul
   return createAuthedClient();
 }
 
-function resolveUserName(user: User): string {
+function resolveUserName(user: User, profile?: Record<string, unknown> | null): string {
   const meta = user.user_metadata as
     | {
         first_name?: string;
         last_name?: string;
         full_name?: string;
+        display_name?: string;
       }
     | undefined;
 
-  const fullName = meta?.full_name?.trim();
-  const combined = `${meta?.first_name ?? ""} ${meta?.last_name ?? ""}`.trim();
-  return fullName || combined || user.email?.split("@")[0] || "Kullanıcı";
+  if (profile) {
+    return formatUserCompact(profile, user.email);
+  }
+
+  return formatUserCompact(
+    {
+      full_name: meta?.full_name,
+      display_name: meta?.display_name,
+      first_name: meta?.first_name,
+      last_name: meta?.last_name,
+      email: user.email,
+    },
+    user.email,
+  );
 }
 
 export async function getCurrentUserProjects(
@@ -133,11 +150,31 @@ export async function getCurrentUserProjects(
     const auth = await getAuthenticatedUser();
 
     if (!auth) {
-      return { userName: "Kullanıcı", projects: [] };
+      return { userName: "—", projects: [] };
     }
 
     const { supabase, user } = auth;
-    const userName = resolveUserName(user);
+
+    let profile: Record<string, unknown> | null = null;
+    {
+      const { data } = await supabase
+        .from("profiles")
+        .select(PROFILE_SELECT_FIELDS)
+        .eq("id", user.id)
+        .maybeSingle();
+      if (data) {
+        profile = data as Record<string, unknown>;
+      } else {
+        const { data: fallback } = await supabase
+          .from("profiles")
+          .select(PROFILE_SELECT_FIELDS_FALLBACK)
+          .eq("id", user.id)
+          .maybeSingle();
+        profile = (fallback as Record<string, unknown> | null) ?? null;
+      }
+    }
+
+    const userName = resolveUserName(user, profile);
     const cookieStore = await cookies();
     const activeWorkspaceId =
       workspaceId?.trim() ||
@@ -297,7 +334,7 @@ export async function getCurrentUserProjects(
     };
   } catch (error) {
     console.error("[getCurrentUserProjects]", error);
-    return { userName: "Kullanıcı", projects: [] };
+    return { userName: "—", projects: [] };
   }
 }
 
@@ -445,20 +482,15 @@ function mapProfileToAssignee(
 ): TaskAssignee {
   const email =
     (profile && typeof profile.email === "string" && profile.email) || null;
-  const fullName =
-    (profile && typeof profile.full_name === "string" && profile.full_name) ||
-    (profile && typeof profile.name === "string" && profile.name) ||
-    null;
-  const displayName =
-    fullName?.trim() ||
-    (email ? email.split("@")[0] : null) ||
-    "Kullanıcı";
+  const displayName = formatUserCompact(profile, email);
 
   const parts = displayName.split(/\s+/).filter(Boolean);
   const initials =
-    parts.length >= 2
+    parts.length >= 2 && displayName !== "—"
       ? `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase()
-      : displayName.slice(0, 2).toUpperCase();
+      : displayName === "—"
+        ? "?"
+        : displayName.slice(0, 2).toUpperCase();
 
   const avatarUrl =
     (profile && typeof profile.avatar_url === "string" && profile.avatar_url) ||
@@ -487,19 +519,31 @@ async function enrichTasksWithAssignees(
   const profileById = new Map<string, Record<string, unknown>>();
   const { data: profiles, error } = await supabase
     .from("profiles")
-    .select("*")
+    .select(PROFILE_SELECT_FIELDS)
     .in("id", assigneeIds);
 
   if (error) {
     console.warn("[enrichTasksWithAssignees] profiles:", error.message);
-  }
-
-  for (const p of profiles ?? []) {
-    if (p && typeof p === "object" && "id" in p) {
-      profileById.set(
-        String((p as { id: string }).id),
-        p as Record<string, unknown>,
-      );
+    const { data: fallback } = await supabase
+      .from("profiles")
+      .select(PROFILE_SELECT_FIELDS_FALLBACK)
+      .in("id", assigneeIds);
+    for (const p of fallback ?? []) {
+      if (p && typeof p === "object" && "id" in p) {
+        profileById.set(
+          String((p as { id: string }).id),
+          p as Record<string, unknown>,
+        );
+      }
+    }
+  } else {
+    for (const p of profiles ?? []) {
+      if (p && typeof p === "object" && "id" in p) {
+        profileById.set(
+          String((p as { id: string }).id),
+          p as Record<string, unknown>,
+        );
+      }
     }
   }
 

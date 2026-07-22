@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import type { TaskComment } from "@/lib/supabase/types";
+import {
+  formatAuthUserLabel,
+  formatMemberOptionLabel,
+  PROFILE_SELECT_FIELDS,
+  PROFILE_SELECT_FIELDS_FALLBACK,
+} from "@/lib/member-labels";
 
 export type GetCommentsResult =
   | { success: true; comments: TaskComment[] }
@@ -29,19 +35,6 @@ function toPlainErrorMessage(error: unknown): string {
   } catch {
     return "Yorum işlemi başarısız.";
   }
-}
-
-function authorFromProfile(
-  profile: Record<string, unknown> | null | undefined,
-  fallback: string,
-): string {
-  if (!profile) return fallback;
-  const name =
-    (typeof profile.full_name === "string" && profile.full_name) ||
-    (typeof profile.name === "string" && profile.name) ||
-    (typeof profile.username === "string" && profile.username) ||
-    (typeof profile.email === "string" && profile.email);
-  return name || fallback;
 }
 
 function mapComment(
@@ -78,10 +71,17 @@ async function enrichComments(
 
   const profileById = new Map<string, Record<string, unknown>>();
   if (userIds.length > 0) {
-    const { data: profiles } = await supabase
+    let { data: profiles, error } = await supabase
       .from("profiles")
-      .select("*")
+      .select(PROFILE_SELECT_FIELDS)
       .in("id", userIds);
+
+    if (error) {
+      ({ data: profiles, error } = await supabase
+        .from("profiles")
+        .select(PROFILE_SELECT_FIELDS_FALLBACK)
+        .in("id", userIds));
+    }
 
     for (const profile of profiles ?? []) {
       if (profile && typeof profile === "object" && "id" in profile) {
@@ -95,10 +95,8 @@ async function enrichComments(
 
   return rows.map((row) => {
     const uid = typeof row.user_id === "string" ? row.user_id : null;
-    const author = authorFromProfile(
-      uid ? profileById.get(uid) : null,
-      "Kullanıcı",
-    );
+    const profile = uid ? profileById.get(uid) ?? null : null;
+    const author = formatMemberOptionLabel(profile, null);
     return mapComment(row, author);
   });
 }
@@ -234,15 +232,36 @@ export async function createComment(
       revalidatePath(`/project/${task.project_id}`);
     }
 
-    const authorName =
-      (typeof user.user_metadata?.full_name === "string" &&
-        user.user_metadata.full_name) ||
-      user.email ||
-      "Sen";
+    const authorName = formatAuthUserLabel({
+      email: user.email,
+      user_metadata: user.user_metadata as {
+        first_name?: string;
+        last_name?: string;
+        full_name?: string;
+        display_name?: string;
+      },
+    });
+
+    // Profil varsa onu tercih et
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select(PROFILE_SELECT_FIELDS_FALLBACK)
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const resolvedAuthor = profile
+      ? formatMemberOptionLabel(
+          profile as Record<string, unknown>,
+          user.email ?? null,
+        )
+      : authorName;
 
     return {
       success: true,
-      comment: mapComment(data as Record<string, unknown>, authorName),
+      comment: mapComment(
+        data as Record<string, unknown>,
+        resolvedAuthor === "—" ? authorName : resolvedAuthor,
+      ),
     };
   } catch (error) {
     console.error("[createComment] catch:", toPlainErrorMessage(error));

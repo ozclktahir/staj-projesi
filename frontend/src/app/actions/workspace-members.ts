@@ -1,7 +1,7 @@
 "use server";
 
 import { getAuthenticatedUser } from "@/lib/supabase/server";
-import { formatMemberOptionLabel } from "@/lib/member-labels";
+import { formatMemberOptionLabel, PROFILE_SELECT_FIELDS, PROFILE_SELECT_FIELDS_FALLBACK } from "@/lib/member-labels";
 import {
   resolveWorkspaceRole,
   type WorkspaceMemberOption,
@@ -76,12 +76,10 @@ export async function getWorkspaceMembers(
     if (userIds.length > 0) {
       const { data: profiles, error: profileError } = await supabase
         .from("profiles")
-        .select(
-          "id, full_name, email, avatar_url, first_name, last_name, name, username",
-        )
+        .select(PROFILE_SELECT_FIELDS)
         .in("id", userIds);
 
-      // Bazı şemalarda display_name / first_name yok — * ile düş
+      // Bazı şemalarda display_name / first_name yok — fallback select
       if (profileError) {
         console.warn(
           "[getWorkspaceMembers] profile select fallback:",
@@ -89,7 +87,7 @@ export async function getWorkspaceMembers(
         );
         const { data: fallbackProfiles } = await supabase
           .from("profiles")
-          .select("id, full_name, email, avatar_url")
+          .select(PROFILE_SELECT_FIELDS_FALLBACK)
           .in("id", userIds);
         for (const p of fallbackProfiles ?? []) {
           if (p && typeof p === "object" && "id" in p) {
