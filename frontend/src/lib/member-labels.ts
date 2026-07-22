@@ -71,7 +71,7 @@ export function extractUserNameParts(
  * Son çare etiket — asla tek başına "-", "—", null, undefined dönmez.
  */
 function resolveLabelFallback(email: string | null): string {
-  return emailLocalPart(email) || email || "Hesap";
+  return emailLocalPart(email) || email || "";
 }
 
 /**
@@ -116,7 +116,7 @@ export function formatAuthUserLabel(input?: {
   } | null;
 } | null): string {
   if (!input) {
-    return "Hesap";
+    return "";
   }
   const meta = input.user_metadata ?? undefined;
   return formatUserCompact(

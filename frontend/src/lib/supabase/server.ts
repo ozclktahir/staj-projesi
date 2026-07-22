@@ -162,7 +162,7 @@ export async function getCurrentUserProjects(
     const auth = await getAuthenticatedUser();
 
     if (!auth) {
-      return { userName: "Hesap", projects: [] };
+      return { userName: "", projects: [] };
     }
 
     const { supabase, user } = auth;
@@ -379,7 +379,7 @@ export async function getCurrentUserProjects(
     };
   } catch (error) {
     console.error("[getCurrentUserProjects]", error);
-    return { userName: "Hesap", projects: [] };
+    return { userName: "", projects: [] };
   }
 }
 

@@ -12,12 +12,24 @@ import { isAdminRole } from "@/lib/rbac";
 
 type AppHeaderProps = {
   userName?: string;
+  userEmail?: string | null;
 };
 
-function AppHeaderInner({ userName = "" }: AppHeaderProps) {
+function AppHeaderInner({
+  userName = "",
+  userEmail = null,
+}: AppHeaderProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { activeWorkspace, activeWorkspaceId, refresh } = useWorkspaces();
   const canCreateProject = isAdminRole(activeWorkspace?.role);
+
+  const displayName = userName.trim();
+  const secondary =
+    userEmail &&
+    displayName &&
+    userEmail.toLowerCase() !== displayName.toLowerCase()
+      ? userEmail
+      : null;
 
   async function handleLogout() {
     if (isLoggingOut) return;
@@ -56,15 +68,22 @@ function AppHeaderInner({ userName = "" }: AppHeaderProps) {
           }}
         />
 
-        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-border bg-card px-2.5 py-1.5">
-          <span className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-primary">
+        <div
+          className="flex max-w-[220px] items-center gap-2 rounded-[var(--radius)] border border-border bg-card px-2.5 py-1.5"
+          title={secondary ?? displayName}
+        >
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
             <UserRound className="size-4" />
           </span>
           <div className="hidden min-w-0 sm:block">
             <p className="truncate text-sm font-medium text-foreground">
-              {userName}
+              {displayName || secondary || "…"}
             </p>
-      <p className="text-xs text-muted-foreground">Profil</p>
+            {secondary ? (
+              <p className="truncate text-xs text-muted-foreground">
+                {secondary}
+              </p>
+            ) : null}
           </div>
         </div>
 

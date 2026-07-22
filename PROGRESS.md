@@ -275,6 +275,7 @@
 - Giriş (Login) akışında auth hatası ile login sonrası workspace/profil yönlendirme hataları ayrıştırıldı. Hatalı "Şifre veya e-posta yanlış" uyarısı ve sayfa yenileme gereksinimi düzeltildi.
 - Proje genelindeki jenerik "Kullanıcı" / "Üye" fallback ifadeleri kaldırıldı. Tüm görev, yorum, aktivite ve profil alanlarında kullanıcıların gerçek Ad Soyad ve e-posta bilgilerinin görüntülenmesi sağlandı.
 - Kullanıcı etiketlerindeki boş veri kaynaklı " - " (tire) görünüm hatası düzeltildi. Helper fonksiyonlar null/undefined değerlere karşı güvenli hale getirildi.
+- Profil, Header ve menülerde statik olarak yer alan "Hesap" yazıları kaldırılarak kullanıcının gerçek ismi (dinamik veri) ile değiştirildi.
 
 ### [21 Temmuz 2026] - Auth bağlantı düzeltmeleri ve projects.updated_at şema sync
 - Auth akışındaki bağlantı hataları (port ve exception düzeltmeleri) giderildi.

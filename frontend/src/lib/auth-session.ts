@@ -1,4 +1,5 @@
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { formatAuthUserLabel } from "@/lib/member-labels";
 
 export type StoredAuthUser = {
   email?: string;
@@ -6,6 +7,7 @@ export type StoredAuthUser = {
     first_name?: string;
     last_name?: string;
     full_name?: string;
+    display_name?: string;
   };
 };
 
@@ -47,37 +49,7 @@ export function isJwtExpired(token: string | null | undefined): boolean {
 export function resolveUserDisplayName(
   user?: StoredAuthUser | null,
 ): string {
-  if (!user) {
-    return "Hesap";
-  }
-
-  try {
-    const meta = user.user_metadata;
-    if (meta?.full_name?.trim()) {
-      return meta.full_name.trim();
-    }
-
-    const first = meta?.first_name?.trim() ?? "";
-    const last = meta?.last_name?.trim() ?? "";
-    const combined = `${first} ${last}`.trim();
-    if (combined) {
-      return combined;
-    }
-
-    const email = user.email?.trim();
-    if (email) {
-      const local = email.split("@")[0]?.trim();
-      return local || email;
-    }
-  } catch {
-    const email = user.email?.trim();
-    if (email) {
-      return email.split("@")[0]?.trim() || email;
-    }
-    return "Hesap";
-  }
-
-  return "Hesap";
+  return formatAuthUserLabel(user ?? null);
 }
 
 export function readStoredUser(): StoredAuthUser | null {
