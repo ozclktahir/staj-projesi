@@ -18,15 +18,31 @@ BEGIN
   VALUES (
     NEW.id,
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+    COALESCE(
+      NULLIF(TRIM(NEW.raw_user_meta_data->>'full_name'), ''),
+      NULLIF(
+        TRIM(
+          CONCAT_WS(
+            ' ',
+            NEW.raw_user_meta_data->>'first_name',
+            NEW.raw_user_meta_data->>'last_name'
+          )
+        ),
+        ''
+      ),
+      SPLIT_PART(NEW.email, '@', 1)
+    ),
     COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
     COALESCE(NEW.raw_user_meta_data->>'last_name', '')
   )
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
-    full_name = EXCLUDED.full_name,
-    first_name = EXCLUDED.first_name,
-    last_name = EXCLUDED.last_name;
+    full_name = CASE
+      WHEN NULLIF(TRIM(EXCLUDED.full_name), '') IS NOT NULL THEN EXCLUDED.full_name
+      ELSE profiles.full_name
+    END,
+    first_name = COALESCE(NULLIF(TRIM(EXCLUDED.first_name), ''), profiles.first_name),
+    last_name = COALESCE(NULLIF(TRIM(EXCLUDED.last_name), ''), profiles.last_name);
 
   RETURN NEW;
 END;

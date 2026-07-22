@@ -260,7 +260,9 @@ export async function createComment(
       success: true,
       comment: mapComment(
         data as Record<string, unknown>,
-        resolvedAuthor === "—" ? authorName : resolvedAuthor,
+        resolvedAuthor === "Hesap" && authorName !== "Hesap"
+          ? authorName
+          : resolvedAuthor,
       ),
     };
   } catch (error) {

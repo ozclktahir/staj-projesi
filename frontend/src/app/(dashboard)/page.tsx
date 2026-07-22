@@ -19,7 +19,7 @@ export default async function DashboardPage({
   const params = await searchParams;
   const workspaceId = await resolveActiveWorkspaceId(params.workspaceId ?? null);
 
-  let userName = "—";
+  let userName = "Hesap";
   let projects: DashboardProject[] = [];
   let stats: DashboardTaskStats = { total: 0, inProgress: 0, done: 0 };
   let adminMembers: Awaited<ReturnType<typeof getAdminOverview>>["members"] =

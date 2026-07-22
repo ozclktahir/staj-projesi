@@ -124,20 +124,32 @@ function resolveUserName(user: User, profile?: Record<string, unknown> | null): 
       }
     | undefined;
 
-  if (profile) {
-    return formatUserCompact(profile, user.email);
-  }
+  // Profil boşsa auth metadata ile doldur (eski test hesapları)
+  const merged: Record<string, unknown> = {
+    ...(profile ?? {}),
+    full_name:
+      (typeof profile?.full_name === "string" && profile.full_name.trim()) ||
+      meta?.full_name ||
+      null,
+    display_name:
+      (typeof profile?.display_name === "string" && profile.display_name.trim()) ||
+      meta?.display_name ||
+      null,
+    first_name:
+      (typeof profile?.first_name === "string" && profile.first_name.trim()) ||
+      meta?.first_name ||
+      null,
+    last_name:
+      (typeof profile?.last_name === "string" && profile.last_name.trim()) ||
+      meta?.last_name ||
+      null,
+    email:
+      (typeof profile?.email === "string" && profile.email.trim()) ||
+      user.email ||
+      null,
+  };
 
-  return formatUserCompact(
-    {
-      full_name: meta?.full_name,
-      display_name: meta?.display_name,
-      first_name: meta?.first_name,
-      last_name: meta?.last_name,
-      email: user.email,
-    },
-    user.email,
-  );
+  return formatUserCompact(merged, user.email);
 }
 
 export async function getCurrentUserProjects(
@@ -150,7 +162,7 @@ export async function getCurrentUserProjects(
     const auth = await getAuthenticatedUser();
 
     if (!auth) {
-      return { userName: "—", projects: [] };
+      return { userName: "Hesap", projects: [] };
     }
 
     const { supabase, user } = auth;
@@ -175,6 +187,39 @@ export async function getCurrentUserProjects(
     }
 
     const userName = resolveUserName(user, profile);
+
+    // full_name boşsa metadata'dan profiles'a geri yaz (eski test kullanıcıları)
+    try {
+      const meta = user.user_metadata as
+        | { full_name?: string; first_name?: string; last_name?: string }
+        | undefined;
+      const profileFull =
+        typeof profile?.full_name === "string" ? profile.full_name.trim() : "";
+      const metaFull =
+        meta?.full_name?.trim() ||
+        `${meta?.first_name ?? ""} ${meta?.last_name ?? ""}`.trim();
+      if (!profileFull && metaFull) {
+        await supabase.from("profiles").upsert({
+          id: user.id,
+          email: user.email ?? null,
+          full_name: metaFull,
+          first_name: meta?.first_name?.trim() || null,
+          last_name: meta?.last_name?.trim() || null,
+        });
+      } else if (!profileFull && user.email) {
+        const local = user.email.split("@")[0]?.trim();
+        if (local) {
+          await supabase.from("profiles").upsert({
+            id: user.id,
+            email: user.email,
+            full_name: local,
+          });
+        }
+      }
+    } catch (syncError) {
+      console.warn("[getCurrentUserProjects] profile sync:", syncError);
+    }
+
     const cookieStore = await cookies();
     const activeWorkspaceId =
       workspaceId?.trim() ||
@@ -334,7 +379,7 @@ export async function getCurrentUserProjects(
     };
   } catch (error) {
     console.error("[getCurrentUserProjects]", error);
-    return { userName: "—", projects: [] };
+    return { userName: "Hesap", projects: [] };
   }
 }
 
@@ -486,11 +531,9 @@ function mapProfileToAssignee(
 
   const parts = displayName.split(/\s+/).filter(Boolean);
   const initials =
-    parts.length >= 2 && displayName !== "—"
+    parts.length >= 2
       ? `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase()
-      : displayName === "—"
-        ? "?"
-        : displayName.slice(0, 2).toUpperCase();
+      : displayName.slice(0, 2).toUpperCase() || "?";
 
   const avatarUrl =
     (profile && typeof profile.avatar_url === "string" && profile.avatar_url) ||

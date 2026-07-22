@@ -14,7 +14,7 @@ type AppHeaderProps = {
   userName?: string;
 };
 
-function AppHeaderInner({ userName = "—" }: AppHeaderProps) {
+function AppHeaderInner({ userName = "" }: AppHeaderProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { activeWorkspace, activeWorkspaceId, refresh } = useWorkspaces();
   const canCreateProject = isAdminRole(activeWorkspace?.role);

@@ -70,7 +70,10 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const email = this.normalizeEmail(dto.email);
-    const fullName = `${dto.firstName} ${dto.lastName}`.trim();
+    const fullName =
+      `${dto.firstName} ${dto.lastName}`.trim() ||
+      email.split('@')[0] ||
+      email;
     const metadata = {
       first_name: dto.firstName,
       last_name: dto.lastName,

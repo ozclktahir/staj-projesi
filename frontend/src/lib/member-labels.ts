@@ -22,39 +22,43 @@ type NameParts = {
   email: string | null;
 };
 
-/** Profil + e-postadan ad ve e-posta çıkarır (jenerik fallback yok). */
+function cleanText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  // Boş ayraç / tire kalıntıları
+  if (trimmed === "-" || trimmed === "—" || trimmed === "–") return null;
+  return trimmed;
+}
+
+/** e-posta yerel kısmı: ahmet@x.com → ahmet */
+export function emailLocalPart(email: string | null | undefined): string | null {
+  const mail = cleanText(email);
+  if (!mail || !mail.includes("@")) return mail;
+  const local = mail.split("@")[0]?.trim() ?? "";
+  return local || null;
+}
+
+/** Profil + e-postadan ad ve e-posta çıkarır. */
 export function extractUserNameParts(
   profile: Record<string, unknown> | null | undefined,
   email?: string | null,
 ): NameParts {
   const fullName =
-    (profile &&
-      typeof profile.full_name === "string" &&
-      profile.full_name.trim()) ||
-    (profile &&
-      typeof profile.display_name === "string" &&
-      profile.display_name.trim()) ||
-    (profile && typeof profile.name === "string" && profile.name.trim()) ||
+    cleanText(profile?.full_name) ||
+    cleanText(profile?.display_name) ||
+    cleanText(profile?.name) ||
     null;
 
-  const first =
-    profile && typeof profile.first_name === "string"
-      ? profile.first_name.trim()
-      : "";
-  const last =
-    profile && typeof profile.last_name === "string"
-      ? profile.last_name.trim()
-      : "";
+  const first = cleanText(profile?.first_name) ?? "";
+  const last = cleanText(profile?.last_name) ?? "";
   const combined = `${first} ${last}`.trim() || null;
 
-  const username =
-    profile && typeof profile.username === "string"
-      ? profile.username.trim()
-      : null;
+  const username = cleanText(profile?.username);
 
   const mail =
-    (email && email.trim()) ||
-    (profile && typeof profile.email === "string" && profile.email.trim()) ||
+    cleanText(email) ||
+    cleanText(profile?.email) ||
     null;
 
   return {
@@ -64,29 +68,41 @@ export function extractUserNameParts(
 }
 
 /**
- * Kompakt etiket (header, kart, yorum): Ad Soyad → e-posta.
- * Jenerik "Kullanıcı" / "Üye" / "Anonim" asla dönmez.
+ * Son çare etiket — asla tek başına "-", "—", null, undefined dönmez.
+ */
+function resolveLabelFallback(email: string | null): string {
+  return emailLocalPart(email) || email || "Hesap";
+}
+
+/**
+ * Kompakt etiket (header, kart): Ad Soyad → e-posta → e-posta yerel kısmı.
  */
 export function formatUserCompact(
   profile?: Record<string, unknown> | null,
   email?: string | null,
 ): string {
   const parts = extractUserNameParts(profile, email);
-  return parts.name || parts.email || "—";
+  if (parts.name) return parts.name;
+  if (parts.email) return parts.email;
+  return resolveLabelFallback(parts.email);
 }
 
 /**
- * Dropdown / liste etiketi: Ad Soyad (email) önceliği.
+ * Dropdown / liste: Ad Soyad (email) — boş parçalar birleştirilmez.
+ * Mantık: name ? (email ? `${name} (${email})` : name) : email || localPart
  */
 export function formatMemberOptionLabel(
   profile: Record<string, unknown> | null | undefined,
   email: string | null | undefined,
 ): string {
   const parts = extractUserNameParts(profile, email);
-  if (parts.name && parts.email) return `${parts.name} (${parts.email})`;
-  if (parts.name) return parts.name;
-  if (parts.email) return parts.email;
-  return "—";
+  const name = parts.name;
+  const mail = parts.email;
+
+  if (name && mail) return `${name} (${mail})`;
+  if (name) return name;
+  if (mail) return mail;
+  return resolveLabelFallback(mail);
 }
 
 /** Auth user_metadata + email → görünen ad (client/header). */
@@ -99,7 +115,9 @@ export function formatAuthUserLabel(input?: {
     display_name?: string;
   } | null;
 } | null): string {
-  if (!input) return "—";
+  if (!input) {
+    return "Hesap";
+  }
   const meta = input.user_metadata ?? undefined;
   return formatUserCompact(
     {

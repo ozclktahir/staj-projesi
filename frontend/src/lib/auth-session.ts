@@ -48,7 +48,7 @@ export function resolveUserDisplayName(
   user?: StoredAuthUser | null,
 ): string {
   if (!user) {
-    return "—";
+    return "Hesap";
   }
 
   try {
@@ -64,14 +64,20 @@ export function resolveUserDisplayName(
       return combined;
     }
 
-    if (user.email?.trim()) {
-      return user.email.trim();
+    const email = user.email?.trim();
+    if (email) {
+      const local = email.split("@")[0]?.trim();
+      return local || email;
     }
   } catch {
-    return user.email?.trim() || "—";
+    const email = user.email?.trim();
+    if (email) {
+      return email.split("@")[0]?.trim() || email;
+    }
+    return "Hesap";
   }
 
-  return "—";
+  return "Hesap";
 }
 
 export function readStoredUser(): StoredAuthUser | null {
