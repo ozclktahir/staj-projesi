@@ -1,6 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { readAccessToken } from "@/lib/auth-session";
 
 export function createSupabaseBrowserClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,13 +23,11 @@ export function createAuthedRealtimeClient(): SupabaseClient | null {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey || typeof window === "undefined") return null;
 
-  let accessToken = readAccessToken();
-  if (!accessToken) {
-    try {
-      accessToken = localStorage.getItem("access_token");
-    } catch {
-      accessToken = null;
-    }
+  let accessToken: string | null = null;
+  try {
+    accessToken = localStorage.getItem("access_token");
+  } catch {
+    accessToken = null;
   }
 
   if (!accessToken?.trim()) return null;
