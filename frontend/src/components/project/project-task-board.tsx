@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ListTodo, UserRound } from "lucide-react";
+import { ListTodo, MoreHorizontal, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
+import { DeleteTaskModal } from "@/components/delete-task-modal";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
 import {
   Card,
@@ -12,6 +13,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   TASK_PRIORITY_LABELS,
   TASK_STATUSES,
@@ -107,10 +114,22 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
   const [tasks, setTasks] = useState(initialTasks);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
     setTasks(initialTasks);
   }, [initialTasks]);
+
+  function removeTaskFromBoard(taskId: string) {
+    setTasks((prev) => prev.filter((task) => task.id !== taskId));
+    if (selectedTaskId === taskId) {
+      setSelectedTaskId(null);
+    }
+    router.refresh();
+  }
 
   async function handleStatusChange(taskId: string, status: TaskStatus) {
     const previous = tasks;
@@ -207,8 +226,35 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
                             </p>
                           ) : null}
                         </button>
-                        <div className="shrink-0 pt-0.5">
+                        <div className="flex shrink-0 items-start gap-1 pt-0.5">
                           <AssigneeBadge assignee={task.assignee} />
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                aria-label="Görev menüsü"
+                                onClick={(event) => event.stopPropagation()}
+                                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              >
+                                <MoreHorizontal className="size-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-44">
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600"
+                                onSelect={(event) => {
+                                  event.preventDefault();
+                                  setTaskToDelete({
+                                    id: task.id,
+                                    title: task.title,
+                                  });
+                                }}
+                              >
+                                <Trash2 className="size-3.5" />
+                                Görevi Sil
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
 
@@ -265,6 +311,16 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
           );
           router.refresh();
         }}
+        onTaskDeleted={removeTaskFromBoard}
+      />
+
+      <DeleteTaskModal
+        open={Boolean(taskToDelete)}
+        onOpenChange={(next) => {
+          if (!next) setTaskToDelete(null);
+        }}
+        task={taskToDelete}
+        onDeleted={removeTaskFromBoard}
       />
     </>
   );

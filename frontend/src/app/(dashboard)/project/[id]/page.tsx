@@ -2,10 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { CreateTaskModal } from "@/components/CreateTaskModal";
+import { DeleteProjectButton } from "@/components/delete-project-button";
 import { ProjectTaskBoard } from "@/components/project/project-task-board";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
 import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
-import { getProjectById, getProjectTasks } from "@/lib/supabase/server";
+import {
+  getAuthenticatedUser,
+  getProjectById,
+  getProjectTasks,
+} from "@/lib/supabase/server";
+import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 
 type ProjectDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -25,7 +31,6 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  // Proje başka workspace'e aitse görevleri filtrele / boş göster
   const effectiveWorkspaceId = workspaceId ?? project.workspace_id ?? null;
   if (
     workspaceId &&
@@ -37,16 +42,40 @@ export default async function ProjectDetailPage({
 
   const tasks = await getProjectTasks(project.id, effectiveWorkspaceId);
 
+  let canDeleteProject = false;
+  if (effectiveWorkspaceId) {
+    const auth = await getAuthenticatedUser();
+    if (auth) {
+      const roleCtx = await resolveWorkspaceRole(
+        auth.supabase,
+        effectiveWorkspaceId,
+        auth.user.id,
+      );
+      canDeleteProject = roleCtx.isAdmin;
+    }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
       <div className="space-y-3 rounded-lg border border-border bg-card p-5 shadow-sm">
-        <Link
-          href={withWorkspaceQuery("/projects", effectiveWorkspaceId)}
-          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-        >
-          <ArrowLeft className="size-4" />
-          Projelere dön
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href={withWorkspaceQuery("/projects", effectiveWorkspaceId)}
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+          >
+            <ArrowLeft className="size-4" />
+            Projelere dön
+          </Link>
+          {canDeleteProject ? (
+            <DeleteProjectButton
+              project={{
+                id: project.id,
+                name: project.name,
+                workspaceId: effectiveWorkspaceId,
+              }}
+            />
+          ) : null}
+        </div>
 
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">Proje detayı</p>

@@ -17,6 +17,7 @@ import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { getWorkspaceMembers } from "@/app/actions/workspace-members";
 import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
 import { cleanText, emailLocalPart } from "@/lib/member-labels";
+import { DeleteTaskModal } from "@/components/delete-task-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,7 @@ type TaskDetailSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTaskUpdated?: (task: Partial<ProjectTask> & { id: string }) => void;
+  onTaskDeleted?: (taskId: string) => void;
 };
 
 function toDateInputValue(iso: string | null | undefined): string {
@@ -59,6 +61,7 @@ export function TaskDetailSheet({
   open,
   onOpenChange,
   onTaskUpdated,
+  onTaskDeleted,
 }: TaskDetailSheetProps) {
   const router = useRouter();
   const [task, setTask] = useState<ProjectTask | null>(null);
@@ -77,6 +80,7 @@ export function TaskDetailSheet({
   const [saving, setSaving] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const loadAll = useCallback(async (id: string) => {
     setLoading(true);
@@ -405,6 +409,22 @@ export function TaskDetailSheet({
               >
                 {saving ? "Kaydediliyor…" : "Kaydet"}
               </Button>
+
+              <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Görevi kalıcı olarak kaldırmak için silme işlemini kullanın.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setDeleteOpen(true)}
+                  className="rounded-lg border-red-500/40 text-red-600 hover:bg-red-500/10 hover:text-red-700"
+                >
+                  <Trash2 className="size-3.5" />
+                  Görevi Sil
+                </Button>
+              </div>
             </section>
 
             <section className="space-y-3">
@@ -537,6 +557,17 @@ export function TaskDetailSheet({
           </div>
         ) : null}
       </SheetContent>
+
+      <DeleteTaskModal
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        task={task ? { id: task.id, title: task.title } : null}
+        onDeleted={(deletedId) => {
+          onOpenChange(false);
+          onTaskDeleted?.(deletedId);
+          router.refresh();
+        }}
+      />
     </Sheet>
   );
 }
