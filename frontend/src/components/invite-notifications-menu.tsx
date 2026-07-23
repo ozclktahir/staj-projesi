@@ -28,6 +28,10 @@ import {
 import { writeActiveWorkspaceId } from "@/hooks/use-workspaces";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import { createAuthedRealtimeClient } from "@/lib/supabase/client";
+import {
+  decodeAccessTokenClaims,
+  resolveRealtimeUserId,
+} from "@/lib/supabase/realtime";
 import { cn } from "@/lib/utils";
 
 type InviteNotificationsMenuProps = {
@@ -106,41 +110,18 @@ export function InviteNotificationsMenu({
     if (open) void refresh();
   }, [open, refresh]);
 
-  // Supabase Realtime: kendi bildirimlerini dinle
+  // Supabase Realtime: bildirimler + davetler
   useEffect(() => {
     const client = createAuthedRealtimeClient();
     if (!client) return;
 
-    let userId: string | null = null;
     let channel: ReturnType<typeof client.channel> | null = null;
     let cancelled = false;
 
     void (async () => {
       try {
-        const { data } = await client.auth.getUser();
-        // getUser JWT ile çalışmayabilir — token payload'dan dene
-        userId = data.user?.id ?? null;
-        if (!userId) {
-          const token =
-            typeof window !== "undefined"
-              ? localStorage.getItem("access_token")
-              : null;
-          if (token) {
-            try {
-              const part = token.split(".")[1] ?? "";
-              const base64 = part.replace(/-/g, "+").replace(/_/g, "/");
-              const padded = base64.padEnd(
-                base64.length + ((4 - (base64.length % 4)) % 4),
-                "=",
-              );
-              const payload = JSON.parse(atob(padded)) as { sub?: string };
-              userId = payload.sub ?? null;
-            } catch {
-              userId = null;
-            }
-          }
-        }
-
+        const userId = await resolveRealtimeUserId(client);
+        const { email } = decodeAccessTokenClaims();
         if (!userId || cancelled) return;
 
         channel = client
@@ -161,12 +142,18 @@ export function InviteNotificationsMenu({
               knownIdsRef.current.add(item.id);
 
               setNotifications((prev) => [item, ...prev].slice(0, 40));
-              toast.info(item.title || "Yeni bildirim", {
-                description: item.message,
-              });
 
-              // Davet geldiyse pending listesini de yenile
-              if (isWorkspaceInviteNotification(item)) {
+              const isInvite = isWorkspaceInviteNotification(item);
+              toast.info(
+                isInvite
+                  ? "Yeni bir Workspace daveti aldınız!"
+                  : "Yeni bir bildirim aldınız!",
+                {
+                  description: item.message || item.title,
+                },
+              );
+
+              if (isInvite) {
                 void getMyPendingInvitations().then((result) => {
                   if (result.success) setInvitations(result.invitations);
                 });
@@ -188,6 +175,28 @@ export function InviteNotificationsMenu({
               setNotifications((prev) =>
                 prev.map((n) => (n.id === item.id ? item : n)),
               );
+            },
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "workspace_invitations",
+            },
+            (payload) => {
+              const row = payload.new as Record<string, unknown>;
+              const inviteEmail =
+                typeof row.email === "string"
+                  ? row.email.toLowerCase().trim()
+                  : "";
+              const myEmail = email?.toLowerCase().trim() ?? "";
+              if (!inviteEmail || !myEmail || inviteEmail !== myEmail) return;
+
+              void getMyPendingInvitations().then((result) => {
+                if (result.success) setInvitations(result.invitations);
+              });
+              toast.info("Yeni bir Workspace daveti aldınız!");
             },
           )
           .subscribe();

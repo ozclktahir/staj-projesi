@@ -8,6 +8,10 @@ import {
 } from "@/app/actions/activity-logs";
 import { formatActivityMessage } from "@/lib/activity-format";
 import { formatRelativeTime } from "@/lib/format-relative-time";
+import {
+  createAuthedRealtimeClient,
+} from "@/lib/supabase/client";
+import { mapRealtimeActivityRow } from "@/lib/supabase/realtime";
 import { cn } from "@/lib/utils";
 
 type ProjectActivityPanelProps = {
@@ -34,19 +38,51 @@ export function ProjectActivityPanel({
     void refresh();
   }, [refresh]);
 
+  // Realtime: project activity_logs
+  useEffect(() => {
+    const client = createAuthedRealtimeClient();
+    if (!client || !projectId) return;
+
+    const channel = client
+      .channel(`activity-logs:project:${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "activity_logs",
+          filter: `project_id=eq.${projectId}`,
+        },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          if (!row?.id) return;
+          const item = mapRealtimeActivityRow(row);
+          setLogs((prev) => {
+            if (prev.some((l) => l.id === item.id)) return prev;
+            return [item, ...prev].slice(0, 80);
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [projectId]);
+
   return (
     <aside
       className={cn(
-        "flex max-h-[70vh] flex-col rounded-lg border border-border bg-card shadow-sm",
+        "flex h-full max-h-full flex-col overflow-y-auto",
         className,
       )}
     >
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+      <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-card/80 px-4 py-3 backdrop-blur">
         <History className="size-4 text-primary" />
         <h2 className="text-sm font-semibold text-foreground">Aktivite</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="flex-1 p-3">
         {loading ? (
           <p className="px-1 py-6 text-center text-xs text-muted-foreground">
             Yükleniyor…

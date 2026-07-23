@@ -45,10 +45,16 @@ import {
   type TaskStatus,
 } from "@/lib/supabase/types";
 import { cleanText, emailLocalPart } from "@/lib/member-labels";
+import {
+  isTaskSoftDeleted,
+  mapRealtimeTaskRow,
+} from "@/lib/supabase/realtime";
+import { createAuthedRealtimeClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 type ProjectTaskBoardProps = {
   tasks: ProjectTask[];
+  projectId: string;
 };
 
 type ColumnSort =
@@ -451,7 +457,10 @@ const KanbanColumn = memo(function KanbanColumn({
   );
 });
 
-export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps) {
+export function ProjectTaskBoard({
+  tasks: initialTasks,
+  projectId,
+}: ProjectTaskBoardProps) {
   const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -471,6 +480,75 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
   useEffect(() => {
     setTasks(initialTasks);
   }, [initialTasks]);
+
+  // Realtime: project tasks
+  useEffect(() => {
+    const client = createAuthedRealtimeClient();
+    if (!client || !projectId) return;
+
+    const channel = client
+      .channel(`project-tasks:${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "tasks",
+          filter: `project_id=eq.${projectId}`,
+        },
+        (payload) => {
+          const eventType = payload.eventType;
+          const nextRow = (payload.new ?? {}) as Record<string, unknown>;
+          const oldRow = (payload.old ?? {}) as Record<string, unknown>;
+
+          if (eventType === "DELETE") {
+            const id = typeof oldRow.id === "string" ? oldRow.id : null;
+            if (!id) return;
+            setTasks((prev) => prev.filter((t) => t.id !== id));
+            setSelectedTaskId((cur) => (cur === id ? null : cur));
+            return;
+          }
+
+          if (!nextRow.id) return;
+
+          // Alt görevleri panoda gösterme
+          if (nextRow.parent_task_id != null && nextRow.parent_task_id !== "") {
+            return;
+          }
+
+          if (eventType === "INSERT") {
+            if (isTaskSoftDeleted(nextRow)) return;
+            const mapped = mapRealtimeTaskRow(nextRow);
+            setTasks((prev) => {
+              if (prev.some((t) => t.id === mapped.id)) return prev;
+              return [mapped, ...prev];
+            });
+            return;
+          }
+
+          if (eventType === "UPDATE") {
+            if (isTaskSoftDeleted(nextRow)) {
+              const id = String(nextRow.id);
+              setTasks((prev) => prev.filter((t) => t.id !== id));
+              setSelectedTaskId((cur) => (cur === id ? null : cur));
+              return;
+            }
+
+            setTasks((prev) => {
+              const existing = prev.find((t) => t.id === nextRow.id);
+              const mapped = mapRealtimeTaskRow(nextRow, existing ?? null);
+              if (!existing) return [mapped, ...prev];
+              return prev.map((t) => (t.id === mapped.id ? mapped : t));
+            });
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [projectId]);
 
   const columns = useMemo(() => {
     return TASK_STATUSES.map((status) => {
@@ -559,26 +637,29 @@ export function ProjectTaskBoard({ tasks: initialTasks }: ProjectTaskBoardProps)
 
   if (tasks.length === 0) {
     return (
-      <Card className="rounded-lg border-dashed border-border bg-card/60">
-        <CardHeader className="items-center text-center">
-          <div className="mb-2 flex size-12 items-center justify-center rounded-lg bg-primary/15 text-primary">
-            <ListTodo className="size-6" />
-          </div>
-          <CardTitle className="text-lg text-foreground">
-            Henüz görev yok
-          </CardTitle>
-          <CardDescription className="max-w-md">
-            Bu projeye ilk görevini eklemek için &quot;Yeni Görev Ekle&quot;
-            butonunu kullan.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <>
+        <Card className="rounded-lg border-dashed border-border bg-card/60">
+          <CardHeader className="items-center text-center">
+            <div className="mb-2 flex size-12 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <ListTodo className="size-6" />
+            </div>
+            <CardTitle className="text-lg text-foreground">
+              Henüz görev yok
+            </CardTitle>
+            <CardDescription className="max-w-md">
+              Bu projeye ilk görevini eklemek için &quot;Yeni Görev Ekle&quot;
+              butonunu kullan. Başka bir kullanıcı eklerse kart burada anında
+              görünür.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </>
     );
   }
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid min-w-[720px] grid-cols-1 gap-4 md:grid-cols-3">
         {columns.map(({ status, rawCount, visible }) => (
           <KanbanColumn
             key={status}

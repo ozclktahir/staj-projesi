@@ -8,6 +8,8 @@ import {
 } from "@/app/actions/activity-logs";
 import { formatActivityMessage } from "@/lib/activity-format";
 import { formatRelativeTime } from "@/lib/format-relative-time";
+import { createAuthedRealtimeClient } from "@/lib/supabase/client";
+import { mapRealtimeActivityRow } from "@/lib/supabase/realtime";
 
 type TaskActivityFeedProps = {
   taskId: string;
@@ -28,6 +30,37 @@ export function TaskActivityFeed({ taskId, refreshKey = 0 }: TaskActivityFeedPro
   useEffect(() => {
     void refresh();
   }, [refresh, refreshKey]);
+
+  useEffect(() => {
+    const client = createAuthedRealtimeClient();
+    if (!client || !taskId) return;
+
+    const channel = client
+      .channel(`activity-logs:task:${taskId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "activity_logs",
+          filter: `task_id=eq.${taskId}`,
+        },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          if (!row?.id) return;
+          const item = mapRealtimeActivityRow(row);
+          setLogs((prev) => {
+            if (prev.some((l) => l.id === item.id)) return prev;
+            return [item, ...prev].slice(0, 40);
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [taskId]);
 
   return (
     <section className="space-y-3">

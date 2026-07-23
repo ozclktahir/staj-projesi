@@ -32,6 +32,7 @@ import {
   setCachedTask,
   setCachedWorkspaceMembers,
 } from "@/lib/client-cache";
+import { createAuthedRealtimeClient } from "@/lib/supabase/client";
 import {
   Sheet,
   SheetContent,
@@ -214,6 +215,141 @@ export function TaskDetailSheet({
       cancelled = true;
     };
   }, [open, taskId, loadAll]);
+
+  // Realtime: yorumlar + dosyalar
+  useEffect(() => {
+    if (!open || !taskId) return;
+    const client = createAuthedRealtimeClient();
+    if (!client) return;
+
+    const applyCommentRow = (
+      eventType: string,
+      row: Record<string, unknown>,
+      oldRow: Record<string, unknown>,
+    ) => {
+      if (eventType === "DELETE") {
+        const id = typeof oldRow.id === "string" ? oldRow.id : null;
+        if (!id) return;
+        setComments((prev) => prev.filter((c) => c.id !== id));
+        setActivityKey((k) => k + 1);
+        return;
+      }
+      if (!row.id) return;
+      const content =
+        (typeof row.content === "string" && row.content) ||
+        (typeof row.body === "string" && row.body) ||
+        "";
+      const mapped: TaskComment = {
+        id: String(row.id),
+        task_id: taskId,
+        content,
+        user_id: (row.user_id as string | null) ?? null,
+        author_name: "Bir kullanıcı",
+        author_avatar_url: null,
+        is_own: false,
+        created_at: (row.created_at as string | null) ?? null,
+      };
+      setComments((prev) => {
+        if (prev.some((c) => c.id === mapped.id)) {
+          return prev.map((c) =>
+            c.id === mapped.id ? { ...c, content: mapped.content } : c,
+          );
+        }
+        return [...prev, mapped];
+      });
+      setActivityKey((k) => k + 1);
+    };
+
+    const applyAttachmentRow = (
+      eventType: string,
+      row: Record<string, unknown>,
+      oldRow: Record<string, unknown>,
+    ) => {
+      if (eventType === "DELETE") {
+        const id = typeof oldRow.id === "string" ? oldRow.id : null;
+        if (!id) return;
+        setAttachments((prev) => prev.filter((a) => a.id !== id));
+        setActivityKey((k) => k + 1);
+        return;
+      }
+      if (!row.id) return;
+      const mapped: TaskAttachment = {
+        id: String(row.id),
+        task_id: taskId,
+        user_id: (row.user_id as string | null) ?? null,
+        file_name: (row.file_name as string) ?? "dosya",
+        file_url: (row.file_url as string) ?? "",
+        file_size:
+          row.file_size === null || row.file_size === undefined
+            ? null
+            : String(row.file_size),
+        storage_path: (row.storage_path as string | null) ?? null,
+        uploader_name: "Bir kullanıcı",
+        is_own: false,
+        created_at: (row.created_at as string | null) ?? null,
+      };
+      setAttachments((prev) => {
+        if (prev.some((a) => a.id === mapped.id)) {
+          return prev.map((a) => (a.id === mapped.id ? mapped : a));
+        }
+        return [mapped, ...prev];
+      });
+      setActivityKey((k) => k + 1);
+    };
+
+    const channel = client
+      .channel(`task-detail:${taskId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "task_comments",
+          filter: `task_id=eq.${taskId}`,
+        },
+        (payload) =>
+          applyCommentRow(
+            payload.eventType,
+            (payload.new ?? {}) as Record<string, unknown>,
+            (payload.old ?? {}) as Record<string, unknown>,
+          ),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "comments",
+          filter: `task_id=eq.${taskId}`,
+        },
+        (payload) =>
+          applyCommentRow(
+            payload.eventType,
+            (payload.new ?? {}) as Record<string, unknown>,
+            (payload.old ?? {}) as Record<string, unknown>,
+          ),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "task_attachments",
+          filter: `task_id=eq.${taskId}`,
+        },
+        (payload) =>
+          applyAttachmentRow(
+            payload.eventType,
+            (payload.new ?? {}) as Record<string, unknown>,
+            (payload.old ?? {}) as Record<string, unknown>,
+          ),
+      )
+      .subscribe();
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [open, taskId]);
 
   async function handleStatusChange(status: TaskStatus) {
     if (!task || task.status === status) return;

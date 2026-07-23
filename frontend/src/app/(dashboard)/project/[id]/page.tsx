@@ -58,8 +58,8 @@ export default async function ProjectDetailPage({
   const canDeleteProject = Boolean(roleCtx?.isAdmin);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-      <div className="space-y-3 rounded-lg border border-border bg-card p-5 shadow-sm">
+    <div className="flex h-full min-h-[calc(100vh-5rem)] w-full flex-col gap-6 overflow-hidden">
+      <div className="shrink-0 space-y-3 rounded-lg border border-border bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href={withWorkspaceQuery("/projects", effectiveWorkspaceId)}
@@ -98,8 +98,8 @@ export default async function ProjectDetailPage({
         </div>
       </div>
 
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="mb-4 flex shrink-0 flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm font-semibold text-foreground">Görevler</h2>
             <p className="text-sm text-muted-foreground">
@@ -112,14 +112,14 @@ export default async function ProjectDetailPage({
           />
         </div>
 
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
-          <div className="min-w-0 flex-1">
-            <ProjectTaskBoard tasks={tasks} />
+        <div className="flex h-full min-h-0 w-full overflow-hidden rounded-lg border border-border bg-background">
+          <div className="min-w-0 flex-1 overflow-x-auto p-4">
+            <ProjectTaskBoard projectId={project.id} tasks={tasks} />
           </div>
           <ProjectActivityPanel
             projectId={project.id}
             workspaceId={effectiveWorkspaceId}
-            className="w-full shrink-0 xl:sticky xl:top-4 xl:w-80"
+            className="hidden h-full w-80 shrink-0 border-l border-border bg-card/50 lg:flex"
           />
         </div>
       </section>

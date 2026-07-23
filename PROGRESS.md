@@ -369,3 +369,5 @@
 - Bildirim menüsü (`invite-notifications-menu`) import yolları yeni utility dosyasına güncellendi; `npm run build` ile derleme doğrulandı.
 - Build’i engelleyen yan TypeScript tip hataları (admin-overview, get-task-details, update-task, workspaces select fallback) giderildi.
 - Aktivite Logu (Activity Feed) altyapısı kuruldu. Görev ve Proje detay sayfalarında tüm kullanıcı hareketleri (durum değişimi, yorum, dosya vb.) kronolojik olarak listelendi.
+- Aktivite paneli w-80 sabit genişlikli sağ sidebar haline getirildi, Kanban alanına maksimum genişlik sağlandı.
+- Tüm uygulama genelinde (Kanban, Görevler, Yorumlar, Dosyalar, Bildirimler, Davetler, Aktivite Logları) Supabase Realtime anlık canlı senkronizasyon altyapısı kuruldu.
