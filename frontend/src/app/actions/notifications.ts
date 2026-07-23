@@ -350,3 +350,41 @@ export async function markAllNotificationsRead(): Promise<{
     };
   }
 }
+
+/** Alias: getNotifications */
+export const getNotifications = getMyNotifications;
+
+/** Alias: markNotificationAsRead */
+export const markNotificationAsRead = markNotificationRead;
+
+/** Alias: markAllNotificationsAsRead */
+export const markAllNotificationsAsRead = markAllNotificationsRead;
+
+/**
+ * Workspace davetine kabul/ret — invitations aksiyonlarını sarmalar.
+ */
+export async function respondToWorkspaceInvite(
+  inviteId: string,
+  action: "accept" | "decline",
+): Promise<{ success: boolean; error?: string; workspaceId?: string }> {
+  const { acceptInvitation, declineInvitation } = await import(
+    "@/app/actions/invitations"
+  );
+
+  if (action === "accept") {
+    const result = await acceptInvitation(inviteId);
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+    return {
+      success: true,
+      workspaceId: result.workspaceIds[0],
+    };
+  }
+
+  const result = await declineInvitation(inviteId);
+  if (!result.success) {
+    return { success: false, error: result.error };
+  }
+  return { success: true };
+}
