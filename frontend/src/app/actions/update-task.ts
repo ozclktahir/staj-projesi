@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-logger";
+import { createTaskAssignedNotification } from "@/app/actions/notifications";
 import {
+  formatAuthUserLabel,
   formatPersonName,
   loadProfilesByIds,
   resolveMemberDisplayFields,
@@ -326,6 +328,26 @@ export async function updateTask(
               task_title: taskTitle,
             },
           });
+
+          if (newAssignee && newAssignee !== user.id && projectId) {
+            const actorName = formatAuthUserLabel({
+              email: user.email,
+              user_metadata: user.user_metadata as {
+                first_name?: string;
+                last_name?: string;
+                full_name?: string;
+                display_name?: string;
+              },
+            });
+            await createTaskAssignedNotification({
+              workspaceId,
+              projectId,
+              taskId,
+              taskTitle,
+              assigneeUserId: newAssignee,
+              actorName,
+            });
+          }
         }
       }
 

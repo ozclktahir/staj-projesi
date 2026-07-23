@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { getWorkspaces } from "@/app/actions/workspaces";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
-import { pickDefaultAdminWorkspace } from "@/lib/member-labels";
+import { formatAuthUserLabel, pickDefaultAdminWorkspace } from "@/lib/member-labels";
 import type { NotificationItem } from "@/lib/notification-utils";
 
 export type { NotificationItem } from "@/lib/notification-utils";
@@ -298,6 +298,96 @@ export async function createInviteNotification(input: {
     }
   } catch (error) {
     console.warn("[createInviteNotification] catch", error);
+  }
+}
+
+/**
+ * Görev atandığında assignee'ye bildirim yazar.
+ * Kendine atamada çağrılmamalı (caller kontrol eder).
+ */
+export async function createTaskAssignedNotification(input: {
+  workspaceId: string;
+  projectId: string;
+  taskId: string;
+  taskTitle: string;
+  assigneeUserId: string;
+  actorName?: string;
+}): Promise<void> {
+  try {
+    const assigneeId = input.assigneeUserId?.trim();
+    const workspaceId = input.workspaceId?.trim();
+    const projectId = input.projectId?.trim();
+    const taskId = input.taskId?.trim();
+    if (!assigneeId || !workspaceId || !projectId || !taskId) return;
+
+    const auth = await getAuthenticatedUser();
+    if (!auth) return;
+
+    // Kendine atama → bildirim yok
+    if (assigneeId === auth.user.id) return;
+
+    const actor =
+      input.actorName?.trim() ||
+      formatAuthUserLabel({
+        email: auth.user.email,
+        user_metadata: auth.user.user_metadata as {
+          first_name?: string;
+          last_name?: string;
+          full_name?: string;
+          display_name?: string;
+        },
+      }) ||
+      "Bir kullanıcı";
+
+    const taskTitle = input.taskTitle?.trim() || "görev";
+    const message = `${actor} sana '${taskTitle}' görevini atadı.`;
+    const link = `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`;
+    const payload = {
+      project_id: projectId,
+      task_id: taskId,
+      task_title: taskTitle,
+      workspace_id: workspaceId,
+      assigned_by: auth.user.id,
+    };
+
+    const { error } = await auth.supabase.from("notifications").insert({
+      workspace_id: workspaceId,
+      user_id: assigneeId,
+      type: "task_assigned",
+      title: "Yeni Görev Atandı",
+      message,
+      metadata: payload,
+      payload,
+      link,
+      is_read: false,
+    });
+
+    if (error) {
+      if (
+        error.message.includes("payload") ||
+        error.message.includes("link")
+      ) {
+        const fallback = await auth.supabase.from("notifications").insert({
+          workspace_id: workspaceId,
+          user_id: assigneeId,
+          type: "task_assigned",
+          title: "Yeni Görev Atandı",
+          message,
+          metadata: payload,
+          is_read: false,
+        });
+        if (fallback.error) {
+          console.warn(
+            "[createTaskAssignedNotification]",
+            fallback.error.message,
+          );
+        }
+        return;
+      }
+      console.warn("[createTaskAssignedNotification]", error.message);
+    }
+  } catch (error) {
+    console.warn("[createTaskAssignedNotification] catch", error);
   }
 }
 

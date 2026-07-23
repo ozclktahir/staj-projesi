@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-logger";
+import { createTaskAssignedNotification } from "@/app/actions/notifications";
+import { formatAuthUserLabel } from "@/lib/member-labels";
 import {
   getMemberVisibleProjectIds,
   resolveWorkspaceRole,
@@ -281,6 +283,26 @@ export async function createTask(
           assignee_id: assigneeId,
         },
       });
+
+      if (assigneeId && assigneeId !== authUid) {
+        const actorName = formatAuthUserLabel({
+          email: user.email,
+          user_metadata: user.user_metadata as {
+            first_name?: string;
+            last_name?: string;
+            full_name?: string;
+            display_name?: string;
+          },
+        });
+        await createTaskAssignedNotification({
+          workspaceId,
+          projectId,
+          taskId: insertedId,
+          taskTitle: title,
+          assigneeUserId: assigneeId,
+          actorName,
+        });
+      }
     }
 
     shouldRevalidate = true;
