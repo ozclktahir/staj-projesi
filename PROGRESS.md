@@ -373,3 +373,4 @@
 - Tüm uygulama genelinde (Kanban, Görevler, Yorumlar, Dosyalar, Bildirimler, Davetler, Aktivite Logları) Supabase Realtime anlık canlı senkronizasyon altyapısı kuruldu.
 - Aktivite paneli sabit layout'tan çıkarılıp Header üzerinden tetiklenen açılır-kapanır sağ çekmeceye (Collapsible Sheet/Drawer) dönüştürüldü. Kanban panosunun %100 genişliği korundu.
 - Dashboard & Analitik Raporlar modülü (Recharts entegrasyonu, KPI kartları, görev durum/öncelik grafikleri ve üye iş yükü dağılımı) tamamlandı.
+- Dashboard sayfası genel Workspace analitiği, KPI kartları, görev grafikler ve üye iş yükü paneli ile ana komuta merkezi olarak yeniden yapılandırıldı. Proje detay sayfaları sade haline getirildi.

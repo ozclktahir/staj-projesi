@@ -160,3 +160,52 @@ export async function getProjectActivityLogs(
     };
   }
 }
+
+export async function getWorkspaceActivityLogs(
+  workspaceId: string,
+  limit = 8,
+): Promise<{ success: boolean; logs: ActivityLogItem[]; error?: string }> {
+  try {
+    const id = workspaceId?.trim() ?? "";
+    if (!id) {
+      return { success: false, logs: [], error: "Workspace kimliği zorunlu." };
+    }
+
+    const auth = await getAuthenticatedUser();
+    if (!auth) return { success: false, logs: [], error: "Oturum yok." };
+
+    const { data, error } = await auth.supabase
+      .from("activity_logs")
+      .select(
+        "id, workspace_id, project_id, task_id, user_id, action_type, details, created_at, action",
+      )
+      .eq("workspace_id", id)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      if (
+        error.message.includes("activity_logs") ||
+        error.code === "42P01" ||
+        error.code === "PGRST205"
+      ) {
+        return { success: true, logs: [] };
+      }
+      return { success: false, logs: [], error: error.message };
+    }
+
+    return {
+      success: true,
+      logs: await enrich(
+        auth.supabase,
+        (data ?? []) as Record<string, unknown>[],
+      ),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      logs: [],
+      error: error instanceof Error ? error.message : "Loglar alınamadı.",
+    };
+  }
+}

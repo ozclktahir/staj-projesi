@@ -40,7 +40,7 @@ export function UpcomingDeadlines({ items }: { items: DeadlineItem[] }) {
           Yaklaşan Teslim Tarihleri
         </CardTitle>
         <CardDescription>
-          Tamamlanmamış görevler, en yakın teslim tarihine göre
+          Tamamlanmamış görevlerden en yakın 5 teslim tarihi
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -1,13 +1,7 @@
-import { DashboardHome } from "@/components/dashboard/dashboard-home";
-import { getAdminOverview } from "@/app/actions/admin-overview";
+import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
+import { getWorkspaceAnalytics } from "@/app/actions/analytics";
+import { getWorkspaceActivityLogs } from "@/app/actions/activity-logs";
 import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
-import {
-  getAuthenticatedUser,
-  getCurrentUserProjects,
-  getDashboardTaskStats,
-} from "@/lib/supabase/server";
-import type { DashboardProject, DashboardTaskStats } from "@/lib/supabase/types";
-import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 
 type DashboardPageProps = {
   searchParams: Promise<{ workspaceId?: string }>;
@@ -17,53 +11,43 @@ export default async function DashboardPage({
   searchParams,
 }: DashboardPageProps) {
   const params = await searchParams;
-  const workspaceId = await resolveActiveWorkspaceId(params.workspaceId ?? null);
+  const workspaceId = await resolveActiveWorkspaceId(
+    params.workspaceId ?? null,
+  );
 
-  let userName = "";
-  let projects: DashboardProject[] = [];
-  let stats: DashboardTaskStats = { total: 0, inProgress: 0, done: 0 };
-  let adminMembers: Awaited<ReturnType<typeof getAdminOverview>>["members"] =
-    [];
-  let showAdminOverview = false;
-  let canCreateProject = false;
+  if (!workspaceId) {
+    return (
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        <div className="rounded-lg border border-dashed border-border bg-card/60 px-4 py-10 text-center text-sm text-muted-foreground">
+          Dashboard’u görmek için bir workspace seçin.
+        </div>
+      </div>
+    );
+  }
 
-  try {
-    const result = await getCurrentUserProjects(workspaceId);
-    userName = result.userName;
-    projects = result.projects;
-    stats = await getDashboardTaskStats(projects.map((p) => p.id));
+  const [analyticsResult, activityResult] = await Promise.all([
+    getWorkspaceAnalytics(workspaceId),
+    getWorkspaceActivityLogs(workspaceId, 8),
+  ]);
 
-    if (workspaceId) {
-      const auth = await getAuthenticatedUser();
-      if (auth) {
-        const roleCtx = await resolveWorkspaceRole(
-          auth.supabase,
-          workspaceId,
-          auth.user.id,
-        );
-        canCreateProject = roleCtx.isAdmin;
-      }
-    }
-
-    const overview = await getAdminOverview(workspaceId);
-    if (overview.success && overview.isAdmin) {
-      showAdminOverview = true;
-      adminMembers = overview.members;
-      canCreateProject = true;
-    }
-  } catch (error) {
-    console.error("[DashboardPage]", error);
+  if (!analyticsResult.success) {
+    return (
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        <div className="rounded-lg border border-rose-300/50 bg-rose-50 px-4 py-6 text-sm text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+          {analyticsResult.error ?? "Dashboard verileri yüklenemedi."}
+        </div>
+      </div>
+    );
   }
 
   return (
-    <DashboardHome
-      userName={userName}
-      projects={projects}
-      stats={stats}
-      workspaceId={workspaceId}
-      showAdminOverview={showAdminOverview}
-      adminMembers={adminMembers}
-      canCreateProject={canCreateProject}
-    />
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+      <AnalyticsDashboard
+        data={analyticsResult.data}
+        recentLogs={activityResult.success ? activityResult.logs : []}
+        title="Dashboard"
+        description="Workspace genel bakış: KPI’lar, görev grafikleri, iş yükü ve son aktiviteler."
+      />
+    </div>
   );
 }
