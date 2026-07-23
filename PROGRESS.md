@@ -371,3 +371,4 @@
 - Aktivite Logu (Activity Feed) altyapısı kuruldu. Görev ve Proje detay sayfalarında tüm kullanıcı hareketleri (durum değişimi, yorum, dosya vb.) kronolojik olarak listelendi.
 - Aktivite paneli w-80 sabit genişlikli sağ sidebar haline getirildi, Kanban alanına maksimum genişlik sağlandı.
 - Tüm uygulama genelinde (Kanban, Görevler, Yorumlar, Dosyalar, Bildirimler, Davetler, Aktivite Logları) Supabase Realtime anlık canlı senkronizasyon altyapısı kuruldu.
+- Aktivite paneli sabit layout'tan çıkarılıp Header üzerinden tetiklenen açılır-kapanır sağ çekmeceye (Collapsible Sheet/Drawer) dönüştürüldü. Kanban panosunun %100 genişliği korundu.
