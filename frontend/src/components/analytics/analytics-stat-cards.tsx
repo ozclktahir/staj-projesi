@@ -60,36 +60,31 @@ export function AnalyticsStatCards({ summary }: { summary: AnalyticsSummary }) {
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {cards.map((card) => (
         <Card
           key={card.label}
           className={cn(
-            "rounded-lg border-2 py-4 shadow-sm dark:border",
+            "rounded-lg border-2 py-3 shadow-sm dark:border",
             card.accent,
           )}
         >
-          <CardContent className="flex items-start gap-3 px-4">
+          <CardContent className="flex items-center gap-2.5 px-3">
             <span
               className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-lg",
+                "flex size-9 shrink-0 items-center justify-center rounded-lg",
                 card.iconWrap,
               )}
             >
-              <card.icon className="size-5" />
+              <card.icon className="size-4" />
             </span>
             <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="truncate text-[11px] font-medium text-muted-foreground">
                 {card.label}
               </p>
-              <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
+              <p className="text-xl font-semibold tracking-tight text-foreground">
                 {card.value}
               </p>
-              {card.hint ? (
-                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                  {card.hint}
-                </p>
-              ) : null}
             </div>
           </CardContent>
         </Card>

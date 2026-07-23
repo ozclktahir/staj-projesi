@@ -16,25 +16,35 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
-function DualPieBlock({
+const CHART_BODY_H = "h-[220px]";
+
+export function DistributionPieChart({
   title,
   description,
   data,
+  className,
 }: {
   title: string;
   description: string;
   data: ChartSlice[];
+  className?: string;
 }) {
   const hasData = data.some((d) => d.count > 0);
 
   return (
-    <Card className="rounded-lg border-border shadow-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+    <Card
+      className={cn(
+        "flex h-full flex-col rounded-lg border-border py-0 shadow-sm",
+        className,
+      )}
+    >
+      <CardHeader className="shrink-0 space-y-1 px-4 pt-4 pb-2">
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+        <CardDescription className="text-xs">{description}</CardDescription>
       </CardHeader>
-      <CardContent className="h-[260px]">
+      <CardContent className={cn("min-h-0 flex-1 px-2 pb-3", CHART_BODY_H)}>
         {!hasData ? (
           <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
             Henüz veri yok
@@ -46,8 +56,8 @@ function DualPieBlock({
                 data={data}
                 dataKey="count"
                 nameKey="label"
-                innerRadius={58}
-                outerRadius={88}
+                innerRadius={48}
+                outerRadius={72}
                 paddingAngle={2}
                 stroke="transparent"
               >
@@ -67,9 +77,11 @@ function DualPieBlock({
               />
               <Legend
                 verticalAlign="bottom"
-                height={36}
+                height={32}
                 formatter={(value) => (
-                  <span className="text-xs text-muted-foreground">{value}</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {value}
+                  </span>
                 )}
               />
             </PieChart>
@@ -80,6 +92,7 @@ function DualPieBlock({
   );
 }
 
+/** Geriye dönük sarmalayıcı */
 export function StatusPriorityCharts({
   byStatus,
   byPriority,
@@ -91,12 +104,12 @@ export function StatusPriorityCharts({
 }) {
   return (
     <div className={stacked ? "grid gap-4" : "grid gap-4 lg:grid-cols-2"}>
-      <DualPieBlock
+      <DistributionPieChart
         title="Durum Dağılımı"
         description="Yapılacak · Devam ediyor · Tamamlandı"
         data={byStatus}
       />
-      <DualPieBlock
+      <DistributionPieChart
         title="Öncelik Yoğunluğu"
         description="Yüksek · Orta · Düşük"
         data={byPriority}

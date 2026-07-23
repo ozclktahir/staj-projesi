@@ -18,10 +18,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
-export function WorkloadChart({ workload }: { workload: WorkloadItem[] }) {
+export function WorkloadChart({
+  workload,
+  className,
+}: {
+  workload: WorkloadItem[];
+  className?: string;
+}) {
   const data = workload.map((w) => ({
-    name: w.name.length > 14 ? `${w.name.slice(0, 12)}…` : w.name,
+    name: w.name.length > 10 ? `${w.name.slice(0, 8)}…` : w.name,
     fullName: w.name,
     total: w.total,
     completed: w.completed,
@@ -29,14 +36,19 @@ export function WorkloadChart({ workload }: { workload: WorkloadItem[] }) {
   }));
 
   return (
-    <Card className="rounded-lg border-border shadow-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Üye İş Yükü</CardTitle>
-        <CardDescription>
-          Atanan görevler ve tamamlananlar (kullanıcı bazlı)
+    <Card
+      className={cn(
+        "flex h-full flex-col rounded-lg border-border py-0 shadow-sm",
+        className,
+      )}
+    >
+      <CardHeader className="shrink-0 space-y-1 px-4 pt-4 pb-2">
+        <CardTitle className="text-sm font-semibold">Üye İş Yükü</CardTitle>
+        <CardDescription className="text-xs">
+          Atanan / tamamlanan görevler
         </CardDescription>
       </CardHeader>
-      <CardContent className="h-[320px]">
+      <CardContent className="h-[220px] min-h-0 flex-1 px-2 pb-3">
         {data.length === 0 ? (
           <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
             Atanmış görev bulunamadı
@@ -45,8 +57,8 @@ export function WorkloadChart({ workload }: { workload: WorkloadItem[] }) {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
-              barGap={4}
+              margin={{ top: 4, right: 4, left: -8, bottom: 0 }}
+              barGap={2}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -55,18 +67,18 @@ export function WorkloadChart({ workload }: { workload: WorkloadItem[] }) {
               />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 10 }}
                 className="fill-muted-foreground"
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 allowDecimals={false}
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 10 }}
                 className="fill-muted-foreground"
                 axisLine={false}
                 tickLine={false}
-                width={28}
+                width={24}
               />
               <Tooltip
                 labelFormatter={(_, payload) => {
@@ -85,7 +97,9 @@ export function WorkloadChart({ workload }: { workload: WorkloadItem[] }) {
               />
               <Legend
                 formatter={(value) => (
-                  <span className="text-xs text-muted-foreground">{value}</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {value}
+                  </span>
                 )}
               />
               <Bar
