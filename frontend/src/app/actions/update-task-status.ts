@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { logActivity } from "@/lib/activity-logger";
 import {
   normalizeTaskStatusInput,
   taskStatusDbVariants,
@@ -61,8 +62,14 @@ export async function updateTaskStatus(
       };
     }
 
-    const { supabase } = auth;
+    const { supabase, user } = auth;
     const variants = taskStatusDbVariants(canonical);
+
+    const { data: before } = await supabase
+      .from("tasks")
+      .select("id, title, status, project_id, workspace_id")
+      .eq("id", id)
+      .maybeSingle();
 
     console.log("[updateTaskStatus] attempt", {
       taskId: id,
@@ -135,6 +142,31 @@ export async function updateTaskStatus(
 
     const persisted =
       normalizeTaskStatusInput(updated.status) ?? canonical;
+
+    const workspaceId =
+      typeof before?.workspace_id === "string" ? before.workspace_id : null;
+    const oldStatus =
+      typeof before?.status === "string"
+        ? normalizeTaskStatusInput(before.status)
+        : null;
+
+    if (workspaceId && oldStatus !== persisted) {
+      await logActivity(supabase, {
+        workspaceId,
+        projectId:
+          updated.project_id ??
+          (typeof before?.project_id === "string" ? before.project_id : null),
+        taskId: id,
+        userId: user.id,
+        actionType: "status_changed",
+        details: {
+          old_value: oldStatus ?? before?.status ?? null,
+          new_value: persisted,
+          task_title:
+            typeof before?.title === "string" ? before.title : "görev",
+        },
+      });
+    }
 
     return { success: true, status: persisted };
   } catch (error) {

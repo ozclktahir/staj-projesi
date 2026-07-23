@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { logActivity } from "@/lib/activity-logger";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 
 export type DeleteTaskResult =
@@ -49,7 +50,9 @@ export async function deleteTask(taskId: string): Promise<DeleteTaskResult> {
 
     const { data: existing, error: fetchError } = await supabase
       .from("tasks")
-      .select("id, workspace_id, project_id, assignee_id, assigned_to, created_by")
+      .select(
+        "id, title, workspace_id, project_id, assignee_id, assigned_to, created_by",
+      )
       .eq("id", id)
       .maybeSingle();
 
@@ -96,8 +99,24 @@ export async function deleteTask(taskId: string): Promise<DeleteTaskResult> {
       .update({ deleted_at: deletedAt })
       .eq("id", id);
 
+    const logPayload = {
+      workspaceId: workspaceId!,
+      projectId,
+      taskId: id,
+      userId: user.id,
+      actionType: "task_deleted" as const,
+      details: {
+        task_title:
+          typeof existing.title === "string" ? existing.title : "görev",
+      },
+    };
+
     if (error?.message?.includes("deleted_at")) {
+      // Hard delete öncesi log (task_id FK)
+      if (workspaceId) await logActivity(supabase, logPayload);
       ({ error } = await supabase.from("tasks").delete().eq("id", id));
+    } else if (!error && workspaceId) {
+      await logActivity(supabase, logPayload);
     }
 
     if (error) {

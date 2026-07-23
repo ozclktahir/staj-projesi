@@ -19,6 +19,7 @@ import { getWorkspaceMembers } from "@/app/actions/workspace-members";
 import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
 import { cleanText, emailLocalPart } from "@/lib/member-labels";
 import { DeleteTaskModal } from "@/components/delete-task-modal";
+import { TaskActivityFeed } from "@/components/task/task-activity-feed";
 import { TaskAttachments } from "@/components/task/task-attachments";
 import { TaskComments } from "@/components/task/task-comments";
 import { Button } from "@/components/ui/button";
@@ -95,6 +96,7 @@ export function TaskDetailSheet({
   const [savingStatus, setSavingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [activityKey, setActivityKey] = useState(0);
 
   const applyTaskToForm = useCallback((next: ProjectTask) => {
     setTask(next);
@@ -230,6 +232,7 @@ export function TaskDetailSheet({
     }
 
     toast.success("Durum güncellendi");
+    setActivityKey((k) => k + 1);
     onTaskUpdated?.({ id: task.id, status: result.status });
     router.refresh();
   }
@@ -258,6 +261,7 @@ export function TaskDetailSheet({
     setCachedTask(result.task);
     applyTaskToForm(result.task);
     toast.success("Görev kaydedildi");
+    setActivityKey((k) => k + 1);
     onTaskUpdated?.({
       id: result.task.id,
       title: result.task.title,
@@ -573,14 +577,22 @@ export function TaskDetailSheet({
             <TaskAttachments
               taskId={task.id}
               attachments={attachments}
-              onChange={setAttachments}
+              onChange={(next) => {
+                setAttachments(next);
+                setActivityKey((k) => k + 1);
+              }}
             />
 
             <TaskComments
               taskId={task.id}
               comments={comments}
-              onChange={setComments}
+              onChange={(next) => {
+                setComments(next);
+                setActivityKey((k) => k + 1);
+              }}
             />
+
+            <TaskActivityFeed taskId={task.id} refreshKey={activityKey} />
           </div>
         ) : null}
       </SheetContent>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { logActivity } from "@/lib/activity-logger";
 import type { TaskAttachment } from "@/lib/supabase/types";
 import {
   formatPersonName,
@@ -172,7 +173,7 @@ export async function createTaskAttachment(input: {
 
     const { data: task } = await supabase
       .from("tasks")
-      .select("id, project_id")
+      .select("id, title, project_id, workspace_id")
       .eq("id", taskId)
       .maybeSingle();
 
@@ -204,8 +205,28 @@ export async function createTaskAttachment(input: {
       };
     }
 
-    if (typeof task?.project_id === "string") {
-      revalidatePath(`/project/${task.project_id}`);
+    const workspaceId =
+      typeof task?.workspace_id === "string" ? task.workspace_id : null;
+    const projectId =
+      typeof task?.project_id === "string" ? task.project_id : null;
+
+    if (workspaceId) {
+      await logActivity(supabase, {
+        workspaceId,
+        projectId,
+        taskId,
+        userId: user.id,
+        actionType: "attachment_added",
+        details: {
+          task_title:
+            typeof task?.title === "string" ? task.title : "görev",
+          file_name: fileName,
+        },
+      });
+    }
+
+    if (projectId) {
+      revalidatePath(`/project/${projectId}`);
     }
 
     const profile =

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { CreateTaskModal } from "@/components/CreateTaskModal";
 import { DeleteProjectButton } from "@/components/delete-project-button";
+import { ProjectActivityPanel } from "@/components/project/project-activity-panel";
 import { ProjectTaskBoard } from "@/components/project/project-task-board";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
 import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
@@ -111,7 +112,16 @@ export default async function ProjectDetailPage({
           />
         </div>
 
-        <ProjectTaskBoard tasks={tasks} />
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+          <div className="min-w-0 flex-1">
+            <ProjectTaskBoard tasks={tasks} />
+          </div>
+          <ProjectActivityPanel
+            projectId={project.id}
+            workspaceId={effectiveWorkspaceId}
+            className="w-full shrink-0 xl:sticky xl:top-4 xl:w-80"
+          />
+        </div>
       </section>
     </div>
   );

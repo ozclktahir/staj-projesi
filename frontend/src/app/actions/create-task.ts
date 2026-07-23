@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { logActivity } from "@/lib/activity-logger";
 import {
   getMemberVisibleProjectIds,
   resolveWorkspaceRole,
@@ -219,7 +220,8 @@ export async function createTask(
       isAdmin: roleCtx.isAdmin,
     });
 
-    let { error: insertError } = await supabase
+    let insertedId: string | null = null;
+    let { data: inserted, error: insertError } = await supabase
       .from("tasks")
       .insert(basePayload)
       .select("id")
@@ -238,7 +240,7 @@ export async function createTask(
       if (toPlainErrorMessage(insertError).includes("assignee_id")) {
         delete retry.assignee_id;
       }
-      ({ error: insertError } = await supabase
+      ({ data: inserted, error: insertError } = await supabase
         .from("tasks")
         .insert(retry)
         .select("id")
@@ -250,7 +252,7 @@ export async function createTask(
       toPlainErrorMessage(insertError).includes("user_id")
     ) {
       const { user_id: _u, ...withoutUserId } = basePayload;
-      ({ error: insertError } = await supabase
+      ({ data: inserted, error: insertError } = await supabase
         .from("tasks")
         .insert(withoutUserId)
         .select("id")
@@ -260,6 +262,25 @@ export async function createTask(
     if (insertError) {
       console.error("[createTask] insert:", insertError);
       return { success: false, error: toPlainErrorMessage(insertError) };
+    }
+
+    insertedId =
+      inserted && typeof inserted.id === "string" ? inserted.id : null;
+
+    if (insertedId) {
+      await logActivity(supabase, {
+        workspaceId,
+        projectId,
+        taskId: insertedId,
+        userId: authUid,
+        actionType: "task_created",
+        details: {
+          task_title: title,
+          status,
+          priority,
+          assignee_id: assigneeId,
+        },
+      });
     }
 
     shouldRevalidate = true;

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { logActivity } from "@/lib/activity-logger";
 import type { TaskComment } from "@/lib/supabase/types";
 import {
   formatAuthUserLabel,
@@ -270,7 +271,7 @@ export async function createComment(
 
     const { data: task } = await supabase
       .from("tasks")
-      .select("id, project_id")
+      .select("id, title, project_id, workspace_id")
       .eq("id", id)
       .maybeSingle();
 
@@ -326,8 +327,28 @@ export async function createComment(
       };
     }
 
-    if (typeof task?.project_id === "string") {
-      revalidatePath(`/project/${task.project_id}`);
+    const workspaceId =
+      typeof task?.workspace_id === "string" ? task.workspace_id : null;
+    const projectId =
+      typeof task?.project_id === "string" ? task.project_id : null;
+
+    if (workspaceId) {
+      await logActivity(supabase, {
+        workspaceId,
+        projectId,
+        taskId: id,
+        userId: user.id,
+        actionType: "comment_added",
+        details: {
+          task_title:
+            typeof task?.title === "string" ? task.title : "görev",
+          preview: body.slice(0, 120),
+        },
+      });
+    }
+
+    if (projectId) {
+      revalidatePath(`/project/${projectId}`);
     }
 
     const authorName = formatAuthUserLabel({

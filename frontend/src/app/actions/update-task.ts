@@ -2,6 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { logActivity } from "@/lib/activity-logger";
+import {
+  formatPersonName,
+  loadProfilesByIds,
+  resolveMemberDisplayFields,
+} from "@/lib/member-labels";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 import {
   normalizeTaskStatusInput,
@@ -74,7 +80,9 @@ export async function updateTask(
 
     const { data: existing, error: fetchError } = await supabase
       .from("tasks")
-      .select("id, workspace_id, assignee_id, assigned_to, created_by")
+      .select(
+        "id, title, status, priority, project_id, workspace_id, assignee_id, assigned_to, created_by",
+      )
       .eq("id", taskId)
       .maybeSingle();
 
@@ -233,6 +241,110 @@ export async function updateTask(
     const row = data as Record<string, unknown>;
     const projectId =
       typeof row.project_id === "string" ? row.project_id : null;
+    const taskTitle =
+      (typeof row.title === "string" && row.title) ||
+      (typeof existing.title === "string" && existing.title) ||
+      "görev";
+
+    if (workspaceId) {
+      const oldStatus = normalizeTaskStatusInput(existing.status);
+      const newStatus = normalizeTaskStatusInput(row.status);
+      if (
+        patch.status !== undefined &&
+        oldStatus &&
+        newStatus &&
+        oldStatus !== newStatus
+      ) {
+        await logActivity(supabase, {
+          workspaceId,
+          projectId,
+          taskId,
+          userId: user.id,
+          actionType: "status_changed",
+          details: {
+            old_value: oldStatus,
+            new_value: newStatus,
+            task_title: taskTitle,
+          },
+        });
+      }
+
+      const oldPriority = normalizePriority(existing.priority);
+      const newPriority = normalizePriority(row.priority);
+      if (
+        patch.priority !== undefined &&
+        oldPriority &&
+        newPriority &&
+        oldPriority !== newPriority
+      ) {
+        await logActivity(supabase, {
+          workspaceId,
+          projectId,
+          taskId,
+          userId: user.id,
+          actionType: "priority_changed",
+          details: {
+            old_value: oldPriority,
+            new_value: newPriority,
+            task_title: taskTitle,
+          },
+        });
+      }
+
+      if (patch.assignee_id !== undefined || patch.assigned_to !== undefined) {
+        const oldAssignee =
+          (typeof existing.assignee_id === "string" && existing.assignee_id) ||
+          (typeof existing.assigned_to === "string" && existing.assigned_to) ||
+          null;
+        const newAssignee =
+          (typeof row.assignee_id === "string" && row.assignee_id) ||
+          (typeof row.assigned_to === "string" && row.assigned_to) ||
+          (typeof patch.assignee_id === "string" ? patch.assignee_id : null);
+
+        if (oldAssignee !== newAssignee) {
+          let newAssigneeName: string | null = null;
+          if (newAssignee) {
+            const profile =
+              (await loadProfilesByIds(supabase, [newAssignee])).get(
+                newAssignee,
+              ) ?? null;
+            const fields = resolveMemberDisplayFields(profile, null);
+            newAssigneeName =
+              formatPersonName(profile, fields.email) || fields.displayName;
+          }
+
+          await logActivity(supabase, {
+            workspaceId,
+            projectId,
+            taskId,
+            userId: user.id,
+            actionType: "assignee_changed",
+            details: {
+              old_value: oldAssignee,
+              new_value: newAssignee,
+              new_assignee_name: newAssigneeName || "Atanmamış",
+              task_title: taskTitle,
+            },
+          });
+        }
+      }
+
+      if (
+        patch.title !== undefined ||
+        patch.description !== undefined ||
+        patch.due_date !== undefined
+      ) {
+        await logActivity(supabase, {
+          workspaceId,
+          projectId,
+          taskId,
+          userId: user.id,
+          actionType: "task_updated",
+          details: { task_title: taskTitle },
+        });
+      }
+    }
+
     if (projectId) revalidatePath(`/project/${projectId}`);
     revalidatePath("/");
     revalidatePath("/dashboard");

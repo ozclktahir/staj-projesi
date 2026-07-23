@@ -271,59 +271,6 @@
 - Shadcn/UI (New York / Slate), turuncu–siyah tema (`--primary: 24 100% 50%`, `--radius: 0.5rem`) ve `next-themes` ile aydınlık/karanlık mod altyapısı tamamlandı.
 - Login/Register sayfaları Split Screen mimarisiyle tasarlandı (`(auth)/login`, `(auth)/register`); Shadcn Card/Input/Label/Button kullanıldı (UI-only).
 
-### [23 Temmuz 2026] - Server Action derleme düzeltmesi
-- Next.js Server Action derleme hatası (Server Actions must be async functions) düzeltildi. Senkron bildirim yardımcı fonksiyonları Server Action dosyasından çıkarılıp utility katmanına taşındı.
-
-### [22 Temmuz 2026] - Login auth / yönlendirme hata ayrımı
-- Giriş (Login) akışında auth hatası ile login sonrası workspace/profil yönlendirme hataları ayrıştırıldı. Hatalı "Şifre veya e-posta yanlış" uyarısı ve sayfa yenileme gereksinimi düzeltildi.
-- Proje genelindeki jenerik "Kullanıcı" / "Üye" fallback ifadeleri kaldırıldı. Tüm görev, yorum, aktivite ve profil alanlarında kullanıcıların gerçek Ad Soyad ve e-posta bilgilerinin görüntülenmesi sağlandı.
-- Kullanıcı etiketlerindeki boş veri kaynaklı " - " (tire) görünüm hatası düzeltildi. Helper fonksiyonlar null/undefined değerlere karşı güvenli hale getirildi.
-- Profil, Header ve menülerde statik olarak yer alan "Hesap" yazıları kaldırılarak kullanıcının gerçek ismi (dinamik veri) ile değiştirildi.
-- Menü ve Header alanlarındaki ismin boş kalma (blank) hatası düzeltildi; Auth context üzerinden gerçek kullanıcı adı ve e-posta verisinin UI'a güvenli şekilde aktarımı sağlandı.
-- Görev kartları, üye tablosu ve dropdown menülerindeki sabit "Kullanıcı Yükleniyor..." metinleri kaldırıldı. Profil verileri (Ad Soyad ve e-posta) dinamik olarak bağlandı.
-- `profiles` sorgusundaki olmayan sütunlar (`display_name` vb.) yüzünden profil okumasının tamamen düşmesi düzeltildi; `loadProfilesByIds` ile güvenli select + gerçek ad bağlama sağlandı.
-- Proje ve Görev silme (Delete Project / Delete Task) işlevleri onay modalları (AlertDialog), Toast bildirimleri ve yönlendirme mantıklarıyla birlikte eklendi.
-- Proje silme (Delete Project) işlemindeki veritabanı foreign key (cascade delete) ve RLS yetki engelleri çözüldü; silme sonrası yönlendirme ve state güncellemesi sağlandı.
-- Kanban panosundaki görevler varsayılan olarak Yüksek -> Düşük öncelik sırasına göre dizildi. Kolon başlıklarına (header) öncelik ve tarihe göre sıralama/filtreleme seçenekleri eklendi.
-- Uygulamaya Beyaz-Mavi-Turuncu renk paletine sahip Açık Mod (Light Mode) desteği eklendi. Ayarlar sayfasından Koyu/Açık/Sistem teması seçimi sağlandı.
-- Tema sistemi global hale getirildi. Hardcoded koyu renk sınıfları temizlenerek tüm sayfaların (Sidebar, Header, Kanban, Modallar, Tablolar) Açık Mod ve Koyu Mod ile %100 uyumlu çalışması sağlandı.
-- Açık Mod (Light Mode) geçişinin çalışmama sorunu düzeltildi. Tailwind darkMode konfigürasyonu, ThemeProvider ve CSS değişkenleri senkronize edildi.
-- UI tasarımında kenarlıklar (borders) daha belirgin ve keskin hale getirildi. Turuncu, mavi ve öncelik rozetlerinin renk doygunlukları (saturation) artırıldı.
-- Keskin kenarlık ve dolgun renk paleti düzenlemeleri sadece Açık Mod (Light Mode) ile sınırlandırıldı. Koyu Mod (Dark Mode) orijinal stiline döndürüldü.
-- Sayfa ve modal geçişlerindeki yavaşlık giderildi. Lazy mounting, React.memo optimizasyonları, paralel veri çekme (Promise.all) ve sorgu caching mantığı entegre edildi.
-- Görev detaylarına Yorum Yapma (Task Comments) ve Dosya Yükleme (File Attachments) özellikleri entegre edildi. Supabase Storage ve ilişkisel veritabanı tabloları bağlandı.
-- Gerçek zamanlı bildirim merkezi (Notification Bell & Realtime) ve Workspace davet kabul/reddetme akışı eklendi.
-
-### [21 Temmuz 2026] - Auth bağlantı düzeltmeleri ve projects.updated_at şema sync
-- Auth akışındaki bağlantı hataları (port ve exception düzeltmeleri) giderildi.
-- `projects` tablosundaki eksik `updated_at` şema hatası giderildi ve `getCurrentUserProjects` sorgusu güncellendi.
-- Workspace switcher aktifleştirildi; workspace geçişlerinde dinamik proje/görev filtrelemesi sağlandı.
-- Görev durum (status) yönetimi dinamikleştirildi (TODO -> IN_PROGRESS -> DONE geçişleri bağlandı).
-- Next.js Client/Server modül ayrımı sağlandı; `active-workspace.ts` içerisindeki server-only `next/headers` bağımlılığı temizlenerek build hatası giderildi.
-- `createProject` aksiyonuna `workspace_id` zorunluluğu eklendi; projelerin workspace bağımsız sahipsiz kalması engellendi.
-- Workspace değişimi esnasında proje ve görevlerin dinamik filtrelenmesi sağlandı.
-- `projects` tablosuna `workspace_id` ilişkisi veritabanı seviyesinde bağlandı; `createProject` hatası görünür kılındı ve workspace çerez kalıcılığı sağlandı.
-- Workspace listesinin aktif filtre nedeniyle kaybolma hatası giderildi; `getWorkspaces` sorgusu tüm kullanıcı üyeliklerini kapsayacak şekilde düzeltildi ve `createWorkspace` üyelik atama akışı sağlama alındı.
-- Workspace silme işlevi (`deleteWorkspace`) ve UI onay modalı eklendi.
-- `updateTaskStatus` aksiyonu veritabanı enum değerleriyle senkronize edilerek görev durumu güncellenememe hatası giderildi.
-- `TaskDetailSheet` bileşeni üzerinden görev düzenleme, alt görev (subtask) ve yorum sistemleri entegre edildi.
-- Admin ve Kullanıcı rolleri (RBAC) ayrıştırıldı; izinsiz girişler için yetkisizlik yönlendirmesi eklendi.
-- Admin kullanıcı davet sistemi (`invitations`) entegre edildi.
-- Admin için üye ve proje durum takip paneli (Admin Overview) oluşturuldu.
-- Workspace Admin ve Member yetkileri ayrıştırıldı.
-- Member rolü için proje oluşturma kısıtlaması ve izole proje/görev görünürlüğü (assignee bazlı) getirildi.
-- Görev atama (`assignee_id`) altyapısı ve arayüzü eklendi.
-- Üye görünürlük hatası giderildi; `getProjects` sorgusu kullanıcıya atanmış görevleri içeren projeleri kapsayacak şekilde genişletildi.
-- Kanban görev kartlarına atanan kullanıcı (assignee) avatarı ve ismi görüntülenecek şekilde UI güncellemesi yapıldı.
-- `src/lib/supabase/server.ts` içerisindeki eksik `normalizeTaskStatus` ve `normalizeTaskPriority` fonksiyonları tanımlanarak ReferenceError hatası giderildi.
-- Kullanıcı engelleme akışı kaldırılarak dinamik Workspace Onboarding (İlk Workspace Oluşturma) ekranı eklendi.
-- Roller workspace bazlı duruma getirildi (Kullanıcı kendi workspace'inde Admin, davet edildiğinde Member).
-- Kanban kartındaki Atanan Kişi (Assignee) rozeti kartın sağ üst köşesine taşındı.
-- "Atanan Kişi" dropdown seçeneğinde jenerik "Üye" ifadesi kaldırıldı; kullanıcıların Ad Soyad ve e-posta bilgileri görüntülenecek şekilde düzenlendi.
-- Giriş yapan kullanıcının Admin olduğu varsayılan Workspace'e otomatik yönlendirilmesi sağlandı.
-- Yeni kayıt olan kullanıcının oturum durumu (session/context) anlık güncellenerek oluşturduğu Workspace'e çıkış yapmadan yönlendirilmesi sağlandı.
-- Workspace davet ve bildirim akışı kuruldu; davet kabul edildiğinde üyenin aktif olarak listelenmesi entegre edildi.
-
 ### [20 Temmuz 2026] - Günlük Özet: RLS, Workspace Yönetimi ve Task Detail UI
 - RLS hatalarının giderilmesi, Workspace yönetim arayüzü ve Task Detail UI geliştirmeleri tamamlandı.
 - **RLS:** `workspace_members`, `projects`, `tasks` ve `workspaces` için INSERT/SELECT politikaları SQL migration’larla hizalandı; Server Action payload’larında `owner_id` / `user_id` / `created_by` = `auth.uid()` garantilendi; hatalar düz `{ success, error }` JSON olarak dönüyor.
@@ -365,3 +312,60 @@
 - Dashboard shell `bg-slate-50` + beyaz sidebar/header; özet kartlar (Toplam / Devam Eden / Tamamlanan).
 - Kanban: geniş flex sütunlar, kart `shadow-sm → shadow-md` hover; görev tıklanınca sağ slide-over (`TaskDetailSheet`: Checklist / Comments / Attachments iskeleti).
 - Sidebar: Dashboard, Projects, My Tasks, Favorites, Settings (Lucide ikonları).
+
+### [21 Temmuz 2026] - Workspace onboarding, RBAC, görev atama, davet/bildirim ve Kanban UX
+- Auth akışındaki bağlantı hataları (port ve exception düzeltmeleri) giderildi.
+- `projects` tablosundaki eksik `updated_at` şema hatası giderildi ve `getCurrentUserProjects` sorgusu güncellendi.
+- Workspace switcher aktifleştirildi; workspace geçişlerinde dinamik proje/görev filtrelemesi sağlandı.
+- Görev durum (status) yönetimi dinamikleştirildi (TODO -> IN_PROGRESS -> DONE geçişleri bağlandı).
+- Next.js Client/Server modül ayrımı sağlandı; `active-workspace.ts` içerisindeki server-only `next/headers` bağımlılığı temizlenerek build hatası giderildi.
+- `createProject` aksiyonuna `workspace_id` zorunluluğu eklendi; projelerin workspace bağımsız sahipsiz kalması engellendi.
+- Workspace değişimi esnasında proje ve görevlerin dinamik filtrelenmesi sağlandı.
+- `projects` tablosuna `workspace_id` ilişkisi veritabanı seviyesinde bağlandı; `createProject` hatası görünür kılındı ve workspace çerez kalıcılığı sağlandı (localStorage + `active_workspace_id` cookie + URL `workspaceId`).
+- Workspace listesinin aktif filtre nedeniyle kaybolma hatası giderildi; `getWorkspaces` sorgusu tüm kullanıcı üyeliklerini kapsayacak şekilde düzeltildi ve `createWorkspace` üyelik atama akışı sağlama alındı.
+- Workspace silme işlevi (`deleteWorkspace`) ve UI onay modalı eklendi.
+- `updateTaskStatus` aksiyonu veritabanı enum değerleriyle senkronize edilerek görev durumu güncellenememe hatası giderildi.
+- `TaskDetailSheet` bileşeni üzerinden görev düzenleme, alt görev (subtask) ve yorum sistemleri entegre edildi.
+- Admin ve Kullanıcı rolleri (RBAC) ayrıştırıldı; izinsiz girişler için yetkisizlik yönlendirmesi eklendi.
+- Admin kullanıcı davet sistemi (`invitations` / `workspace_invitations`) entegre edildi.
+- Admin için üye ve proje durum takip paneli (Admin Overview) oluşturuldu.
+- Workspace Admin ve Member yetkileri ayrıştırıldı (workspace-scoped RBAC: `resolveWorkspaceRole` / `isAdminRole`).
+- Member rolü için proje oluşturma kısıtlaması ve izole proje/görev görünürlüğü (assignee bazlı) getirildi.
+- Görev atama (`assignee_id`) altyapısı ve arayüzü eklendi.
+- Üye görünürlük hatası giderildi; `getProjects` sorgusu kullanıcıya atanmış görevleri içeren projeleri kapsayacak şekilde genişletildi.
+- Kanban görev kartlarına atanan kullanıcı (assignee) avatarı ve ismi görüntülenecek şekilde UI güncellemesi yapıldı.
+- `src/lib/supabase/server.ts` içerisindeki eksik `normalizeTaskStatus` ve `normalizeTaskPriority` fonksiyonları tanımlanarak ReferenceError hatası giderildi.
+- Davet zorunlu lock-out (`/unauthorized`) kaldırıldı; workspace’siz kullanıcı için dinamik Workspace Onboarding (İlk Workspace Oluşturma) ekranı eklendi.
+- Roller workspace bazlı duruma getirildi (Kullanıcı kendi workspace'inde Admin, davet edildiğinde Member).
+- Kanban kartındaki Atanan Kişi (Assignee) rozeti kartın sağ üst köşesine taşındı.
+- "Atanan Kişi" dropdown seçeneğinde jenerik "Üye" ifadesi kaldırıldı; kullanıcıların Ad Soyad ve e-posta bilgileri görüntülenecek şekilde düzenlendi.
+- Giriş yapan kullanıcının Admin olduğu varsayılan Workspace'e otomatik yönlendirilmesi sağlandı (`resolvePostLoginRedirect`).
+- Yeni kayıt olan kullanıcının oturum durumu (session/context) anlık güncellenerek oluşturduğu Workspace'e çıkış yapmadan yönlendirilmesi sağlandı.
+- Workspace davet ve bildirim akışı kuruldu; Header bildirim menüsünden davet kabul edilince üyenin `workspace_members`’a eklenmesi ve listede görünmesi entegre edildi (`fix_notifications_invite.sql`).
+
+### [22 Temmuz 2026] - Profil/isim, silme+RLS, Kanban filtre, Light Mode, performans, yorum/ek, bildirim & davet
+- Giriş (Login) akışında auth hatası ile login sonrası workspace/profil yönlendirme hataları ayrıştırıldı. Hatalı "Şifre veya e-posta yanlış" uyarısı ve sayfa yenileme gereksinimi düzeltildi.
+- Proje genelindeki jenerik "Kullanıcı" / "Üye" fallback ifadeleri kaldırıldı. Tüm görev, yorum, aktivite ve profil alanlarında kullanıcıların gerçek Ad Soyad ve e-posta bilgilerinin görüntülenmesi sağlandı.
+- Kullanıcı etiketlerindeki boş veri kaynaklı " - " (tire) görünüm hatası düzeltildi. Helper fonksiyonlar null/undefined değerlere karşı güvenli hale getirildi.
+- Profil, Header ve menülerde statik olarak yer alan "Hesap" yazıları kaldırılarak kullanıcının gerçek ismi (dinamik veri) ile değiştirildi.
+- Menü ve Header alanlarındaki ismin boş kalma (blank) hatası düzeltildi; Auth context üzerinden gerçek kullanıcı adı ve e-posta verisinin UI'a güvenli şekilde aktarımı sağlandı.
+- Görev kartları, üye tablosu ve dropdown menülerindeki sabit "Kullanıcı Yükleniyor..." metinleri kaldırıldı. Profil verileri (Ad Soyad ve e-posta) dinamik olarak bağlandı.
+- `profiles` sorgusundaki olmayan sütunlar (`display_name` vb.) yüzünden profil okumasının tamamen düşmesi düzeltildi; `loadProfilesByIds` / `formatPersonName` ile güvenli select + gerçek ad bağlama sağlandı (`fix_profiles_select_and_placeholders.sql`).
+- Proje ve Görev silme (Delete Project / Delete Task) işlevleri onay modalları (AlertDialog), Toast bildirimleri ve yönlendirme mantıklarıyla birlikte eklendi.
+- Soft delete (`deleted_at`) + gerekirse hard delete; proje silinirken bağlı görevler de temizlenir. DELETE RLS ve cascade engelleri `fix_projects_delete_rls.sql` ile çözüldü; silme sonrası yönlendirme ve state güncellemesi sağlandı.
+- Kanban panosundaki görevler varsayılan olarak Yüksek -> Düşük öncelik sırasına göre dizildi. Kolon başlıklarına (header) öncelik ve tarihe göre sıralama/filtreleme seçenekleri eklendi.
+- Uygulamaya Beyaz-Mavi-Turuncu renk paletine sahip Açık Mod (Light Mode) desteği eklendi. Ayarlar sayfasından Koyu/Açık/Sistem teması seçimi sağlandı.
+- Tema sistemi global hale getirildi. Hardcoded koyu renk sınıfları temizlenerek tüm sayfaların (Sidebar, Header, Kanban, Modallar, Tablolar) Açık Mod ve Koyu Mod ile %100 uyumlu çalışması sağlandı.
+- Açık Mod (Light Mode) geçişinin çalışmama sorunu düzeltildi. Tailwind darkMode konfigürasyonu, ThemeProvider ve CSS değişkenleri senkronize edildi.
+- UI tasarımında kenarlıklar (borders) daha belirgin ve keskin hale getirildi. Turuncu, mavi ve öncelik rozetlerinin renk doygunlukları (saturation) artırıldı.
+- Keskin kenarlık ve dolgun renk paleti düzenlemeleri sadece Açık Mod (Light Mode) ile sınırlandırıldı. Koyu Mod (Dark Mode) orijinal stiline döndürüldü.
+- Sayfa ve modal geçişlerindeki yavaşlık giderildi. Lazy mounting, React.memo / useCallback / useMemo, paralel veri çekme (Promise.all), istemci cache (`client-cache`) ve görev sheet’te seed + skeleton (optimistic UI) entegre edildi.
+- Görev detaylarına Yorum Yapma (Task Comments: avatar, ad, göreli zaman, kendi yorumunu silme) ve Dosya Yükleme (File Attachments: dropzone, Storage upload, ikonlu liste) özellikleri entegre edildi (`fix_task_comments_attachments_storage.sql`, bucket: `task-attachments`).
+- Gerçek zamanlı bildirim merkezi (Notification Bell, kırmızı rozet, “Tümünü Okundu İşaretle”, Realtime + Toast) ve Workspace davet kabul/reddetme akışı eklendi (`add_notifications_and_invites.sql`).
+- Realtime client’taki circular import riski giderildi (`createAuthedRealtimeClient` auth-session bağı koparıldı).
+
+### [23 Temmuz 2026] - Server Action derleme düzeltmesi
+- Next.js Server Action derleme hatası (Server Actions must be async functions) düzeltildi. Senkron bildirim yardımcı fonksiyonları (`isInviteType`, `isWorkspaceInviteNotification`) Server Action dosyasından çıkarılıp `frontend/src/lib/notification-utils.ts` utility katmanına taşındı.
+- Bildirim menüsü (`invite-notifications-menu`) import yolları yeni utility dosyasına güncellendi; `npm run build` ile derleme doğrulandı.
+- Build’i engelleyen yan TypeScript tip hataları (admin-overview, get-task-details, update-task, workspaces select fallback) giderildi.
+- Aktivite Logu (Activity Feed) altyapısı kuruldu. Görev ve Proje detay sayfalarında tüm kullanıcı hareketleri (durum değişimi, yorum, dosya vb.) kronolojik olarak listelendi.
