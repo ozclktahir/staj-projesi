@@ -375,3 +375,4 @@
 - Dashboard & Analitik Raporlar modülü (Recharts entegrasyonu, KPI kartları, görev durum/öncelik grafikleri ve üye iş yükü dağılımı) tamamlandı.
 - Dashboard sayfası genel Workspace analitiği, KPI kartları, görev grafikler ve üye iş yükü paneli ile ana komuta merkezi olarak yeniden yapılandırıldı. Proje detay sayfaları sade haline getirildi.
 - Dashboard düzeni optimize edildi: 3 ana grafik (Durum, Öncelik, Üye İş Yükü) eşit boyutta yan yana ilk bakış alanına yerleştirildi; Teslim Tarihleri ve Aktivite Akışı alt bölüme konumlandırıldı.
+- Dashboard üzerindeki 3 ana analitik kartı metin halinden Recharts tabanlı Donut ve Bar grafiklerine dönüştürüldü.
