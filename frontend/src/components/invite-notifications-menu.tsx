@@ -11,12 +11,12 @@ import {
 import {
   getMyNotifications,
   getMyPendingInvitations,
-  isWorkspaceInviteNotification,
   markAllNotificationsRead,
   markNotificationRead,
   type NotificationItem,
   type PendingInvitationItem,
 } from "@/app/actions/notifications";
+import { isWorkspaceInviteNotification } from "@/lib/notification-utils";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

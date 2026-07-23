@@ -28,7 +28,7 @@ export type AdminOverviewResult =
       isAdmin: boolean;
       members: AdminMemberOverview[];
     }
-  | { success: false; error: string; isAdmin: false; members: [] };
+  | { success: false; error: string; isAdmin: boolean; members: [] };
 
 function toPlainErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;

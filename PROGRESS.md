@@ -271,6 +271,9 @@
 - Shadcn/UI (New York / Slate), turuncu–siyah tema (`--primary: 24 100% 50%`, `--radius: 0.5rem`) ve `next-themes` ile aydınlık/karanlık mod altyapısı tamamlandı.
 - Login/Register sayfaları Split Screen mimarisiyle tasarlandı (`(auth)/login`, `(auth)/register`); Shadcn Card/Input/Label/Button kullanıldı (UI-only).
 
+### [23 Temmuz 2026] - Server Action derleme düzeltmesi
+- Next.js Server Action derleme hatası (Server Actions must be async functions) düzeltildi. Senkron bildirim yardımcı fonksiyonları Server Action dosyasından çıkarılıp utility katmanına taşındı.
+
 ### [22 Temmuz 2026] - Login auth / yönlendirme hata ayrımı
 - Giriş (Login) akışında auth hatası ile login sonrası workspace/profil yönlendirme hataları ayrıştırıldı. Hatalı "Şifre veya e-posta yanlış" uyarısı ve sayfa yenileme gereksinimi düzeltildi.
 - Proje genelindeki jenerik "Kullanıcı" / "Üye" fallback ifadeleri kaldırıldı. Tüm görev, yorum, aktivite ve profil alanlarında kullanıcıların gerçek Ad Soyad ve e-posta bilgilerinin görüntülenmesi sağlandı.

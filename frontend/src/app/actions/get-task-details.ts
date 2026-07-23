@@ -93,33 +93,27 @@ export async function getTaskDetails(
       return { success: false, error: "Görev bulunamadı veya erişim yok." };
     }
 
+    const row = data as Record<string, unknown>;
+
     return {
       success: true,
       task: {
-        id: data.id as string,
-        title: (data.title as string) ?? "Adsız görev",
-        description: (data.description as string | null) ?? null,
-        status: (normalizeTaskStatusInput(data.status) ??
+        id: row.id as string,
+        title: (row.title as string) ?? "Adsız görev",
+        description: (row.description as string | null) ?? null,
+        status: (normalizeTaskStatusInput(row.status) ??
           "TODO") as TaskStatus,
-        priority: normalizeTaskPriority(data.priority),
-        project_id: (data.project_id as string | null) ?? null,
-        workspace_id: (data.workspace_id as string | null) ?? null,
-        due_date:
-          "due_date" in data
-            ? ((data.due_date as string | null) ?? null)
-            : null,
-        parent_task_id:
-          "parent_task_id" in data
-            ? ((data.parent_task_id as string | null) ?? null)
-            : null,
+        priority: normalizeTaskPriority(row.priority),
+        project_id: (row.project_id as string | null) ?? null,
+        workspace_id: (row.workspace_id as string | null) ?? null,
+        due_date: (row.due_date as string | null) ?? null,
+        parent_task_id: (row.parent_task_id as string | null) ?? null,
         assignee_id:
-          "assignee_id" in data
-            ? ((data.assignee_id as string | null) ?? null)
-            : "assigned_to" in data
-              ? ((data.assigned_to as string | null) ?? null)
-              : null,
-        created_at: (data.created_at as string | null) ?? null,
-        created_by: (data.created_by as string | null) ?? null,
+          (row.assignee_id as string | null | undefined) ??
+          (row.assigned_to as string | null | undefined) ??
+          null,
+        created_at: (row.created_at as string | null) ?? null,
+        created_by: (row.created_by as string | null) ?? null,
       },
     };
   } catch (error) {

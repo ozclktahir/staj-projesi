@@ -230,8 +230,9 @@ export async function updateTask(
       };
     }
 
+    const row = data as Record<string, unknown>;
     const projectId =
-      typeof data.project_id === "string" ? data.project_id : null;
+      typeof row.project_id === "string" ? row.project_id : null;
     if (projectId) revalidatePath(`/project/${projectId}`);
     revalidatePath("/");
     revalidatePath("/dashboard");
@@ -239,30 +240,22 @@ export async function updateTask(
     return {
       success: true,
       task: {
-        id: data.id as string,
-        title: (data.title as string) ?? "Adsız görev",
-        description: (data.description as string | null) ?? null,
-        status: (normalizeTaskStatusInput(data.status) ?? "TODO") as TaskStatus,
-        priority: (normalizePriority(data.priority) ??
+        id: row.id as string,
+        title: (row.title as string) ?? "Adsız görev",
+        description: (row.description as string | null) ?? null,
+        status: (normalizeTaskStatusInput(row.status) ?? "TODO") as TaskStatus,
+        priority: (normalizePriority(row.priority) ??
           "MEDIUM") as TaskPriority,
-        project_id: (data.project_id as string | null) ?? null,
-        workspace_id: (data.workspace_id as string | null) ?? null,
-        due_date:
-          "due_date" in data
-            ? ((data.due_date as string | null) ?? null)
-            : null,
-        parent_task_id:
-          "parent_task_id" in data
-            ? ((data.parent_task_id as string | null) ?? null)
-            : null,
+        project_id: (row.project_id as string | null) ?? null,
+        workspace_id: (row.workspace_id as string | null) ?? null,
+        due_date: (row.due_date as string | null) ?? null,
+        parent_task_id: (row.parent_task_id as string | null) ?? null,
         assignee_id:
-          "assignee_id" in data
-            ? ((data.assignee_id as string | null) ?? null)
-            : "assigned_to" in data
-              ? ((data.assigned_to as string | null) ?? null)
-              : null,
-        created_at: (data.created_at as string | null) ?? null,
-        created_by: (data.created_by as string | null) ?? null,
+          (row.assignee_id as string | null | undefined) ??
+          (row.assigned_to as string | null | undefined) ??
+          null,
+        created_at: (row.created_at as string | null) ?? null,
+        created_by: (row.created_by as string | null) ?? null,
       },
     };
   } catch (error) {

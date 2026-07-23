@@ -264,13 +264,15 @@ export async function getCurrentUserProjects(
     }
 
     if (error?.message?.includes("updated_at")) {
-      ({ data, error } = await supabase
+      const legacy = await supabase
         .from("projects")
         .select(
           "id, name, description, created_at, workspace_id, user_id, created_by",
         )
         .eq("workspace_id", activeWorkspaceId)
-        .order("created_at", { ascending: false }));
+        .order("created_at", { ascending: false });
+      data = legacy.data as typeof data;
+      error = legacy.error;
     }
 
     if (error) {

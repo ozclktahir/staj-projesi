@@ -2,61 +2,67 @@
 
 **Tarih:** 22 Temmuz 2026  
 **Proje:** İş Yönetim Sistemi (Workspace App)  
-**Faz:** Faz 6–7 — Profil görünen ad düzeltmeleri, login hata ayrımı, proje/görev silme
+**Faz:** Faz 6–7 — Profil/isim, silme+RLS, Kanban filtre, Light Mode, performans, yorum/ek, bildirim & davet
 
 ---
 
 ## 1. Günün Özeti
 
-Bugün staj kapsamında iki ana başlık tamamlanmıştır. Birincisi, arayüzde sabit kalan “Kullanıcı Yükleniyor...” / boş kullanıcı adı sorunlarının kök nedeniyle giderilmesidir; Header, görev kartı, atanan kişi dropdown’ı ve üye tablosunda gerçek `full_name` / e-posta gösterimi sağlanmıştır. İkincisi, **Proje ve Görev silme** (`Delete Project` / `Delete Task`) işlevlerinin onay modalları, Toast bildirimleri, yetki kontrolü ve silme sonrası yönlendirme/state güncellemesiyle entegre edilmesidir. `PROGRESS.md` ve bu günlük rapor güncellenerek değişiklikler GitHub’a gönderilmiştir.
+Bugün staj kapsamında ürünün hem “görünen kimlik” hem de operasyon/iletişim katmanı yoğun şekilde olgunlaştırılmıştır. Sabah tarafında login hata ayrımı ve arayüzde sabit kalan “Kullanıcı Yükleniyor...” / boş ad sorunları kök nedeniyle (`profiles` select) giderilmiş; ardından Proje/Görev silme (onay modalı, cascade, DELETE RLS) eklenmiştir. Kanban’da varsayılan öncelik sıralaması ve kolon başlığı filtreleri getirilmiş; global Açık Mod (Light Mode) ile tema geçişi düzgün çalışır hale getirilmiş, keskin stil yalnızca light’a sınırlanmıştır. Öğleden sonra sayfa/modal yavaşlığı lazy mounting, memoization, `Promise.all` ve istemci cache ile iyileştirilmiş; görev detayına yorumlar ve dosya ekleri (Supabase Storage) bağlanmıştır. Gün sonunda gerçek zamanlı bildirim zili (Realtime + Toast) ve workspace davet kabul/reddetme akışı tamamlanmış; `PROGRESS.md` ile günlük geliştirmeler kayıt altına alınmıştır. *(Bu staj raporu yerel dosya olarak kaydedilmiştir; push edilmemiştir.)*
 
 ---
 
 ## 2. Kullanılan Teknolojiler ve Terimler
 
-- **`profiles` (Supabase):** Kullanıcının görünen adı (`full_name`), e-posta ve avatar bilgilerini tutan tablo. Auth `user_metadata` ile senkron tutulur.
+- **`loadProfilesByIds` / `formatPersonName`:** Yalnızca mevcut `profiles` kolonlarını (`id, email, full_name, avatar_url` …) çeker; “Kullanıcı Yükleniyor...” gibi placeholder’ları filtreler. Ad → e-posta → `@` öncesi sırası.
 
-- **`loadProfilesByIds`:** Önce `id, email, full_name, avatar_url` seçer; şema genişse `first_name` / `last_name` dener. Olmayan sütun isteyerek tüm sorgunun düşmesini engeller.
+- **Soft / Hard Delete + DELETE RLS:** Silmede önce `deleted_at` (soft), gerekirse hard delete. `fix_projects_delete_rls.sql` ile Admin/sahip `DELETE` politikası; proje silinirken bağlı görevler de temizlenir.
 
-- **`formatPersonName` / `cleanText`:** Placeholder metinleri (“Kullanıcı Yükleniyor...”, “Kullanıcı”) filtreler; sıralama: Ad Soyad → e-posta → `@` öncesi.
+- **Kanban kolon prefs (`useMemo`):** Kolon bazlı sort (`priority_desc` …) ve öncelik filtresi; varsayılan Yüksek → Düşük.
 
-- **Soft delete (`deleted_at`):** Görev/proje silmede önce `deleted_at` güncellenir; sütun yoksa hard delete’e düşülür. Proje silinirken bağlı görevler de temizlenir.
+- **ThemeProvider + Tailwind `dark` variant:** Açık / Koyu / Sistem. Light’ta keskin border ve doygun rozetler; dark’ta önceki yumuşak stil korunur.
 
-- **Onay modalı (Dialog / AlertDialog kalıbı):** Silme işlemi doğrudan yapılmaz; kullanıcıya geri alınamaz uyarı metni gösterilir (`DeleteTaskModal`, `DeleteProjectModal`).
+- **Lazy mounting & optimistic UI:** Kapalı modal/sheet DOM’a mount edilmez; kart tıklanınca sheet anında açılır, seed + skeleton ile veri beklenir. `React.memo` / `useCallback` / `client-cache`.
 
-- **Server Action:** `deleteTask`, `deleteProject`, `getWorkspaceMembers`, `enrichTasksWithAssignees` vb. UI’dan güvenli sunucu tarafı işlemler.
+- **`task_comments` / `task_attachments` + Storage:** Yorumlar profil join’li; dosyalar `task-attachments` bucket’ına Server Action ile yüklenir, metadata tabloda tutulur.
 
-- **RBAC:** Proje silme yalnızca Admin (veya proje sahibi); görev silmede Admin tüm görevleri, Member kendi atanan/oluşturduğu görevleri silebilir.
+- **Notification Bell + Realtime:** `notifications` INSERT dinlenir; toast + rozet + liste güncellenir. Davet tipi `workspace_invite`; Kabul → `workspace_members` + yönlendirme, Reddet → `rejected`.
 
 ---
 
 ## 3. Geliştirme Süreci
 
-### 3.1. Login Hata Ayrımı
+### 3.1. Login Hata Ayrımı ve Profil İsimleri
 
-Girişte yalnızca `/auth/login` başarısızlığında “şifre/e-posta hatalı” gösterilir; login sonrası workspace/profil yönlendirme hataları ayrı ele alınır. Gereksiz sayfa yenileme ihtiyacı azaltılmıştır.
+Girişte yalnızca auth login başarısızlığında “şifre/e-posta hatalı” gösterilir; post-login yönlendirme hataları ayrılmıştır. Header, Kanban assignee, üye tablosu ve dropdown’larda gerçek Ad Soyad / e-posta bağlanmıştır. Kök neden: olmayan `display_name` sütununun select’i düşürmesi → `loadProfilesByIds` + `fix_profiles_select_and_placeholders.sql`.
 
-### 3.2. Görünen Ad ve Placeholder Temizliği
+### 3.2. Proje ve Görev Silme (Cascade & RLS)
 
-Jenerik “Kullanıcı” / “Üye” / “Hesap” fallback’leri kaldırılmıştır. Header skeleton ile yükleme durumu ayrılmış; veri etiketine loading metni yazılmaz. Görev kartı, dropdown ve üye tablosunda dinamik ad/e-posta bağlanmıştır.
+Kanban ⋯ menüsü ve `TaskDetailSheet` üzerinden görev silme; proje detayında Admin “Projeyi Sil”. Onay modalı + Toast. RLS DELETE eksikliği ve 0 satır dönmesi `fix_projects_delete_rls.sql` ve sıralı hard delete + satır doğrulamasıyla çözülmüştür; başarıda dashboard’a yönlendirme yapılmıştır.
 
-### 3.3. Profiles Sorgu Düzeltmesi (Kök Neden)
+### 3.3. Kanban Öncelik Sıralama / Filtre
 
-Loglarda `column profiles.display_name does not exist` ve ardından `found: []` görülmüştür. Select listesi gerçek şemaya indirgenmiş; `loadProfilesByIds` tüm üye/assignee/yorum yollarına uygulanmıştır. `fix_profiles_select_and_placeholders.sql` ile placeholder temizliği ve RLS politikaları eklenmiştir.
+Görevler varsayılan Yüksek → Düşük. Kolon header’da ⇅ menüsü ile öncelik ve tarih sıralaması / öncelik filtresi eklenmiştir.
 
-### 3.4. Görev Silme (Delete Task)
+### 3.4. Global Tema ve Light Mode
 
-Kanban kartında üç nokta menüsüne ve `TaskDetailSheet` detay paneline “Görevi Sil” eklenmiştir. Onay modalında “Bu görevi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.” uyarısı gösterilir. Onay sonrası `tasks` kaydı silinir/arşivlenir; görev listeden anında düşer ve Toast (“Görev başarıyla silindi”) gösterilir.
+Beyaz–Mavi–Turuncu Açık Mod; Ayarlar’dan tema seçimi. Hardcoded koyu sınıflar temizlenmiş; tema geçişinin çalışmaması Tailwind darkMode / ThemeProvider / CSS değişkenleriyle düzeltilmiştir. Keskin kenarlık ve zengin renkler yalnızca Light Mode’a scope edilmiştir.
 
-### 3.5. Proje Silme (Delete Project)
+### 3.5. Performans Optimizasyonları
 
-Proje detay sayfası header’ına Admin için “Projeyi Sil” butonu eklenmiştir. Onay modalında cascade uyarısı yer alır: projeye ait tüm görevlerin de silineceği belirtilir. Silme sonrası kullanıcı Dashboard / workspace ana sayfasına yönlendirilir; proje listesi `revalidatePath` ile güncellenir.
+Proje detayında paralel fetch (`Promise.all`); `TaskDetailSheet` / `CreateTaskModal` lazy mount; kart seed ile anında açılış; Kanban `TaskCard` / kolon memoization; daraltılmış select ve kısa TTL istemci cache.
 
-RLS’te eksik `DELETE` politikası ve soft-delete’in 0 satır dönmesi sorunları giderilmiştir: `fix_projects_delete_rls.sql` ile Admin/sahip DELETE izni eklenmiş; kod tarafında önce `tasks`, sonra `projects` hard delete + etkilenen satır doğrulaması yapılmıştır. Başarıda hard navigate ile dashboard yenilenir.
+### 3.6. Görev Yorumları ve Dosya Ekleri
 
-### 3.6. Dokümantasyon
+`TaskComments`: avatar, ad, göreli zaman (“5 dakika önce”), Yorum Yap, kendi yorumunu sil. `TaskAttachments`: dropzone / dosya seç, yükleme durumu, ikonlu liste, yeni sekmede aç, kendi dosyasını sil. Migration: `fix_task_comments_attachments_storage.sql`.
 
-`PROGRESS.md` 22 Temmuz maddeleri (profil ad bağlama + proje/görev silme) güncellenmiş; günlük staj raporu tamamlanmış; ilgili commit’ler `main` dalına push edilmiştir.
+### 3.7. Bildirim Merkezi ve Davet Kabul/Red
+
+Header zilinde kırmızı okunmamış rozeti; dropdown; “Tümünü Okundu İşaretle”. Realtime ile anlık toast. Davet kartında Kabul Et / Reddet. Davet gönderilince `workspace_invite` bildirimi. Migration: `add_notifications_and_invites.sql`.
+
+### 3.8. Dokümantasyon
+
+`PROGRESS.md` 22 Temmuz maddeleri günün tüm başlıklarıyla güncellenmiş; `reports/2026-07-22_DAILY_REPORT.md` teknik günlük özeti ve bu staj defteri raporu yazılmıştır.
 
 ---
 
@@ -64,31 +70,34 @@ RLS’te eksik `DELETE` politikası ve soft-delete’in 0 satır dönmesi sorunl
 
 | Sorun | Durum | Açıklama |
 |--------|--------|---------|
-| Sabit “Kullanıcı Yükleniyor...” etiketi | Çözüldü | Placeholder formatlayıcılardan ve UI fallback’lerinden kaldırıldı |
-| Görev kartında atanan kişi adı boş / Atanmadı | Çözüldü | `enrichTasksWithAssignees` profil select’i düzeltilerek isimler bağlandı |
-| `display_name` sütunu yok → profil select düşmesi | Çözüldü | `loadProfilesByIds` yalnızca mevcut kolonları dener |
-| Header’da ad boş / skeleton sonrası yanlış metin | Çözüldü | `getCurrentUserDisplayLabel` + metadata / e-posta local fallback |
-| RLS upsert engeli (kendi profil satırı yoksa) | Migration ile | `fix_profiles_select_and_placeholders.sql` politikaları |
-| Yanlışlıkla silme riski | Çözüldü | Onay modalı + net uyarı metinleri |
-| Proje silinince bağlı görevlerin kalması | Çözüldü | Proje silmeden önce `project_id` görevleri de temizlenir |
-| Proje silme RLS / FK engeli (0 satır / permission) | Çözüldü | `fix_projects_delete_rls.sql` DELETE politikaları + sıralı hard delete + doğrulama |
+| Sabit “Kullanıcı Yükleniyor...” / boş ad | Çözüldü | Placeholder temizliği + `loadProfilesByIds` |
+| `profiles.display_name` yok → select düşmesi | Çözüldü | Yalnızca mevcut kolonlar seçilir |
+| Proje silme RLS / FK (0 satır) | Çözüldü | DELETE politikaları + sıralı hard delete |
+| Tema geçişinin çalışmaması | Çözüldü | darkMode class + ThemeProvider + CSS sync |
+| Light keskinliğin dark’ı bozması | Çözüldü | Sharp/rich stiller light-only |
+| Modal / proje detay yavaş açılış | Çözüldü | Lazy mount, memo, parallel fetch, cache |
+| Yorum/ek için tablo–storage yokluğu | Migration | `fix_task_comments_attachments_storage.sql` |
+| Bildirim/davet Realtime & kabul/red | Çözüldü | Bell UI + `add_notifications_and_invites.sql` |
+| Realtime client’ta circular import | Çözüldü | `client.ts` auth-session bağı koparıldı |
 
 ---
 
 ## 5. Gün Sonu Değerlendirmesi
 
-Bugün kullanıcı kimliğinin UI’da doğru görünmesi stabilize edilmiş; ayrıca proje ve görev yaşam döngüsüne güvenli silme akışı eklenmiştir. Kanban ve proje detayı üzerinden silme, onay ve yönlendirme uçtan uca çalışır durumdadır. Kalan iş: profil SQL migration doğrulaması ve silme senaryolarının smoke testi.
+Bugün sistem; doğru kullanıcı kimliği, güvenli silme, kullanılabilir Kanban, çift tema, daha hızlı detay panelleri, görev içi iletişim (yorum/ek) ve gerçek zamanlı davet/bildirim döngüsüyle staj web fazının olgun bir günlük teslimatına ulaşmıştır. Kod tarafı tamamdır; üretim ortamında henüz uygulanmamış SQL migration’ların Supabase’te çalıştırılması ve uçtan uca smoke test kritik kalan adımdır.
 
 ---
 
 ## 6. Yarınki Plan
 
-1. `fix_profiles_select_and_placeholders.sql` migration’ının Supabase’te uygulanıp doğrulanması  
-2. Görev kartı / dropdown / üye tablosu smoke testi (gerçek full_name)  
-3. Proje ve görev silme akışının Admin / Member yetki senaryolarıyla smoke testi  
-4. Davet / bildirim akışının ek doğrulaması  
-5. Dashboard istatistiklerinin aktif workspace’e göre gözden geçirilmesi  
-6. Mobil (Flutter) fazına geçiş öncesi web akışının son kontrolü  
+1. Şu migration’ların Supabase SQL Editor’de uygulanıp doğrulanması:  
+   `fix_profiles_select_and_placeholders.sql`, `fix_projects_delete_rls.sql`,  
+   `fix_task_comments_attachments_storage.sql`, `add_notifications_and_invites.sql`  
+2. Profil adı + silme + Kanban filtre smoke testi  
+3. Light/Dark tema ve performans (proje detay / görev sheet) kontrolü  
+4. Yorum yazma / dosya yükleme / silme uçtan uca testi  
+5. Admin davet → Member Realtime bildirim → Kabul/Reddet → workspace yönlendirme smoke testi  
+6. Staj defteri çıktısının (PDF/yazdırma) kontrolü  
 
 ---
 

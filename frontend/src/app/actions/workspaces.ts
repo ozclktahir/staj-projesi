@@ -157,10 +157,10 @@ export async function getWorkspaces(): Promise<GetWorkspacesResult> {
       ownedQuery.error &&
       toPlainErrorMessage(ownedQuery.error).includes("updated_at")
     ) {
-      ownedQuery = await supabase
+      ownedQuery = (await supabase
         .from("workspaces")
         .select(WORKSPACE_SELECT_LEGACY)
-        .eq("owner_id", authUid);
+        .eq("owner_id", authUid)) as typeof ownedQuery;
     }
 
     if (ownedQuery.error) {
@@ -181,10 +181,10 @@ export async function getWorkspaces(): Promise<GetWorkspacesResult> {
       memberQuery.error &&
       toPlainErrorMessage(memberQuery.error).includes("updated_at")
     ) {
-      memberQuery = await supabase
+      memberQuery = (await supabase
         .from("workspace_members")
         .select(`role, workspaces(${WORKSPACE_SELECT_LEGACY})`)
-        .eq("user_id", authUid);
+        .eq("user_id", authUid)) as typeof memberQuery;
     }
 
     if (memberQuery.error) {
@@ -327,11 +327,13 @@ export async function createWorkspace(
       workspaceError &&
       toPlainErrorMessage(workspaceError).includes("updated_at")
     ) {
-      ({ data: workspace, error: workspaceError } = await supabase
+      const legacy = await supabase
         .from("workspaces")
         .insert(payload)
         .select(WORKSPACE_SELECT_LEGACY)
-        .single());
+        .single();
+      workspace = legacy.data as typeof workspace;
+      workspaceError = legacy.error;
     }
 
     if (workspaceError || !workspace) {

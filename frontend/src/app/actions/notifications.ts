@@ -5,6 +5,9 @@ import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { getWorkspaces } from "@/app/actions/workspaces";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
 import { pickDefaultAdminWorkspace } from "@/lib/member-labels";
+import type { NotificationItem } from "@/lib/notification-utils";
+
+export type { NotificationItem } from "@/lib/notification-utils";
 
 /**
  * Giriş sonrası yönlendirme:
@@ -137,28 +140,6 @@ export async function getMyPendingInvitations(): Promise<GetPendingInvitationsRe
   }
 }
 
-export type NotificationItem = {
-  id: string;
-  workspaceId: string | null;
-  type: string;
-  title: string;
-  message: string;
-  isRead: boolean;
-  createdAt: string | null;
-  link: string | null;
-  metadata: Record<string, unknown> | null;
-  payload: Record<string, unknown> | null;
-};
-
-function isInviteType(type: string): boolean {
-  const t = type.trim().toLowerCase();
-  return t === "workspace_invite" || t === "workspace_invitation";
-}
-
-export function isWorkspaceInviteNotification(n: NotificationItem): boolean {
-  return isInviteType(n.type);
-}
-
 function mapNotificationRow(row: Record<string, unknown>): NotificationItem {
   const metadata =
     row.metadata && typeof row.metadata === "object"
@@ -214,14 +195,14 @@ export async function getMyNotifications(limit = 20): Promise<{
       query.error?.message?.includes("payload") ||
       query.error?.message?.includes("link")
     ) {
-      query = await auth.supabase
+      query = (await auth.supabase
         .from("notifications")
         .select(
           "id, workspace_id, type, title, message, is_read, created_at, metadata",
         )
         .eq("user_id", auth.user.id)
         .order("created_at", { ascending: false })
-        .limit(limit);
+        .limit(limit)) as typeof query;
     }
 
     const { data, error } = query;
