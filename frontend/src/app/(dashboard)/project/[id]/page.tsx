@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { CreateTaskModal } from "@/components/CreateTaskModal";
+import { getProjectAnalytics } from "@/app/actions/analytics";
 import { DeleteProjectButton } from "@/components/delete-project-button";
-import { ProjectActivityDrawer } from "@/components/project/project-activity-panel";
-import { ProjectTaskBoard } from "@/components/project/project-task-board";
+import { ProjectDetailViews } from "@/components/project/project-detail-views";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
 import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
 import {
@@ -44,7 +43,7 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const [tasks, roleCtx] = await Promise.all([
+  const [tasks, roleCtx, analyticsResult] = await Promise.all([
     getProjectTasks(project.id, effectiveWorkspaceId),
     effectiveWorkspaceId && auth
       ? resolveWorkspaceRole(
@@ -53,6 +52,7 @@ export default async function ProjectDetailPage({
           auth.user.id,
         )
       : Promise.resolve(null),
+    getProjectAnalytics(project.id, effectiveWorkspaceId),
   ]);
 
   const canDeleteProject = Boolean(roleCtx?.isAdmin);
@@ -98,30 +98,12 @@ export default async function ProjectDetailPage({
         </div>
       </div>
 
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Görevler</h2>
-            <p className="text-sm text-muted-foreground">
-              Kartlara tıklayarak detay panelini aç. Durumu hızlıca değiştir.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ProjectActivityDrawer
-              projectId={project.id}
-              workspaceId={effectiveWorkspaceId}
-            />
-            <CreateTaskModal
-              projectId={project.id}
-              workspaceId={effectiveWorkspaceId}
-            />
-          </div>
-        </div>
-
-        <div className="w-full flex-1 overflow-x-auto">
-          <ProjectTaskBoard projectId={project.id} tasks={tasks} />
-        </div>
-      </section>
+      <ProjectDetailViews
+        projectId={project.id}
+        workspaceId={effectiveWorkspaceId}
+        tasks={tasks}
+        analytics={analyticsResult.data}
+      />
     </div>
   );
 }

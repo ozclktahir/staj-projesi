@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Check,
   CheckSquare,
+  ChartColumn,
   ChevronsUpDown,
   FolderKanban,
   LayoutDashboard,
@@ -33,6 +34,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/analytics", label: "Analiz", icon: ChartColumn },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/my-tasks", label: "My Tasks", icon: CheckSquare },
   { href: "/favorites", label: "Favorites", icon: Star },
