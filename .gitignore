@@ -5,3 +5,7 @@
 *.log
 npm-debug.log*
 .DS_Store
+
+# Staj defteri günlük raporları (yerelde kalsın, GitHub'a push edilmesin)
+STAJ_RAPORU_*.md
+**/STAJ_RAPORU_*.md
