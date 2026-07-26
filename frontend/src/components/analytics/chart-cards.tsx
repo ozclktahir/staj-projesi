@@ -8,7 +8,6 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -24,23 +23,14 @@ import { cn } from "@/lib/utils";
 
 const CHART_H = 220;
 
-/** Yüksek kontrastlı, sabit konumlu grafik ipucu — sadece rakam */
-function CustomTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{ value?: number | string }>;
-}) {
-  if (active && payload && payload.length) {
-    return (
-      <div className="rounded-md border border-border bg-popover px-3 py-1.5 text-lg font-bold text-popover-foreground shadow-md">
-        {payload[0].value}
-      </div>
-    );
-  }
-  return null;
-}
+const WORKLOAD_COLORS = [
+  "#8b5cf6",
+  "#f59e0b",
+  "#10b981",
+  "#ec4899",
+  "#3b82f6",
+  "#ef4444",
+];
 
 function ColorBadges({
   items,
@@ -129,11 +119,6 @@ export function StatusDonutCard({
                     <Cell key={entry.key} fill={entry.fill} />
                   ))}
                 </Pie>
-                <Tooltip
-                  content={<CustomTooltip />}
-                  position={{ x: 10, y: 10 }}
-                  isAnimationActive={false}
-                />
               </PieChart>
             </ResponsiveContainer>
           )}
@@ -211,12 +196,6 @@ export function PriorityBarCard({
                   tickLine={false}
                   width={28}
                 />
-                <Tooltip
-                  content={<CustomTooltip />}
-                  position={{ x: 10, y: 10 }}
-                  cursor={{ fill: "transparent" }}
-                  isAnimationActive={false}
-                />
                 <Bar dataKey="count" name="Görev" radius={[4, 4, 0, 0]}>
                   {chartData.map((entry) => (
                     <Cell key={entry.key} fill={entry.fill} />
@@ -239,7 +218,7 @@ export function PriorityBarCard({
   );
 }
 
-/** Üye iş yükü — stacked Bar */
+/** Üye iş yükü — üye başına renkli Bar */
 export function WorkloadBarCard({
   workload,
   className,
@@ -247,12 +226,11 @@ export function WorkloadBarCard({
   workload: WorkloadItem[];
   className?: string;
 }) {
-  const chartData = workload.map((w) => ({
+  const chartData = workload.map((w, index) => ({
     name: w.name.length > 10 ? `${w.name.slice(0, 8)}…` : w.name,
     fullName: w.name,
     total: w.total,
-    completed: w.completed,
-    open: Math.max(0, w.total - w.completed),
+    color: WORKLOAD_COLORS[index % WORKLOAD_COLORS.length],
   }));
 
   return (
@@ -265,7 +243,7 @@ export function WorkloadBarCard({
       <CardHeader className="space-y-1 px-4 pt-4 pb-1">
         <CardTitle className="text-sm font-semibold">Üye İş Yükü</CardTitle>
         <CardDescription className="text-xs">
-          Atanan / tamamlanan görevler
+          Üye başına atanan görev sayısı
         </CardDescription>
       </CardHeader>
       <CardContent className="px-2 pb-3">
@@ -296,45 +274,26 @@ export function WorkloadBarCard({
                   tickLine={false}
                   width={28}
                 />
-                <Tooltip
-                  content={<CustomTooltip />}
-                  position={{ x: 10, y: 10 }}
-                  cursor={{ fill: "transparent" }}
-                  isAnimationActive={false}
-                />
-                <Bar
-                  dataKey="open"
-                  name="Açık"
-                  stackId="a"
-                  fill="#6366f1"
-                />
-                <Bar
-                  dataKey="completed"
-                  name="Tamamlanan"
-                  stackId="a"
-                  fill="#10b981"
-                  radius={[4, 4, 0, 0]}
-                />
+                <Bar dataKey="total" name="Görev" radius={[4, 4, 0, 0]}>
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={WORKLOAD_COLORS[index % WORKLOAD_COLORS.length]}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
         {chartData.length > 0 ? (
           <ColorBadges
-            items={[
-              {
-                key: "open",
-                label: "Açık",
-                color: "#6366f1",
-                count: chartData.reduce((s, d) => s + d.open, 0),
-              },
-              {
-                key: "done",
-                label: "Tamamlanan",
-                color: "#10b981",
-                count: chartData.reduce((s, d) => s + d.completed, 0),
-              },
-            ]}
+            items={chartData.map((d, index) => ({
+              key: `${d.fullName}-${index}`,
+              label: d.fullName,
+              color: d.color,
+              count: d.total,
+            }))}
           />
         ) : null}
       </CardContent>

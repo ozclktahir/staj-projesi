@@ -6,7 +6,6 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
-  Tooltip,
 } from "recharts";
 import type { ChartSlice } from "@/app/actions/analytics";
 import {
@@ -19,23 +18,6 @@ import {
 import { cn } from "@/lib/utils";
 
 const CHART_BODY_H = "h-[220px]";
-
-function CustomTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{ value?: number | string }>;
-}) {
-  if (active && payload && payload.length) {
-    return (
-      <div className="rounded-md border border-border bg-popover px-3 py-1.5 text-lg font-bold text-popover-foreground shadow-md">
-        {payload[0].value}
-      </div>
-    );
-  }
-  return null;
-}
 
 export function DistributionPieChart({
   title,
@@ -82,11 +64,6 @@ export function DistributionPieChart({
                   <Cell key={entry.key} fill={entry.fill} />
                 ))}
               </Pie>
-              <Tooltip
-                content={<CustomTooltip />}
-                position={{ x: 10, y: 10 }}
-                isAnimationActive={false}
-              />
               <Legend
                 verticalAlign="bottom"
                 height={32}

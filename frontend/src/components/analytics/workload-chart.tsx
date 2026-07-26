@@ -4,9 +4,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
+  Cell,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -20,22 +19,14 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-function CustomTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{ value?: number | string }>;
-}) {
-  if (active && payload && payload.length) {
-    return (
-      <div className="rounded-md border border-border bg-popover px-3 py-1.5 text-lg font-bold text-popover-foreground shadow-md">
-        {payload[0].value}
-      </div>
-    );
-  }
-  return null;
-}
+const WORKLOAD_COLORS = [
+  "#8b5cf6",
+  "#f59e0b",
+  "#10b981",
+  "#ec4899",
+  "#3b82f6",
+  "#ef4444",
+];
 
 export function WorkloadChart({
   workload,
@@ -48,8 +39,6 @@ export function WorkloadChart({
     name: w.name.length > 10 ? `${w.name.slice(0, 8)}…` : w.name,
     fullName: w.name,
     total: w.total,
-    completed: w.completed,
-    open: Math.max(0, w.total - w.completed),
   }));
 
   return (
@@ -62,7 +51,7 @@ export function WorkloadChart({
       <CardHeader className="shrink-0 space-y-1 px-4 pt-4 pb-2">
         <CardTitle className="text-sm font-semibold">Üye İş Yükü</CardTitle>
         <CardDescription className="text-xs">
-          Atanan / tamamlanan görevler
+          Üye başına atanan görev sayısı
         </CardDescription>
       </CardHeader>
       <CardContent className="h-[220px] min-h-0 flex-1 px-2 pb-3">
@@ -97,33 +86,14 @@ export function WorkloadChart({
                 tickLine={false}
                 width={24}
               />
-              <Tooltip
-                content={<CustomTooltip />}
-                position={{ x: 10, y: 10 }}
-                cursor={{ fill: "transparent" }}
-                isAnimationActive={false}
-              />
-              <Legend
-                formatter={(value) => (
-                  <span className="text-[11px] text-muted-foreground">
-                    {value}
-                  </span>
-                )}
-              />
-              <Bar
-                dataKey="open"
-                name="Açık"
-                stackId="a"
-                fill="#6366f1"
-                radius={[0, 0, 0, 0]}
-              />
-              <Bar
-                dataKey="completed"
-                name="Tamamlanan"
-                stackId="a"
-                fill="#10b981"
-                radius={[4, 4, 0, 0]}
-              />
+              <Bar dataKey="total" name="Görev" radius={[4, 4, 0, 0]}>
+                {data.map((_, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={WORKLOAD_COLORS[index % WORKLOAD_COLORS.length]}
+                  />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
