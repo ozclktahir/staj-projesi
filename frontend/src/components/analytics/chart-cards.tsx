@@ -24,6 +24,24 @@ import { cn } from "@/lib/utils";
 
 const CHART_H = 220;
 
+/** Yüksek kontrastlı, sabit konumlu grafik ipucu — sadece rakam */
+function CustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ value?: number | string }>;
+}) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-md border border-border bg-popover px-3 py-1.5 text-lg font-bold text-popover-foreground shadow-md">
+        {payload[0].value}
+      </div>
+    );
+  }
+  return null;
+}
+
 function ColorBadges({
   items,
 }: {
@@ -112,14 +130,9 @@ export function StatusDonutCard({
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value) => [`${value ?? 0} görev`, "Adet"]}
-                  contentStyle={{
-                    borderRadius: 8,
-                    border: "1px solid hsl(var(--border))",
-                    background: "hsl(var(--card))",
-                    color: "hsl(var(--card-foreground))",
-                    fontSize: 12,
-                  }}
+                  content={<CustomTooltip />}
+                  position={{ x: 10, y: 10 }}
+                  isAnimationActive={false}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -199,14 +212,10 @@ export function PriorityBarCard({
                   width={28}
                 />
                 <Tooltip
-                  formatter={(value) => [`${value ?? 0} görev`, "Adet"]}
-                  contentStyle={{
-                    borderRadius: 8,
-                    border: "1px solid hsl(var(--border))",
-                    background: "hsl(var(--card))",
-                    color: "hsl(var(--card-foreground))",
-                    fontSize: 12,
-                  }}
+                  content={<CustomTooltip />}
+                  position={{ x: 10, y: 10 }}
+                  cursor={{ fill: "transparent" }}
+                  isAnimationActive={false}
                 />
                 <Bar dataKey="count" name="Görev" radius={[4, 4, 0, 0]}>
                   {chartData.map((entry) => (
@@ -288,19 +297,10 @@ export function WorkloadBarCard({
                   width={28}
                 />
                 <Tooltip
-                  labelFormatter={(_, payload) => {
-                    const item = payload?.[0]?.payload as
-                      | { fullName?: string }
-                      | undefined;
-                    return item?.fullName ?? "";
-                  }}
-                  contentStyle={{
-                    borderRadius: 8,
-                    border: "1px solid hsl(var(--border))",
-                    background: "hsl(var(--card))",
-                    color: "hsl(var(--card-foreground))",
-                    fontSize: 12,
-                  }}
+                  content={<CustomTooltip />}
+                  position={{ x: 10, y: 10 }}
+                  cursor={{ fill: "transparent" }}
+                  isAnimationActive={false}
                 />
                 <Bar
                   dataKey="open"

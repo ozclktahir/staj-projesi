@@ -20,6 +20,23 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
+function CustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ value?: number | string }>;
+}) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-md border border-border bg-popover px-3 py-1.5 text-lg font-bold text-popover-foreground shadow-md">
+        {payload[0].value}
+      </div>
+    );
+  }
+  return null;
+}
+
 export function WorkloadChart({
   workload,
   className,
@@ -81,19 +98,10 @@ export function WorkloadChart({
                 width={24}
               />
               <Tooltip
-                labelFormatter={(_, payload) => {
-                  const item = payload?.[0]?.payload as
-                    | { fullName?: string }
-                    | undefined;
-                  return item?.fullName ?? "";
-                }}
-                contentStyle={{
-                  borderRadius: 8,
-                  border: "1px solid hsl(var(--border))",
-                  background: "hsl(var(--card))",
-                  color: "hsl(var(--card-foreground))",
-                  fontSize: 12,
-                }}
+                content={<CustomTooltip />}
+                position={{ x: 10, y: 10 }}
+                cursor={{ fill: "transparent" }}
+                isAnimationActive={false}
               />
               <Legend
                 formatter={(value) => (

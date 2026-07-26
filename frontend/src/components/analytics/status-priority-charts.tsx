@@ -20,6 +20,23 @@ import { cn } from "@/lib/utils";
 
 const CHART_BODY_H = "h-[220px]";
 
+function CustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ value?: number | string }>;
+}) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-md border border-border bg-popover px-3 py-1.5 text-lg font-bold text-popover-foreground shadow-md">
+        {payload[0].value}
+      </div>
+    );
+  }
+  return null;
+}
+
 export function DistributionPieChart({
   title,
   description,
@@ -66,14 +83,9 @@ export function DistributionPieChart({
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value) => [`${value ?? 0} görev`, ""]}
-                contentStyle={{
-                  borderRadius: 8,
-                  border: "1px solid hsl(var(--border))",
-                  background: "hsl(var(--card))",
-                  color: "hsl(var(--card-foreground))",
-                  fontSize: 12,
-                }}
+                content={<CustomTooltip />}
+                position={{ x: 10, y: 10 }}
+                isAnimationActive={false}
               />
               <Legend
                 verticalAlign="bottom"
