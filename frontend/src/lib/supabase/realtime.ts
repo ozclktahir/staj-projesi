@@ -115,6 +115,8 @@ export function mapRealtimeTaskRow(
         : ((row.parent_task_id as string | null) ?? null),
     assignee_id: assigneeId,
     assignee: keepAssignee,
+    project_name: previous?.project_name ?? null,
+    workspace_name: previous?.workspace_name ?? null,
     created_at:
       (typeof row.created_at === "string" && row.created_at) ||
       previous?.created_at ||

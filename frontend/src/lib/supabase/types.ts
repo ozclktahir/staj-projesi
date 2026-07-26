@@ -54,6 +54,10 @@ export type ProjectTask = {
   assignee_id?: string | null;
   /** Join edilmiş atanan kullanıcı özeti */
   assignee?: TaskAssignee | null;
+  /** Görevlerim panosu: proje adı (join) */
+  project_name?: string | null;
+  /** Görevlerim panosu: workspace adı (join) */
+  workspace_name?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   created_by?: string | null;

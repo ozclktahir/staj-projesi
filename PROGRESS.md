@@ -383,3 +383,4 @@
 ### [26 Temmuz 2026] - Dashboard Tooltip okunabilirliği
 - Dashboard grafiklerindeki Tooltip okunabilirlik sorunu düzeltildi. CustomTooltip bileşeni oluşturularak sadece rakamların yüksek kontrastla ve sabit bir konumda gösterilmesi sağlandı.
 - Dashboard grafiklerindeki gereksiz Tooltip'ler kaldırılarak arayüz sadeleştirildi. Üye İş Yükü grafiğindeki (Bar Chart) her bir sütuna (üyeye) farklı bir renk atanarak görsellik artırıldı.
+- Kullanıcıya özel 'Görevlerim' sayfası Kişisel Kanban Panosu olarak eklendi. Tüm projelerdeki atanmış görevler tek bir board üzerinde birleştirildi ve sürükle-bırak durum güncelleme desteği getirildi.
