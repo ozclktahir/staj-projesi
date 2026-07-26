@@ -385,3 +385,4 @@
 - Dashboard grafiklerindeki gereksiz Tooltip'ler kaldırılarak arayüz sadeleştirildi. Üye İş Yükü grafiğindeki (Bar Chart) her bir sütuna (üyeye) farklı bir renk atanarak görsellik artırıldı.
 - Kullanıcıya özel 'Görevlerim' sayfası Kişisel Kanban Panosu olarak eklendi. Tüm projelerdeki atanmış görevler tek bir board üzerinde birleştirildi ve sürükle-bırak durum güncelleme desteği getirildi.
 - Projedeki tüm veri çekme ve gönderme fonksiyonları asenkron (async/await) yapıya geçirildi ve try/catch bloklarıyla detaylı hata yönetimi (error handling) entegre edildi.
+- Kullanıcıya özel gizli Kişisel Alan (Personal Workspace) sayfası eklendi. Kişisel notlar, zamanlanmış yapılacaklar listesi (todos) ve Supabase Storage destekli dosya/fotoğraf yükleme özellikleri entegre edildi.

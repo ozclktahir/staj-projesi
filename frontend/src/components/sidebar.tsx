@@ -9,6 +9,7 @@ import {
   ChevronsUpDown,
   FolderKanban,
   LayoutDashboard,
+  NotebookPen,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -51,6 +52,7 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/my-tasks", label: "My Tasks", icon: CheckSquare },
+  { href: "/personal", label: "Kişisel Alan", icon: NotebookPen },
   { href: "/favorites", label: "Favorites", icon: Star },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
