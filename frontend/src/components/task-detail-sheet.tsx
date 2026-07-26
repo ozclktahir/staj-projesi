@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckSquare, Trash2 } from "lucide-react";
+import { CheckSquare, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { getTaskAttachments } from "@/app/actions/attachments";
 import { getTaskComments } from "@/app/actions/comments";
@@ -95,6 +95,10 @@ export function TaskDetailSheet({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [subtaskBusy, setSubtaskBusy] = useState(false);
+  const [togglingSubtaskId, setTogglingSubtaskId] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
@@ -410,47 +414,73 @@ export function TaskDetailSheet({
   }
 
   async function handleAddSubtask() {
-    if (!task || !subtaskDraft.trim()) return;
-    const result = await createSubtask(task.id, subtaskDraft);
-    if (!result.success) {
-      console.error("[TaskDetailSheet] createSubtask:", result.error);
-      toast.error(result.error);
-      return;
+    if (!task || !subtaskDraft.trim() || subtaskBusy) return;
+    setSubtaskBusy(true);
+    try {
+      const result = await createSubtask(task.id, subtaskDraft);
+      if (!result.success) {
+        console.error("[TaskDetailSheet] createSubtask:", result.error);
+        toast.error(result.error);
+        return;
+      }
+      setSubtasks((prev) => [...prev, result.subtask]);
+      setSubtaskDraft("");
+      toast.success("Alt görev eklendi");
+      onTaskUpdated?.({
+        id: task.id,
+        subtask_total: subtasks.length + 1,
+        subtask_done: subtasks.filter((s) => s.done).length,
+      });
+      router.refresh();
+    } catch (error) {
+      console.error("[TaskDetailSheet] createSubtask catch:", error);
+      toast.error("Alt görev eklenirken bir hata oluştu.");
+    } finally {
+      setSubtaskBusy(false);
     }
-    setSubtasks((prev) => [...prev, result.subtask]);
-    setSubtaskDraft("");
-    toast.success("Alt görev eklendi");
-    onTaskUpdated?.({
-      id: task.id,
-      subtask_total: subtasks.length + 1,
-      subtask_done: subtasks.filter((s) => s.done).length,
-    });
-    router.refresh();
   }
 
   async function handleToggleSubtask(id: string) {
-    const result = await toggleSubtask(id);
-    if (!result.success) {
-      console.error("[TaskDetailSheet] toggleSubtask:", result.error);
-      toast.error(result.error);
-      return;
+    if (togglingSubtaskId) return;
+    setTogglingSubtaskId(id);
+    try {
+      const result = await toggleSubtask(id);
+      if (!result.success) {
+        console.error("[TaskDetailSheet] toggleSubtask:", result.error);
+        toast.error(result.error);
+        return;
+      }
+      setSubtasks((prev) =>
+        prev.map((s) => (s.id === id ? result.subtask : s)),
+      );
+      router.refresh();
+    } catch (error) {
+      console.error("[TaskDetailSheet] toggleSubtask catch:", error);
+      toast.error("Alt görev güncellenirken bir hata oluştu.");
+    } finally {
+      setTogglingSubtaskId(null);
     }
-    setSubtasks((prev) =>
-      prev.map((s) => (s.id === id ? result.subtask : s)),
-    );
-    router.refresh();
   }
 
   async function handleDeleteSubtask(id: string) {
-    const result = await deleteSubtask(id);
-    if (!result.success) {
-      console.error("[TaskDetailSheet] deleteSubtask:", result.error);
-      toast.error(result.error);
-      return;
+    if (togglingSubtaskId) return;
+    setTogglingSubtaskId(id);
+    try {
+      const result = await deleteSubtask(id);
+      if (!result.success) {
+        console.error("[TaskDetailSheet] deleteSubtask:", result.error);
+        toast.error(result.error);
+        return;
+      }
+      setSubtasks((prev) => prev.filter((s) => s.id !== id));
+      toast.success("Alt görev silindi");
+      router.refresh();
+    } catch (error) {
+      console.error("[TaskDetailSheet] deleteSubtask catch:", error);
+      toast.error("Alt görev silinirken bir hata oluştu.");
+    } finally {
+      setTogglingSubtaskId(null);
     }
-    setSubtasks((prev) => prev.filter((s) => s.id !== id));
-    toast.success("Alt görev silindi");
-    router.refresh();
   }
 
   const doneCount = subtasks.filter((s) => s.done).length;
@@ -664,11 +694,15 @@ export function TaskDetailSheet({
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!subtaskDraft.trim()}
+                  disabled={!subtaskDraft.trim() || subtaskBusy}
                   onClick={() => void handleAddSubtask()}
                   className="shrink-0 rounded-lg"
                 >
-                  Ekle
+                  {subtaskBusy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    "Ekle"
+                  )}
                 </Button>
               </div>
 
@@ -684,8 +718,9 @@ export function TaskDetailSheet({
                         id={`sub-${item.id}`}
                         type="checkbox"
                         checked={item.done}
+                        disabled={togglingSubtaskId === item.id}
                         onChange={() => void handleToggleSubtask(item.id)}
-                        className="mt-0.5 size-4 rounded border-border accent-primary"
+                        className="mt-0.5 size-4 rounded border-border accent-primary disabled:opacity-50"
                       />
                       <label
                         htmlFor={`sub-${item.id}`}
@@ -699,10 +734,15 @@ export function TaskDetailSheet({
                       <button
                         type="button"
                         aria-label="Alt görevi sil"
+                        disabled={togglingSubtaskId === item.id}
                         onClick={() => void handleDeleteSubtask(item.id)}
-                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                       >
-                        <Trash2 className="size-3.5" />
+                        {togglingSubtaskId === item.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-3.5" />
+                        )}
                       </button>
                     </li>
                   ))}

@@ -372,12 +372,30 @@ export function InviteNotificationsMenu({
 
   const handleNotificationClick = async (n: NotificationItem) => {
     if (!n.isRead) {
-      void markNotificationAsRead(n.id);
       setNotifications((prev) =>
         prev.map((item) =>
           item.id === n.id ? { ...item, isRead: true } : item,
         ),
       );
+      try {
+        const result = await markNotificationAsRead(n.id);
+        if (!result.success) {
+          setNotifications((prev) =>
+            prev.map((item) =>
+              item.id === n.id ? { ...item, isRead: false } : item,
+            ),
+          );
+          toast.error(result.error ?? "Bildirim güncellenemedi");
+        }
+      } catch (error) {
+        console.error("[handleNotificationClick]", error);
+        setNotifications((prev) =>
+          prev.map((item) =>
+            item.id === n.id ? { ...item, isRead: false } : item,
+          ),
+        );
+        toast.error("Bildirim güncellenirken bir hata oluştu");
+      }
     }
 
     const href = taskLinkFromNotification(n);

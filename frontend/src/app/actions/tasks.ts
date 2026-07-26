@@ -1,5 +1,6 @@
 "use server";
 
+import { logActionError } from "@/lib/action-result";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import {
   normalizeTaskStatusInput,
@@ -7,6 +8,10 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
+
+export type GetMyTasksResult =
+  | { success: true; tasks: ProjectTask[] }
+  | { success: false; error: string; tasks: [] };
 
 function normalizePriority(priority: unknown): TaskPriority {
   if (typeof priority !== "string") return "MEDIUM";
@@ -163,10 +168,16 @@ async function enrichProjectNames(
 /**
  * Oturum açmış kullanıcıya atanmış tüm görevleri (tüm projeler) getirir.
  */
-export async function getMyTasks(): Promise<ProjectTask[]> {
+export async function getMyTasks(): Promise<GetMyTasksResult> {
   try {
     const auth = await getAuthenticatedUser();
-    if (!auth) return [];
+    if (!auth) {
+      return {
+        success: false,
+        error: "Oturum bulunamadı. Lütfen tekrar giriş yapın.",
+        tasks: [],
+      };
+    }
 
     const { supabase, user } = auth;
 
@@ -194,7 +205,6 @@ export async function getMyTasks(): Promise<ProjectTask[]> {
         .order("created_at", { ascending: false });
 
       if (fallback.error) {
-        // assigned_to legacy
         const legacy = await supabase
           .from("tasks")
           .select(selectPlain)
@@ -202,7 +212,11 @@ export async function getMyTasks(): Promise<ProjectTask[]> {
           .order("created_at", { ascending: false });
         if (legacy.error) {
           console.error("[getMyTasks]", legacy.error.message);
-          return [];
+          return {
+            success: false,
+            error: "Görevler getirilirken bir hata oluştu.",
+            tasks: [],
+          };
         }
         rows = (legacy.data as Record<string, unknown>[] | null) ?? [];
       } else {
@@ -225,10 +239,16 @@ export async function getMyTasks(): Promise<ProjectTask[]> {
     let tasks = filtered.map(mapTaskRow);
     tasks = await enrichProjectNames(supabase, tasks);
 
-    console.log("[getMyTasks]", { userId: user.id, count: tasks.length });
-    return tasks;
+    return { success: true, tasks };
   } catch (error) {
-    console.error("[getMyTasks]", error);
-    return [];
+    return {
+      success: false,
+      error: logActionError(
+        "getMyTasks",
+        error,
+        "Görevler getirilirken bir hata oluştu.",
+      ),
+      tasks: [],
+    };
   }
 }

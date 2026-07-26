@@ -1,11 +1,13 @@
 "use server";
 
+import { logActionError } from "@/lib/action-result";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 
 export type WorkspaceAccessResult = {
   hasAccess: boolean;
   workspaceCount: number;
   userId: string | null;
+  error?: string;
 };
 
 /**
@@ -49,7 +51,15 @@ export async function ensureWorkspaceAccess(): Promise<WorkspaceAccessResult> {
       userId: user.id,
     };
   } catch (error) {
-    console.error("[ensureWorkspaceAccess]", error);
-    return { hasAccess: false, workspaceCount: 0, userId: null };
+    return {
+      hasAccess: false,
+      workspaceCount: 0,
+      userId: null,
+      error: logActionError(
+        "ensureWorkspaceAccess",
+        error,
+        "Workspace erişimi kontrol edilirken bir hata oluştu.",
+      ),
+    };
   }
 }

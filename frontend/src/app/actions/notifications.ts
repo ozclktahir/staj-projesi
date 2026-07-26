@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { getWorkspaces } from "@/app/actions/workspaces";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
+import { logActionError } from "@/lib/action-result";
 import { formatAuthUserLabel, pickDefaultAdminWorkspace } from "@/lib/member-labels";
 import type { NotificationItem } from "@/lib/notification-utils";
 
@@ -237,7 +238,11 @@ export async function getMyNotifications(limit = 20): Promise<{
       success: false,
       notifications: [],
       unreadCount: 0,
-      error: error instanceof Error ? error.message : "Bildirimler alınamadı.",
+      error: logActionError(
+        "getMyNotifications",
+        error,
+        "Bildirimler getirilirken bir hata oluştu.",
+      ),
     };
   }
 }
@@ -249,10 +254,12 @@ export async function createInviteNotification(input: {
   inviteeUserId: string;
   invitationId: string;
   invitedByName?: string;
-}): Promise<void> {
+}): Promise<{ success: boolean; error?: string }> {
   try {
     const auth = await getAuthenticatedUser();
-    if (!auth) return;
+    if (!auth) {
+      return { success: false, error: "Oturum bulunamadı." };
+    }
 
     const message = `${input.invitedByName ?? "Bir yönetici"} sizi "${input.workspaceName}" çalışma alanına davet etti.`;
     const payload = {
@@ -290,14 +297,27 @@ export async function createInviteNotification(input: {
           is_read: false,
         });
         if (fallback.error) {
-          console.warn("[createInviteNotification]", fallback.error.message);
+          console.error(
+            "[createInviteNotification]",
+            fallback.error.message,
+          );
+          return { success: false, error: fallback.error.message };
         }
-        return;
+        return { success: true };
       }
-      console.warn("[createInviteNotification]", error.message);
+      console.error("[createInviteNotification]", error.message);
+      return { success: false, error: error.message };
     }
+    return { success: true };
   } catch (error) {
-    console.warn("[createInviteNotification] catch", error);
+    return {
+      success: false,
+      error: logActionError(
+        "createInviteNotification",
+        error,
+        "Davet bildirimi oluşturulamadı.",
+      ),
+    };
   }
 }
 
@@ -312,19 +332,25 @@ export async function createTaskAssignedNotification(input: {
   taskTitle: string;
   assigneeUserId: string;
   actorName?: string;
-}): Promise<void> {
+}): Promise<{ success: boolean; error?: string }> {
   try {
     const assigneeId = input.assigneeUserId?.trim();
     const workspaceId = input.workspaceId?.trim();
     const projectId = input.projectId?.trim();
     const taskId = input.taskId?.trim();
-    if (!assigneeId || !workspaceId || !projectId || !taskId) return;
+    if (!assigneeId || !workspaceId || !projectId || !taskId) {
+      return { success: false, error: "Bildirim için gerekli alanlar eksik." };
+    }
 
     const auth = await getAuthenticatedUser();
-    if (!auth) return;
+    if (!auth) {
+      return { success: false, error: "Oturum bulunamadı." };
+    }
 
     // Kendine atama → bildirim yok
-    if (assigneeId === auth.user.id) return;
+    if (assigneeId === auth.user.id) {
+      return { success: true };
+    }
 
     const actor =
       input.actorName?.trim() ||
@@ -377,37 +403,66 @@ export async function createTaskAssignedNotification(input: {
           is_read: false,
         });
         if (fallback.error) {
-          console.warn(
+          console.error(
             "[createTaskAssignedNotification]",
             fallback.error.message,
           );
+          return { success: false, error: fallback.error.message };
         }
-        return;
+        return { success: true };
       }
-      console.warn("[createTaskAssignedNotification]", error.message);
+      console.error("[createTaskAssignedNotification]", error.message);
+      return { success: false, error: error.message };
     }
+    return { success: true };
   } catch (error) {
-    console.warn("[createTaskAssignedNotification] catch", error);
+    return {
+      success: false,
+      error: logActionError(
+        "createTaskAssignedNotification",
+        error,
+        "Görev atama bildirimi oluşturulamadı.",
+      ),
+    };
   }
 }
 
 export async function markNotificationRead(
   notificationId: string,
-): Promise<{ success: boolean }> {
+): Promise<{ success: boolean; error?: string }> {
   try {
     const auth = await getAuthenticatedUser();
-    if (!auth) return { success: false };
+    if (!auth) {
+      return { success: false, error: "Oturum bulunamadı." };
+    }
 
-    await auth.supabase
+    const id = notificationId?.trim();
+    if (!id) {
+      return { success: false, error: "Bildirim kimliği zorunludur." };
+    }
+
+    const { error } = await auth.supabase
       .from("notifications")
       .update({ is_read: true })
-      .eq("id", notificationId)
+      .eq("id", id)
       .eq("user_id", auth.user.id);
+
+    if (error) {
+      console.error("[markNotificationRead]", error.message);
+      return { success: false, error: error.message };
+    }
 
     revalidatePath("/");
     return { success: true };
-  } catch {
-    return { success: false };
+  } catch (error) {
+    return {
+      success: false,
+      error: logActionError(
+        "markNotificationRead",
+        error,
+        "Bildirim okundu olarak işaretlenemedi.",
+      ),
+    };
   }
 }
 
@@ -436,7 +491,11 @@ export async function markAllNotificationsRead(): Promise<{
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "İşlem başarısız.",
+      error: logActionError(
+        "markAllNotificationsRead",
+        error,
+        "Bildirimler okundu olarak işaretlenemedi.",
+      ),
     };
   }
 }
@@ -457,24 +516,35 @@ export async function respondToWorkspaceInvite(
   inviteId: string,
   action: "accept" | "decline",
 ): Promise<{ success: boolean; error?: string; workspaceId?: string }> {
-  const { acceptInvitation, declineInvitation } = await import(
-    "@/app/actions/invitations"
-  );
+  try {
+    const { acceptInvitation, declineInvitation } = await import(
+      "@/app/actions/invitations"
+    );
 
-  if (action === "accept") {
-    const result = await acceptInvitation(inviteId);
+    if (action === "accept") {
+      const result = await acceptInvitation(inviteId);
+      if (!result.success) {
+        return { success: false, error: result.error };
+      }
+      return {
+        success: true,
+        workspaceId: result.workspaceIds[0],
+      };
+    }
+
+    const result = await declineInvitation(inviteId);
     if (!result.success) {
       return { success: false, error: result.error };
     }
+    return { success: true };
+  } catch (error) {
     return {
-      success: true,
-      workspaceId: result.workspaceIds[0],
+      success: false,
+      error: logActionError(
+        "respondToWorkspaceInvite",
+        error,
+        "Davet yanıtlanırken bir hata oluştu.",
+      ),
     };
   }
-
-  const result = await declineInvitation(inviteId);
-  if (!result.success) {
-    return { success: false, error: result.error };
-  }
-  return { success: true };
 }

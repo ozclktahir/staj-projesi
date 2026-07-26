@@ -5,7 +5,10 @@ import { getAuthenticatedUser } from "@/lib/supabase/server";
 
 export default async function MyTasksPage() {
   const auth = await getAuthenticatedUser();
-  const tasks = auth ? await getMyTasks() : [];
+  const result = auth ? await getMyTasks() : null;
+  const tasks = result?.success ? result.tasks : [];
+  const loadError =
+    result && !result.success ? result.error : null;
   const currentUserId = auth?.user.id ?? "";
 
   return (
@@ -29,6 +32,12 @@ export default async function MyTasksPage() {
           </span>
         </div>
       </div>
+
+      {loadError ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {loadError}
+        </div>
+      ) : null}
 
       {!currentUserId ? (
         <div className="rounded-lg border border-dashed border-border bg-card/60 px-6 py-16 text-center text-sm text-muted-foreground">
