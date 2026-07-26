@@ -12,7 +12,9 @@ import {
   CheckSquare,
   Download,
   FileText,
+  Flag,
   ImageIcon,
+  ListTodo,
   Loader2,
   NotebookPen,
   Plus,
@@ -34,6 +36,7 @@ import {
   type PersonalNote,
   type PersonalTodo,
 } from "@/app/actions/personal";
+import { TaskDetailSheet } from "@/components/task-detail-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,15 +47,74 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  TASK_PRIORITY_LABELS,
+  TASK_STATUS_LABELS,
+  type ProjectTask,
+  type TaskStatus,
+} from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 
-type TabId = "notes" | "todos" | "files";
+type TabId = "assigned" | "notes" | "todos" | "files";
 
 const TABS: { id: TabId; label: string; icon: typeof StickyNote }[] = [
+  { id: "assigned", label: "Atanan Görevler", icon: ListTodo },
   { id: "notes", label: "Not Defteri", icon: NotebookPen },
   { id: "todos", label: "Yapılacaklar", icon: CheckSquare },
   { id: "files", label: "Dosyalar", icon: Upload },
 ];
+
+const PROJECT_BADGE_COLORS = [
+  "border-violet-300 bg-violet-100 text-violet-800 dark:border-violet-500/40 dark:bg-violet-500/15 dark:text-violet-300",
+  "border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300",
+  "border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300",
+  "border-pink-300 bg-pink-100 text-pink-800 dark:border-pink-500/40 dark:bg-pink-500/15 dark:text-pink-300",
+  "border-sky-300 bg-sky-100 text-sky-800 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-300",
+  "border-rose-300 bg-rose-100 text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/15 dark:text-rose-300",
+];
+
+function projectBadgeClass(projectId: string | null | undefined): string {
+  if (!projectId) return PROJECT_BADGE_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < projectId.length; i += 1) {
+    hash =
+      (hash + projectId.charCodeAt(i) * (i + 1)) % PROJECT_BADGE_COLORS.length;
+  }
+  return PROJECT_BADGE_COLORS[hash] ?? PROJECT_BADGE_COLORS[0];
+}
+
+function statusClass(status: TaskStatus): string {
+  switch (status) {
+    case "DONE":
+      return "border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300";
+    case "IN_PROGRESS":
+      return "border-indigo-300 bg-indigo-100 text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300";
+    default:
+      return "border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300";
+  }
+}
+
+function priorityClass(priority: ProjectTask["priority"]): string {
+  switch (priority) {
+    case "HIGH":
+      return "text-red-600 dark:text-red-400";
+    case "LOW":
+      return "text-emerald-600 dark:text-emerald-400";
+    default:
+      return "text-amber-600 dark:text-amber-400";
+  }
+}
+
+function formatTaskDue(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  return date.toLocaleDateString("tr-TR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 function formatBytes(size: number | null): string {
   if (size == null || Number.isNaN(size)) return "";
@@ -109,18 +171,27 @@ function isImageName(name: string): boolean {
 }
 
 export function PersonalWorkspace({
+  initialAssignedTasks,
   initialNotes,
   initialTodos,
   initialFiles,
 }: {
+  initialAssignedTasks: ProjectTask[];
   initialNotes: PersonalNote[];
   initialTodos: PersonalTodo[];
   initialFiles: PersonalFile[];
 }) {
-  const [tab, setTab] = useState<TabId>("notes");
+  const [tab, setTab] = useState<TabId>("assigned");
+  const [assignedTasks, setAssignedTasks] = useState(initialAssignedTasks);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [notes, setNotes] = useState(initialNotes);
   const [todos, setTodos] = useState(initialTodos);
   const [files, setFiles] = useState(initialFiles);
+
+  const selectedTask = useMemo(
+    () => assignedTasks.find((t) => t.id === selectedTaskId) ?? null,
+    [assignedTasks, selectedTaskId],
+  );
 
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
@@ -371,6 +442,126 @@ export function PersonalWorkspace({
           </button>
         ))}
       </div>
+
+      {tab === "assigned" ? (
+        <div className="space-y-3">
+          <Card className="rounded-lg border-border shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ListTodo className="size-4 text-primary" />
+                Atanan proje görevleri
+              </CardTitle>
+              <CardDescription>
+                Tüm projelerde sana atanmış görevler — tıklayarak detayı aç
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          {assignedTasks.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border bg-card/60 px-4 py-12 text-center text-sm text-muted-foreground">
+              Henüz sana atanmış proje görevi yok.
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {assignedTasks.map((task) => {
+                const projectLabel = task.project_name?.trim() || "Proje";
+                const dueLabel = formatTaskDue(task.due_date);
+                return (
+                  <li key={task.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTaskId(task.id)}
+                      className="flex w-full flex-col gap-2 rounded-lg border border-border bg-card px-3 py-3 text-left shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/30"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <span
+                            className={cn(
+                              "mb-1.5 inline-flex max-w-full truncate rounded-md border px-2 py-0.5 text-[11px] font-semibold",
+                              projectBadgeClass(task.project_id),
+                            )}
+                            title={
+                              task.workspace_name
+                                ? `${projectLabel} · ${task.workspace_name}`
+                                : projectLabel
+                            }
+                          >
+                            {projectLabel}
+                          </span>
+                          <p className="text-sm font-semibold text-foreground">
+                            {task.title}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-medium",
+                            statusClass(task.status),
+                          )}
+                        >
+                          {TASK_STATUS_LABELS[task.status]}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 font-medium",
+                            priorityClass(task.priority),
+                          )}
+                        >
+                          <Flag className="size-3.5" />
+                          {TASK_PRIORITY_LABELS[task.priority] ??
+                            TASK_PRIORITY_LABELS.MEDIUM}
+                        </span>
+                        {dueLabel ? (
+                          <span className="inline-flex items-center gap-1">
+                            <CalendarDays className="size-3.5" />
+                            {dueLabel}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/70">
+                            Teslim tarihi yok
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {selectedTaskId ? (
+            <TaskDetailSheet
+              taskId={selectedTaskId}
+              initialTask={selectedTask}
+              open
+              onOpenChange={(next) => {
+                if (!next) setSelectedTaskId(null);
+              }}
+              onTaskUpdated={(partial) => {
+                setAssignedTasks((prev) =>
+                  prev.map((t) =>
+                    t.id === partial.id
+                      ? {
+                          ...t,
+                          ...partial,
+                          project_name: t.project_name,
+                          workspace_name: t.workspace_name,
+                        }
+                      : t,
+                  ),
+                );
+              }}
+              onTaskDeleted={(taskId) => {
+                setAssignedTasks((prev) =>
+                  prev.filter((t) => t.id !== taskId),
+                );
+                setSelectedTaskId(null);
+              }}
+            />
+          ) : null}
+        </div>
+      ) : null}
 
       {tab === "notes" ? (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
