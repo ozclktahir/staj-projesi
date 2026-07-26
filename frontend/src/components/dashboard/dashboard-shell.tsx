@@ -14,6 +14,8 @@ export function DashboardShell({
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,14 +53,20 @@ export function DashboardShell({
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      <Sidebar />
+      <Sidebar
+        collapsed={isSidebarCollapsed}
+        onCollapsedChange={setIsSidebarCollapsed}
+        mobileOpen={isMobileNavOpen}
+        onMobileOpenChange={setIsMobileNavOpen}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader
           userName={userName}
           userEmail={userEmail}
           isLoadingUser={isLoadingUser}
+          onOpenMobileNav={() => setIsMobileNavOpen(true)}
         />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );

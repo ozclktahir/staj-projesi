@@ -378,3 +378,4 @@
 - Dashboard üzerindeki 3 ana analitik kartı metin halinden Recharts tabanlı Donut ve Bar grafiklerine dönüştürüldü.
 - Header Bildirim Zili ve Popover paneli tamamlandı. Çalışma alanı davetleri (Kabul Et/Reddet), görev atama bildirimleri, okunmamış rozeti ve canlı senkronizasyon eklendi.
 - Görev oluşturma ve güncelleme eylemlerine (createTask/updateTask) otomatik bildirim tetikleyicisi (notifications insert) eklendi. Görev atanan kullanıcıya anlık bildirim gitmesi sağlandı.
+- Ana layout'taki Sidebar tam boy (h-screen) yapıldı ve açılır-kapanır (collapsible) mekanizması eklendi. Daralmış modda sadece ikonlar gösterilerek ekran alanı optimize edildi.

@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { LogOut, UserRound } from "lucide-react";
+import { LogOut, Menu, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { InviteNotificationsMenu } from "@/components/invite-notifications-menu";
@@ -15,6 +15,7 @@ type AppHeaderProps = {
   userName?: string;
   userEmail?: string | null;
   isLoadingUser?: boolean;
+  onOpenMobileNav?: () => void;
 };
 
 function UserNameSkeleton() {
@@ -30,6 +31,7 @@ function AppHeaderInner({
   userName = "",
   userEmail = null,
   isLoadingUser = false,
+  onOpenMobileNav,
 }: AppHeaderProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { activeWorkspace, activeWorkspaceId, refresh } = useWorkspaces();
@@ -58,12 +60,26 @@ function AppHeaderInner({
   }
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b-2 border-border bg-background/80 px-6 backdrop-blur dark:border-b">
-      <div>
-        <p className="text-sm text-muted-foreground">Genel bakış</p>
-        <h1 className="text-base font-semibold tracking-tight text-foreground">
-          Çalışma alanı
-        </h1>
+    <header className="flex h-16 shrink-0 items-center justify-between border-b-2 border-border bg-background/80 px-4 backdrop-blur sm:px-6 dark:border-b">
+      <div className="flex min-w-0 items-center gap-2">
+        {onOpenMobileNav ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0 md:hidden"
+            onClick={onOpenMobileNav}
+            aria-label="Menüyü aç"
+          >
+            <Menu className="size-5" />
+          </Button>
+        ) : null}
+        <div className="min-w-0">
+          <p className="text-sm text-muted-foreground">Genel bakış</p>
+          <h1 className="truncate text-base font-semibold tracking-tight text-foreground">
+            Çalışma alanı
+          </h1>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
