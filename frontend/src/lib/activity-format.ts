@@ -49,6 +49,10 @@ export function formatActivityMessage(log: ActivityLogItem): string {
     }
     case "task_updated":
       return `${name} "${taskTitle}" görevini güncelledi`;
+    case "task_claim_accepted":
+      return `${name}, '${taskTitle}' görevini kabul etti ve üzerinde çalışmaya başladı.`;
+    case "task_claim_rejected":
+      return `${name}, kendisine atanan '${taskTitle}' görevini reddetti.`;
     default:
       return `${name} bir işlem yaptı`;
   }

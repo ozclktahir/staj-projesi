@@ -8,7 +8,9 @@ export type ActivityActionType =
   | "assignee_changed"
   | "comment_added"
   | "attachment_added"
-  | "task_updated";
+  | "task_updated"
+  | "task_claim_accepted"
+  | "task_claim_rejected";
 
 export type LogActivityInput = {
   workspaceId: string;

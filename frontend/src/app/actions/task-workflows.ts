@@ -729,7 +729,25 @@ export async function respondToTaskClaim(
         },
       }) || "Kullanıcı";
 
-    if (decision === "decline") {
+    if (decision === "accept") {
+      if (workspaceId) {
+        try {
+          await logActivity(supabase, {
+            workspaceId,
+            projectId,
+            taskId,
+            userId: user.id,
+            actionType: "task_claim_accepted",
+            details: {
+              task_title: title,
+              message: `${actorName}, '${title}' görevini kabul etti ve üzerinde çalışmaya başladı.`,
+            },
+          });
+        } catch (logError) {
+          console.warn("[respondToTaskClaim] accept activity log:", logError);
+        }
+      }
+    } else {
       if (workspaceId) {
         const adminIds = await getWorkspaceAdminIds(supabase, workspaceId);
         await Promise.all(
@@ -753,6 +771,23 @@ export async function respondToTaskClaim(
               }),
             ),
         );
+
+        // Görev silinmeden önce proje/görev ilişkili log yaz
+        try {
+          await logActivity(supabase, {
+            workspaceId,
+            projectId,
+            taskId,
+            userId: user.id,
+            actionType: "task_claim_rejected",
+            details: {
+              task_title: title,
+              message: `${actorName}, kendisine atanan '${title}' görevini reddetti.`,
+            },
+          });
+        } catch (logError) {
+          console.warn("[respondToTaskClaim] reject activity log:", logError);
+        }
       }
 
       const { error: deleteError } = await hardOrSoftDeleteTask(
