@@ -335,6 +335,8 @@ export async function createTaskAssignedNotification(input: {
   taskTitle: string;
   assigneeUserId: string;
   actorName?: string;
+  /** Özel mesaj (yeniden atama vb.) */
+  message?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const assigneeId = input.assigneeUserId?.trim();
@@ -360,7 +362,9 @@ export async function createTaskAssignedNotification(input: {
       (await resolveActorDisplayName(auth.supabase, auth.user));
 
     const taskTitle = input.taskTitle?.trim() || "görev";
-    const message = `${actor} sana '${taskTitle}' görevini atadı. Kabul ediyor musunuz?`;
+    const message =
+      input.message?.trim() ||
+      `${actor} sana '${taskTitle}' görevini atadı. Kabul ediyor musunuz?`;
     const link = `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`;
     const payload = {
       project_id: projectId,

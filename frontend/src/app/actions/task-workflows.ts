@@ -619,20 +619,23 @@ export async function respondToTaskClaim(
         return { success: false, error: error.message };
       }
     } else {
-      // Red: önce rejected işaretle (audit), admin bildirimi, sonra görevi sistemden kaldır
+      // Red: görevi silme — arşivle (rejected) ve adminleri bilgilendir
       const { error: rejectError } = await supabase
         .from("tasks")
         .update({
           assignment_status: "rejected" satisfies TaskAssignmentStatus,
-          assignment_pending_at: new Date().toISOString(),
+          assignment_pending_at: null,
         })
         .eq("id", taskId);
 
-      if (
-        rejectError &&
-        !rejectError.message.includes("assignment_status") &&
-        !rejectError.message.includes("assignment_pending_at")
-      ) {
+      if (rejectError) {
+        if (rejectError.message.includes("assignment_status")) {
+          return {
+            success: false,
+            error:
+              "assignment_status sütunu yok. add_task_approval_workflows.sql migration'ını çalıştırın.",
+          };
+        }
         return { success: false, error: rejectError.message };
       }
     }
@@ -675,7 +678,7 @@ export async function respondToTaskClaim(
                 userId: adminId,
                 type: "task_claim_rejected",
                 title: "Görev reddedildi",
-                message: `${actorName}, '${title}' görevini reddetti.`,
+                message: `${actorName}, '${title}' görevini reddetti. Yeniden atamak için Yeni Görev penceresini kullanabilirsiniz.`,
                 link: projectId
                   ? `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`
                   : null,
@@ -688,7 +691,6 @@ export async function respondToTaskClaim(
             ),
         );
 
-        // Görev silinmeden önce proje/görev ilişkili log yaz
         try {
           await logActivity(supabase, {
             workspaceId,
@@ -706,19 +708,6 @@ export async function respondToTaskClaim(
           console.warn("[respondToTaskClaim] reject activity log:", logError);
         }
       }
-
-      const { error: deleteError } = await hardOrSoftDeleteTask(
-        supabase,
-        taskId,
-      );
-      if (deleteError) {
-        return {
-          success: false,
-          error:
-            deleteError.message ||
-            "Görev reddedildi ancak silinemedi. Lütfen tekrar deneyin.",
-        };
-      }
     }
 
     revalidateTaskPaths(projectId);
@@ -727,7 +716,7 @@ export async function respondToTaskClaim(
       message:
         decision === "accept"
           ? "Görev kabul edildi."
-          : "Görev reddedildi ve iptal edildi. Yöneticiler bilgilendirildi.",
+          : "Görev reddedildi. Yöneticiler bilgilendirildi; görev arşivlendi.",
     };
   } catch (error) {
     return {

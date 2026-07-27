@@ -398,3 +398,4 @@
 - Bug Fix: Next.js 'failed-to-find-server-action' hatası giderildi. Bildirim onay/red Server Action bağlantıları doğrudan import yapısına geçirilerek güncellendi.
 - Bug Fix: Görev silme onayındaki veritabanı ilişkili kayıt (foreign key) engeli giderildi ve revalidatePath entegrasyonuyla silinen görevlerin anında arayüzden kalkması sağlandı.
 - Bildirim yönetim sistemi geliştirildi: Zil menüsündeki bildirimler için tek tek silme ve "Tümünü Temizle" özellikleri ile Server Action entegrasyonu sağlandı.
+- Görev reddetme akışı güncellendi: Reddedilen görevler silinmek yerine arşivlendi. "Yeni Görev Ekle" modalına reddedilen görevleri hızlıca seçip başka kullanıcılara yeniden atama (re-assign) desteği getirildi.

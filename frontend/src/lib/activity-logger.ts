@@ -11,7 +11,8 @@ export type ActivityActionType =
   | "attachment_added"
   | "task_updated"
   | "task_claim_accepted"
-  | "task_claim_rejected";
+  | "task_claim_rejected"
+  | "task_reassigned";
 
 export type LogActivityInput = {
   workspaceId: string;

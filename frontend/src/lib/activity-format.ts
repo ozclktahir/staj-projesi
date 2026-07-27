@@ -53,6 +53,12 @@ export function formatActivityMessage(log: ActivityLogItem): string {
       return `${name}, '${taskTitle}' görevini kabul etti ve üzerinde çalışmaya başladı.`;
     case "task_claim_rejected":
       return `${name}, kendisine atanan '${taskTitle}' görevini reddetti.`;
+    case "task_reassigned": {
+      const assignee =
+        (typeof d.new_assignee_name === "string" && d.new_assignee_name) ||
+        "bir kullanıcı";
+      return `${name}, reddedilen '${taskTitle}' görevini ${assignee}'na yeniden atadı.`;
+    }
     default:
       return `${name} bir işlem yaptı`;
   }

@@ -557,6 +557,12 @@ export function ProjectTaskBoard({
 
           if (eventType === "INSERT") {
             if (isTaskSoftDeleted(nextRow)) return;
+            if (
+              String(nextRow.assignment_status ?? "").toLowerCase() ===
+              "rejected"
+            ) {
+              return;
+            }
             const mapped = mapRealtimeTaskRow(nextRow);
             setTasks((prev) => {
               if (prev.some((t) => t.id === mapped.id)) return prev;
@@ -567,6 +573,16 @@ export function ProjectTaskBoard({
 
           if (eventType === "UPDATE") {
             if (isTaskSoftDeleted(nextRow)) {
+              const id = String(nextRow.id);
+              setTasks((prev) => prev.filter((t) => t.id !== id));
+              setSelectedTaskId((cur) => (cur === id ? null : cur));
+              return;
+            }
+
+            const assignmentStatus = String(
+              nextRow.assignment_status ?? "",
+            ).toLowerCase();
+            if (assignmentStatus === "rejected") {
               const id = String(nextRow.id);
               setTasks((prev) => prev.filter((t) => t.id !== id));
               setSelectedTaskId((cur) => (cur === id ? null : cur));
