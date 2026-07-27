@@ -391,3 +391,4 @@
 ### [27 Temmuz 2026] - Kurumsal onay iş akışları
 - Kurumsal iş mantıkları eklendi: Görevler üzerinde ilerleme varsa silme işlemleri için Karşılıklı Onay Sistemi (Admin/User Approval) kuruldu. Yeni atanan görevler için Sahiplenme/Kabul Etme (Task Claim) ve zaman aşımı bildirimleri entegre edildi.
 - Next.js 16 build hatası çözüldü: Server Action dosyasında senkron kalan helper fonksiyonu (isAssignmentClaimOverdue) utils klasörüne taşınarak build uyumluluğu sağlandı.
+- Bug Fix: Kullanıcı bir görevi reddettiğinde görevin veritabanından/arayüzden tamamen silinmesi (iptal edilmesi) sağlandı. Giriş (Auth) sayfaları tamamen Dark Mode arayüzüne zorlandı.

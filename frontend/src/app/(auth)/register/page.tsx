@@ -120,12 +120,10 @@ export default function RegisterPage() {
 
   return (
     <AuthSplitShell>
-      <Card className="rounded-[var(--radius)] border border-border bg-card shadow-xl">
+      <Card className="rounded-[var(--radius)] border border-zinc-800 bg-zinc-900 text-zinc-50 shadow-xl">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl text-foreground">
-            Kayıt Ol
-          </CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl text-zinc-50">Kayıt Ol</CardTitle>
+          <CardDescription className="text-zinc-400">
             Yeni bir hesap oluşturmak için bilgilerini doldur.
           </CardDescription>
         </CardHeader>
@@ -133,68 +131,76 @@ export default function RegisterPage() {
           <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="firstName">Ad</Label>
+                <Label htmlFor="firstName" className="text-zinc-200">
+                  Ad
+                </Label>
                 <Input
                   id="firstName"
                   type="text"
                   autoComplete="given-name"
                   placeholder="Adınız"
-                  className="rounded-[var(--radius)]"
+                  className="rounded-[var(--radius)] border-zinc-800 bg-zinc-950 text-zinc-50 placeholder:text-zinc-500"
                   aria-invalid={Boolean(errors.firstName)}
                   {...register("firstName")}
                 />
                 {errors.firstName ? (
-                  <p className="text-sm text-red-500">
+                  <p className="text-sm text-red-400">
                     {errors.firstName.message}
                   </p>
                 ) : null}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Soyad</Label>
+                <Label htmlFor="lastName" className="text-zinc-200">
+                  Soyad
+                </Label>
                 <Input
                   id="lastName"
                   type="text"
                   autoComplete="family-name"
                   placeholder="Soyadınız"
-                  className="rounded-[var(--radius)]"
+                  className="rounded-[var(--radius)] border-zinc-800 bg-zinc-950 text-zinc-50 placeholder:text-zinc-500"
                   aria-invalid={Boolean(errors.lastName)}
                   {...register("lastName")}
                 />
                 {errors.lastName ? (
-                  <p className="text-sm text-red-500">
+                  <p className="text-sm text-red-400">
                     {errors.lastName.message}
                   </p>
                 ) : null}
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-zinc-200">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
                 autoComplete="email"
                 placeholder="ornek@email.com"
-                className="rounded-[var(--radius)]"
+                className="rounded-[var(--radius)] border-zinc-800 bg-zinc-950 text-zinc-50 placeholder:text-zinc-500"
                 aria-invalid={Boolean(errors.email)}
                 {...register("email")}
               />
               {errors.email ? (
-                <p className="text-sm text-red-500">{errors.email.message}</p>
+                <p className="text-sm text-red-400">{errors.email.message}</p>
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Şifre</Label>
+              <Label htmlFor="password" className="text-zinc-200">
+                Şifre
+              </Label>
               <Input
                 id="password"
                 type="password"
                 autoComplete="new-password"
                 placeholder="En az 6 karakter"
-                className="rounded-[var(--radius)]"
+                className="rounded-[var(--radius)] border-zinc-800 bg-zinc-950 text-zinc-50 placeholder:text-zinc-500"
                 aria-invalid={Boolean(errors.password)}
                 {...register("password")}
               />
               {errors.password ? (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-red-400">
                   {errors.password.message}
                 </p>
               ) : null}
@@ -209,7 +215,7 @@ export default function RegisterPage() {
           </form>
         </CardContent>
         <CardFooter className="justify-center">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-zinc-400">
             Zaten hesabın var mı?{" "}
             <Link
               href="/login"

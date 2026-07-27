@@ -762,6 +762,12 @@ export async function getProjectTasks(
     }
 
     let topLevel = (rows ?? []).filter((row) => {
+      if (row.deleted_at != null && row.deleted_at !== "") return false;
+      const assignmentStatus =
+        typeof row.assignment_status === "string"
+          ? row.assignment_status.toLowerCase()
+          : null;
+      if (assignmentStatus === "rejected") return false;
       if (!("parent_task_id" in row)) return true;
       return row.parent_task_id == null;
     });

@@ -244,6 +244,11 @@ export async function getMyTasks(): Promise<GetMyTasksResult> {
     const filtered = (rows ?? []).filter((row) => {
       if (row.deleted_at != null && row.deleted_at !== "") return false;
       if (row.parent_task_id != null && row.parent_task_id !== "") return false;
+      const assignmentStatus =
+        typeof row.assignment_status === "string"
+          ? row.assignment_status.toLowerCase()
+          : null;
+      if (assignmentStatus === "rejected") return false;
       const assignee =
         (typeof row.assignee_id === "string" && row.assignee_id) ||
         (typeof row.assigned_to === "string" && row.assigned_to) ||

@@ -675,27 +675,42 @@ export async function respondToTaskClaim(
       typeof task.project_id === "string" ? task.project_id : null;
     const title = typeof task.title === "string" ? task.title : "görev";
 
-    const nextStatus: TaskAssignmentStatus =
-      decision === "accept" ? "accepted" : "rejected";
+    if (decision === "accept") {
+      const { error } = await supabase
+        .from("tasks")
+        .update({
+          assignment_status: "accepted" satisfies TaskAssignmentStatus,
+          assignment_pending_at: null,
+        })
+        .eq("id", taskId);
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        assignment_status: nextStatus,
-        assignment_pending_at:
-          decision === "accept" ? null : new Date().toISOString(),
-      })
-      .eq("id", taskId);
-
-    if (error) {
-      if (error.message.includes("assignment_status")) {
-        return {
-          success: false,
-          error:
-            "assignment_status sütunu yok. add_task_approval_workflows.sql migration'ını çalıştırın.",
-        };
+      if (error) {
+        if (error.message.includes("assignment_status")) {
+          return {
+            success: false,
+            error:
+              "assignment_status sütunu yok. add_task_approval_workflows.sql migration'ını çalıştırın.",
+          };
+        }
+        return { success: false, error: error.message };
       }
-      return { success: false, error: error.message };
+    } else {
+      // Red: önce rejected işaretle (audit), admin bildirimi, sonra görevi sistemden kaldır
+      const { error: rejectError } = await supabase
+        .from("tasks")
+        .update({
+          assignment_status: "rejected" satisfies TaskAssignmentStatus,
+          assignment_pending_at: new Date().toISOString(),
+        })
+        .eq("id", taskId);
+
+      if (
+        rejectError &&
+        !rejectError.message.includes("assignment_status") &&
+        !rejectError.message.includes("assignment_pending_at")
+      ) {
+        return { success: false, error: rejectError.message };
+      }
     }
 
     await supabase
@@ -714,29 +729,44 @@ export async function respondToTaskClaim(
         },
       }) || "Kullanıcı";
 
-    if (decision === "decline" && workspaceId) {
-      const adminIds = await getWorkspaceAdminIds(supabase, workspaceId);
-      await Promise.all(
-        adminIds
-          .filter((id) => id !== user.id)
-          .map((adminId) =>
-            insertNotification(supabase, {
-              workspaceId,
-              userId: adminId,
-              type: "task_claim_rejected",
-              title: "Görev reddedildi",
-              message: `${actorName} '${title}' görevini reddetti.`,
-              link: projectId
-                ? `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`
-                : null,
-              payload: {
-                task_id: taskId,
-                project_id: projectId,
-                task_title: title,
-              },
-            }),
-          ),
+    if (decision === "decline") {
+      if (workspaceId) {
+        const adminIds = await getWorkspaceAdminIds(supabase, workspaceId);
+        await Promise.all(
+          adminIds
+            .filter((id) => id !== user.id)
+            .map((adminId) =>
+              insertNotification(supabase, {
+                workspaceId,
+                userId: adminId,
+                type: "task_claim_rejected",
+                title: "Görev reddedildi",
+                message: `${actorName} '${title}' görevini reddetti.`,
+                link: projectId
+                  ? `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`
+                  : null,
+                payload: {
+                  task_id: taskId,
+                  project_id: projectId,
+                  task_title: title,
+                },
+              }),
+            ),
+        );
+      }
+
+      const { error: deleteError } = await hardOrSoftDeleteTask(
+        supabase,
+        taskId,
       );
+      if (deleteError) {
+        return {
+          success: false,
+          error:
+            deleteError.message ||
+            "Görev reddedildi ancak silinemedi. Lütfen tekrar deneyin.",
+        };
+      }
     }
 
     revalidateTaskPaths(projectId);
@@ -745,7 +775,7 @@ export async function respondToTaskClaim(
       message:
         decision === "accept"
           ? "Görev kabul edildi."
-          : "Görev reddedildi. Yöneticiler bilgilendirildi.",
+          : "Görev reddedildi ve iptal edildi. Yöneticiler bilgilendirildi.",
     };
   } catch (error) {
     return {

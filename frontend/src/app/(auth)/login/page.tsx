@@ -123,35 +123,37 @@ export default function LoginPage() {
 
   return (
     <AuthSplitShell>
-      <Card className="rounded-[var(--radius)] border border-border bg-card shadow-xl">
+      <Card className="rounded-[var(--radius)] border border-zinc-800 bg-zinc-900 text-zinc-50 shadow-xl">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl text-foreground">
-            Giriş Yap
-          </CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl text-zinc-50">Giriş Yap</CardTitle>
+          <CardDescription className="text-zinc-400">
             Hesabınıza giriş yapmak için e-posta ve şifrenizi girin.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-zinc-200">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
                 autoComplete="email"
                 placeholder="ornek@email.com"
-                className="rounded-[var(--radius)]"
+                className="rounded-[var(--radius)] border-zinc-800 bg-zinc-950 text-zinc-50 placeholder:text-zinc-500"
                 aria-invalid={Boolean(errors.email)}
                 {...register("email")}
               />
               {errors.email ? (
-                <p className="text-sm text-red-500">{errors.email.message}</p>
+                <p className="text-sm text-red-400">{errors.email.message}</p>
               ) : null}
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="password">Şifre</Label>
+                <Label htmlFor="password" className="text-zinc-200">
+                  Şifre
+                </Label>
                 <Link
                   href="#"
                   className="text-sm font-medium text-primary transition-colors hover:text-primary/80"
@@ -164,12 +166,12 @@ export default function LoginPage() {
                 type="password"
                 autoComplete="current-password"
                 placeholder="••••••••"
-                className="rounded-[var(--radius)]"
+                className="rounded-[var(--radius)] border-zinc-800 bg-zinc-950 text-zinc-50 placeholder:text-zinc-500"
                 aria-invalid={Boolean(errors.password)}
                 {...register("password")}
               />
               {errors.password ? (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-red-400">
                   {errors.password.message}
                 </p>
               ) : null}
@@ -184,7 +186,7 @@ export default function LoginPage() {
           </form>
         </CardContent>
         <CardFooter className="justify-center">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-zinc-400">
             Hesabın yok mu?{" "}
             <Link
               href="/register"
