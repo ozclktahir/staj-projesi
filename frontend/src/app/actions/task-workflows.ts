@@ -13,8 +13,6 @@ import {
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const CLAIM_SLA_HOURS = 24;
-
 export type DeleteTaskWorkflowResult =
   | {
       success: true;
@@ -760,15 +758,3 @@ export async function respondToTaskClaim(
     };
   }
 }
-
-export function isAssignmentClaimOverdue(
-  pendingAt: string | null | undefined,
-  hours = CLAIM_SLA_HOURS,
-): boolean {
-  if (!pendingAt) return false;
-  const ms = new Date(pendingAt).getTime();
-  if (Number.isNaN(ms)) return false;
-  return Date.now() - ms > hours * 60 * 60 * 1000;
-}
-
-export { CLAIM_SLA_HOURS };

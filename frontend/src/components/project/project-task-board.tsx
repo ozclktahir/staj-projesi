@@ -51,7 +51,7 @@ import {
 } from "@/lib/supabase/realtime";
 import { createAuthedRealtimeClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { isAssignmentClaimOverdue } from "@/lib/task-workflow-ui";
+import { isAssignmentClaimOverdue } from "@/lib/utils";
 
 type ProjectTaskBoardProps = {
   tasks: ProjectTask[];
