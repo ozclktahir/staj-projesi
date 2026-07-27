@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  clearAllNotifications,
+  deleteNotification,
   getMyNotifications,
   getMyPendingInvitations,
   markAllNotificationsAsRead,
@@ -118,6 +120,7 @@ export function InviteNotificationsMenu({
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
   const [resolvedActionIds, setResolvedActionIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -447,6 +450,62 @@ export function InviteNotificationsMenu({
     }
   };
 
+  const handleDeleteNotification = async (notificationId: string) => {
+    const previous = notifications;
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+    knownIdsRef.current.delete(notificationId);
+    setBusyId(notificationId);
+
+    try {
+      const result = await deleteNotification(notificationId);
+      if (!result.success) {
+        setNotifications(previous);
+        toast.error(result.error ?? "Bildirim silinemedi");
+        return;
+      }
+    } catch (error) {
+      setNotifications(previous);
+      toast.error(
+        error instanceof Error ? error.message : "Bildirim silinemedi",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleClearAllNotifications = async () => {
+    if (notifications.length === 0) return;
+    const confirmed =
+      typeof window !== "undefined"
+        ? window.confirm(
+            "Tüm bildirimler kalıcı olarak silinecek. Devam edilsin mi?",
+          )
+        : true;
+    if (!confirmed) return;
+
+    const previous = notifications;
+    setClearingAll(true);
+    setNotifications([]);
+    knownIdsRef.current = new Set();
+
+    try {
+      const result = await clearAllNotifications();
+      if (!result.success) {
+        setNotifications(previous);
+        toast.error(result.error ?? "Bildirimler temizlenemedi");
+        return;
+      }
+      toast.success("Tüm bildirimler temizlendi");
+    } catch (error) {
+      setNotifications(previous);
+      toast.error(
+        error instanceof Error ? error.message : "Bildirimler temizlenemedi",
+      );
+    } finally {
+      setClearingAll(false);
+    }
+  };
+
   const handleNotificationClick = async (n: NotificationItem) => {
     if (!n.isRead) {
       setNotifications((prev) =>
@@ -517,20 +576,35 @@ export function InviteNotificationsMenu({
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               {unreadCount > 0
                 ? `${unreadCount} okunmamış bildirim`
-                : "Tümü okundu"}
+                : notifications.length > 0
+                  ? "Tümü okundu"
+                  : "Liste boş"}
             </p>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 shrink-0 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-            disabled={markingAll || unreadCount === 0}
-            onClick={() => void handleMarkAllRead()}
-          >
-            <CheckCheck className="size-3.5" />
-            Tümünü Okundu İşaretle
-          </Button>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+              disabled={markingAll || unreadCount === 0}
+              onClick={() => void handleMarkAllRead()}
+            >
+              <CheckCheck className="size-3.5" />
+              Tümünü Okundu İşaretle
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-[11px] text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={clearingAll || notifications.length === 0}
+              onClick={() => void handleClearAllNotifications()}
+            >
+              <Trash2 className="size-3.5" />
+              {clearingAll ? "Temizleniyor…" : "Tümünü Temizle"}
+            </Button>
+          </div>
         </div>
         <DropdownMenuSeparator />
 
@@ -547,7 +621,7 @@ export function InviteNotificationsMenu({
                 <BellOff className="size-5" />
               </span>
               <p className="text-sm font-medium text-foreground">
-                Henüz yeni bir bildiriminiz yok
+                Hiç bildiriminiz yok 🎉
               </p>
               <p className="text-xs text-muted-foreground">
                 Davetler, görev atamaları ve hatırlatmalar burada görünür.
@@ -655,9 +729,23 @@ export function InviteNotificationsMenu({
                 return (
                   <li
                     key={entry.key}
-                    className="rounded-lg border border-border bg-accent/40 p-3"
+                    className="group relative rounded-lg border border-border bg-accent/40 p-3"
                   >
-                    <div className="flex gap-2.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1.5 top-1.5 size-7 text-muted-foreground opacity-70 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                      disabled={busyId === n.id}
+                      aria-label="Bildirimi sil"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleDeleteNotification(n.id);
+                      }}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                    <div className="flex gap-2.5 pr-7">
                       <span
                         className={cn(
                           "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full",
@@ -714,12 +802,12 @@ export function InviteNotificationsMenu({
               }
 
               return (
-                <li key={entry.key}>
+                <li key={entry.key} className="group relative">
                   <button
                     type="button"
                     onClick={() => void handleNotificationClick(n)}
                     className={cn(
-                      "flex w-full gap-2.5 rounded-lg border border-transparent px-2.5 py-2.5 text-left transition-colors hover:bg-muted/50",
+                      "flex w-full gap-2.5 rounded-lg border border-transparent px-2.5 py-2.5 pr-9 text-left transition-colors hover:bg-muted/50",
                       !n.isRead && "border-border/60 bg-accent/40",
                     )}
                   >
@@ -748,6 +836,20 @@ export function InviteNotificationsMenu({
                       </p>
                     </div>
                   </button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1.5 size-7 text-muted-foreground opacity-70 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                    disabled={busyId === n.id}
+                    aria-label="Bildirimi sil"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleDeleteNotification(n.id);
+                    }}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
                 </li>
               );
             })}

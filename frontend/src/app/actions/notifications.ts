@@ -495,6 +495,90 @@ export async function markAllNotificationsRead(): Promise<{
   }
 }
 
+/** Tek bildirimi sil */
+export async function deleteNotification(
+  notificationId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const auth = await getAuthenticatedUser();
+    if (!auth) {
+      return { success: false, error: "Oturum bulunamadı." };
+    }
+
+    const id = notificationId?.trim();
+    if (!id) {
+      return { success: false, error: "Bildirim kimliği zorunludur." };
+    }
+
+    const { error } = await auth.supabase
+      .from("notifications")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", auth.user.id);
+
+    if (error) {
+      console.error("[deleteNotification]", error.message);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath("/");
+    revalidatePath("/personal");
+    revalidatePath("/projects");
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: logActionError(
+        "deleteNotification",
+        error,
+        "Bildirim silinemedi.",
+      ),
+    };
+  }
+}
+
+/** Kullanıcının tüm bildirimlerini temizle */
+export async function clearAllNotifications(): Promise<{
+  success: boolean;
+  error?: string;
+  deletedCount?: number;
+}> {
+  try {
+    const auth = await getAuthenticatedUser();
+    if (!auth) {
+      return { success: false, error: "Oturum bulunamadı." };
+    }
+
+    const { data, error } = await auth.supabase
+      .from("notifications")
+      .delete()
+      .eq("user_id", auth.user.id)
+      .select("id");
+
+    if (error) {
+      console.error("[clearAllNotifications]", error.message);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath("/");
+    revalidatePath("/personal");
+    revalidatePath("/projects");
+    return {
+      success: true,
+      deletedCount: Array.isArray(data) ? data.length : 0,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: logActionError(
+        "clearAllNotifications",
+        error,
+        "Bildirimler temizlenemedi.",
+      ),
+    };
+  }
+}
+
 /** Alias: getNotifications */
 export const getNotifications = getMyNotifications;
 
