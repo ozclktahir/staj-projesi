@@ -393,3 +393,4 @@
 - Next.js 16 build hatası çözüldü: Server Action dosyasında senkron kalan helper fonksiyonu (isAssignmentClaimOverdue) utils klasörüne taşınarak build uyumluluğu sağlandı.
 - Bug Fix: Kullanıcı bir görevi reddettiğinde görevin veritabanından/arayüzden tamamen silinmesi (iptal edilmesi) sağlandı. Giriş (Auth) sayfaları tamamen Dark Mode arayüzüne zorlandı.
 - Kullanıcı deneyimi için Toast bildirimlerine manuel kapatma (X) butonu eklendi. Görev kabul etme ve reddetme aksiyonları Activity Log (Aktivite Günlüğü) tablosuna entegre edildi.
+- Bug Fix: Bildirimlerde ve Aktivite Günlüğünde "Bir kullanıcı" yerine aksiyonu gerçekleştiren kişinin gerçek adının (dinamik olarak) gösterilmesi sağlandı.

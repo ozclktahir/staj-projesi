@@ -8,6 +8,7 @@ import type { TaskAttachment } from "@/lib/supabase/types";
 import {
   formatPersonName,
   loadProfilesByIds,
+  resolveActorDisplayName,
   resolveMemberDisplayFields,
 } from "@/lib/member-labels";
 
@@ -211,12 +212,14 @@ export async function createTaskAttachment(input: {
       typeof task?.project_id === "string" ? task.project_id : null;
 
     if (workspaceId) {
+      const actorName = await resolveActorDisplayName(supabase, user);
       await logActivity(supabase, {
         workspaceId,
         projectId,
         taskId,
         userId: user.id,
         actionType: "attachment_added",
+        actorName,
         details: {
           task_title:
             typeof task?.title === "string" ? task.title : "görev",
@@ -229,11 +232,7 @@ export async function createTaskAttachment(input: {
       revalidatePath(`/project/${projectId}`);
     }
 
-    const profile =
-      (await loadProfilesByIds(supabase, [user.id])).get(user.id) ?? null;
-    const fields = resolveMemberDisplayFields(profile, user.email ?? null);
-    const name =
-      formatPersonName(profile, user.email ?? null) || fields.displayName;
+    const name = await resolveActorDisplayName(supabase, user);
 
     return {
       success: true,

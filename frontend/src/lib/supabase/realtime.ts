@@ -185,7 +185,10 @@ export function mapRealtimeActivityRow(
     actionType: String(row.action_type ?? row.action ?? ""),
     details,
     createdAt: (row.created_at as string | null) ?? null,
-    actorName: "Bir kullanıcı",
+    actorName:
+      (typeof details.actor_name === "string" && details.actor_name.trim()) ||
+      (typeof details.actorName === "string" && details.actorName.trim()) ||
+      "Bilinmeyen Kullanıcı",
     actorAvatarUrl: null,
   };
 }

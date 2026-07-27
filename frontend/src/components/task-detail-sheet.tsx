@@ -17,7 +17,7 @@ import { updateTask } from "@/app/actions/update-task";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { getWorkspaceMembers } from "@/app/actions/workspace-members";
 import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
-import { cleanText, emailLocalPart } from "@/lib/member-labels";
+import { cleanText, emailLocalPart, formatPersonName } from "@/lib/member-labels";
 import { DeleteTaskModal } from "@/components/delete-task-modal";
 import { TaskActivityFeed } from "@/components/task/task-activity-feed";
 import { TaskAttachments } from "@/components/task/task-attachments";
@@ -243,17 +243,29 @@ export function TaskDetailSheet({
         (typeof row.content === "string" && row.content) ||
         (typeof row.body === "string" && row.body) ||
         "";
-      const mapped: TaskComment = {
-        id: String(row.id),
-        task_id: taskId,
-        content,
-        user_id: (row.user_id as string | null) ?? null,
-        author_name: "Bir kullanıcı",
-        author_avatar_url: null,
-        is_own: false,
-        created_at: (row.created_at as string | null) ?? null,
-      };
+      const userId = (row.user_id as string | null) ?? null;
+      const commentId = String(row.id);
+
       setComments((prev) => {
+        const known =
+          (userId &&
+            prev.find(
+              (c) =>
+                c.user_id === userId &&
+                cleanText(c.author_name) &&
+                c.author_name.toLowerCase() !== "bir kullanıcı",
+            )?.author_name) ||
+          null;
+        const mapped: TaskComment = {
+          id: commentId,
+          task_id: taskId,
+          content,
+          user_id: userId,
+          author_name: known || "Bilinmeyen Kullanıcı",
+          author_avatar_url: null,
+          is_own: false,
+          created_at: (row.created_at as string | null) ?? null,
+        };
         if (prev.some((c) => c.id === mapped.id)) {
           return prev.map((c) =>
             c.id === mapped.id ? { ...c, content: mapped.content } : c,
@@ -262,6 +274,39 @@ export function TaskDetailSheet({
         return [...prev, mapped];
       });
       setActivityKey((k) => k + 1);
+
+      if (userId) {
+        void client
+          .from("profiles")
+          .select("id, email, full_name, first_name, last_name, avatar_url")
+          .eq("id", userId)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (!data || typeof data !== "object") return;
+            const profile = data as Record<string, unknown>;
+            const name =
+              formatPersonName(profile, null) ||
+              emailLocalPart(
+                typeof profile.email === "string" ? profile.email : null,
+              ) ||
+              "Bilinmeyen Kullanıcı";
+            const avatar =
+              typeof profile.avatar_url === "string"
+                ? profile.avatar_url
+                : null;
+            setComments((prev) =>
+              prev.map((c) =>
+                c.id === commentId
+                  ? {
+                      ...c,
+                      author_name: name,
+                      author_avatar_url: avatar,
+                    }
+                  : c,
+              ),
+            );
+          });
+      }
     };
 
     const applyAttachmentRow = (
@@ -277,28 +322,65 @@ export function TaskDetailSheet({
         return;
       }
       if (!row.id) return;
-      const mapped: TaskAttachment = {
-        id: String(row.id),
-        task_id: taskId,
-        user_id: (row.user_id as string | null) ?? null,
-        file_name: (row.file_name as string) ?? "dosya",
-        file_url: (row.file_url as string) ?? "",
-        file_size:
-          row.file_size === null || row.file_size === undefined
-            ? null
-            : String(row.file_size),
-        storage_path: (row.storage_path as string | null) ?? null,
-        uploader_name: "Bir kullanıcı",
-        is_own: false,
-        created_at: (row.created_at as string | null) ?? null,
-      };
+      const userId = (row.user_id as string | null) ?? null;
+      const attachmentId = String(row.id);
+
       setAttachments((prev) => {
+        const known =
+          (userId &&
+            prev.find((a) => {
+              const uploader = a.uploader_name ?? "";
+              return (
+                a.user_id === userId &&
+                Boolean(cleanText(uploader)) &&
+                uploader.toLowerCase() !== "bir kullanıcı"
+              );
+            })?.uploader_name) ||
+          null;
+        const mapped: TaskAttachment = {
+          id: attachmentId,
+          task_id: taskId,
+          user_id: userId,
+          file_name: (row.file_name as string) ?? "dosya",
+          file_url: (row.file_url as string) ?? "",
+          file_size:
+            row.file_size === null || row.file_size === undefined
+              ? null
+              : String(row.file_size),
+          storage_path: (row.storage_path as string | null) ?? null,
+          uploader_name: known || "Bilinmeyen Kullanıcı",
+          is_own: false,
+          created_at: (row.created_at as string | null) ?? null,
+        };
         if (prev.some((a) => a.id === mapped.id)) {
           return prev.map((a) => (a.id === mapped.id ? mapped : a));
         }
         return [mapped, ...prev];
       });
       setActivityKey((k) => k + 1);
+
+      if (userId) {
+        void client
+          .from("profiles")
+          .select("id, email, full_name, first_name, last_name")
+          .eq("id", userId)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (!data || typeof data !== "object") return;
+            const profile = data as Record<string, unknown>;
+            const name =
+              formatPersonName(profile, null) ||
+              emailLocalPart(
+                typeof profile.email === "string" ? profile.email : null,
+              ) ||
+              "Bilinmeyen Kullanıcı";
+            setAttachments((prev) =>
+              prev.map((a) =>
+                a.id === attachmentId ? { ...a, uploader_name: name } : a,
+              ),
+            );
+          });
+      }
     };
 
     const channel = client

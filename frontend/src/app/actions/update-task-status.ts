@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-logger";
+import { resolveActorDisplayName } from "@/lib/member-labels";
 import {
   normalizeTaskStatusInput,
   taskStatusDbVariants,
@@ -151,6 +152,7 @@ export async function updateTaskStatus(
         : null;
 
     if (workspaceId && oldStatus !== persisted) {
+      const actorName = await resolveActorDisplayName(supabase, user);
       await logActivity(supabase, {
         workspaceId,
         projectId:
@@ -159,6 +161,7 @@ export async function updateTaskStatus(
         taskId: id,
         userId: user.id,
         actionType: "status_changed",
+        actorName,
         details: {
           old_value: oldStatus ?? before?.status ?? null,
           new_value: persisted,

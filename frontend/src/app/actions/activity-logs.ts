@@ -62,8 +62,20 @@ async function enrich(
     const uid = typeof row.user_id === "string" ? row.user_id : "";
     const profile = profiles.get(uid) ?? null;
     const fields = resolveMemberDisplayFields(profile, null);
-    const name = formatPersonName(profile, fields.email) || fields.displayName;
-    return mapRow(row, name || "Kullanıcı", fields.avatarUrl);
+    const details =
+      row.details && typeof row.details === "object"
+        ? (row.details as Record<string, unknown>)
+        : {};
+    const fromDetails =
+      (typeof details.actor_name === "string" && details.actor_name.trim()) ||
+      (typeof details.actorName === "string" && details.actorName.trim()) ||
+      "";
+    const name =
+      formatPersonName(profile, fields.email) ||
+      fields.displayName ||
+      fromDetails ||
+      "Bilinmeyen Kullanıcı";
+    return mapRow(row, name, fields.avatarUrl);
   });
 }
 

@@ -5,7 +5,10 @@ import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { getWorkspaces } from "@/app/actions/workspaces";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
 import { logActionError } from "@/lib/action-result";
-import { formatAuthUserLabel, pickDefaultAdminWorkspace } from "@/lib/member-labels";
+import {
+  pickDefaultAdminWorkspace,
+  resolveActorDisplayName,
+} from "@/lib/member-labels";
 import type { NotificationItem } from "@/lib/notification-utils";
 
 export type { NotificationItem } from "@/lib/notification-utils";
@@ -354,16 +357,7 @@ export async function createTaskAssignedNotification(input: {
 
     const actor =
       input.actorName?.trim() ||
-      formatAuthUserLabel({
-        email: auth.user.email,
-        user_metadata: auth.user.user_metadata as {
-          first_name?: string;
-          last_name?: string;
-          full_name?: string;
-          display_name?: string;
-        },
-      }) ||
-      "Bir kullanıcı";
+      (await resolveActorDisplayName(auth.supabase, auth.user));
 
     const taskTitle = input.taskTitle?.trim() || "görev";
     const message = `${actor} sana '${taskTitle}' görevini atadı. Kabul ediyor musunuz?`;

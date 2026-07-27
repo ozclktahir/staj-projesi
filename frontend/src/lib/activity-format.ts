@@ -23,7 +23,7 @@ export function formatActivityMessage(log: ActivityLogItem): string {
   const d = log.details;
   const taskTitle =
     (typeof d.task_title === "string" && d.task_title) || "görev";
-  const name = log.actorName || "Bir kullanıcı";
+  const name = log.actorName || "Bilinmeyen Kullanıcı";
 
   switch (log.actionType) {
     case "task_created":

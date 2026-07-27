@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { logActionError } from "@/lib/action-result";
 import { logActivity } from "@/lib/activity-logger";
-import { formatAuthUserLabel } from "@/lib/member-labels";
+import { resolveActorDisplayName } from "@/lib/member-labels";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import {
   normalizeTaskStatusInput,
@@ -256,12 +256,14 @@ export async function requestOrDeleteTask(
     // İlerleme yok → doğrudan sil
     if (!hasProgress) {
       if (workspaceId) {
+        const actorName = await resolveActorDisplayName(supabase, user);
         await logActivity(supabase, {
           workspaceId,
           projectId,
           taskId: id,
           userId: user.id,
           actionType: "task_deleted",
+          actorName,
           details: { task_title: title, mode: "direct" },
         });
       }
@@ -288,16 +290,7 @@ export async function requestOrDeleteTask(
       };
     }
 
-    const actorName =
-      formatAuthUserLabel({
-        email: user.email,
-        user_metadata: user.user_metadata as {
-          first_name?: string;
-          last_name?: string;
-          full_name?: string;
-          display_name?: string;
-        },
-      }) || "Bir kullanıcı";
+    const actorName = await resolveActorDisplayName(supabase, user);
 
     const link = projectId
       ? `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`
@@ -313,6 +306,7 @@ export async function requestOrDeleteTask(
           taskId: id,
           userId: user.id,
           actionType: "task_deleted",
+          actorName,
           details: { task_title: title, mode: "admin_direct_no_assignee" },
         });
         const { error } = await hardOrSoftDeleteTask(supabase, id);
@@ -576,12 +570,14 @@ export async function respondToTaskDeletion(
 
     // Accept → sil
     if (workspaceId) {
+      const actorName = await resolveActorDisplayName(supabase, user);
       await logActivity(supabase, {
         workspaceId,
         projectId,
         taskId,
         userId: user.id,
         actionType: "task_deleted",
+        actorName,
         details: { task_title: title, mode: "approved_deletion" },
       });
     }
@@ -718,16 +714,7 @@ export async function respondToTaskClaim(
       .update({ is_read: true })
       .eq("id", notifId);
 
-    const actorName =
-      formatAuthUserLabel({
-        email: user.email,
-        user_metadata: user.user_metadata as {
-          first_name?: string;
-          last_name?: string;
-          full_name?: string;
-          display_name?: string;
-        },
-      }) || "Kullanıcı";
+    const actorName = await resolveActorDisplayName(supabase, user);
 
     if (decision === "accept") {
       if (workspaceId) {
@@ -738,6 +725,7 @@ export async function respondToTaskClaim(
             taskId,
             userId: user.id,
             actionType: "task_claim_accepted",
+            actorName,
             details: {
               task_title: title,
               message: `${actorName}, '${title}' görevini kabul etti ve üzerinde çalışmaya başladı.`,
@@ -759,7 +747,7 @@ export async function respondToTaskClaim(
                 userId: adminId,
                 type: "task_claim_rejected",
                 title: "Görev reddedildi",
-                message: `${actorName} '${title}' görevini reddetti.`,
+                message: `${actorName}, '${title}' görevini reddetti.`,
                 link: projectId
                   ? `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`
                   : null,
@@ -780,6 +768,7 @@ export async function respondToTaskClaim(
             taskId,
             userId: user.id,
             actionType: "task_claim_rejected",
+            actorName,
             details: {
               task_title: title,
               message: `${actorName}, kendisine atanan '${title}' görevini reddetti.`,

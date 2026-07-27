@@ -6,9 +6,9 @@ import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-logger";
 import type { TaskComment } from "@/lib/supabase/types";
 import {
-  formatAuthUserLabel,
   formatPersonName,
   loadProfilesByIds,
+  resolveActorDisplayName,
   resolveMemberDisplayFields,
 } from "@/lib/member-labels";
 
@@ -333,12 +333,14 @@ export async function createComment(
       typeof task?.project_id === "string" ? task.project_id : null;
 
     if (workspaceId) {
+      const actorName = await resolveActorDisplayName(supabase, user);
       await logActivity(supabase, {
         workspaceId,
         projectId,
         taskId: id,
         userId: user.id,
         actionType: "comment_added",
+        actorName,
         details: {
           task_title:
             typeof task?.title === "string" ? task.title : "görev",
@@ -351,28 +353,17 @@ export async function createComment(
       revalidatePath(`/project/${projectId}`);
     }
 
-    const authorName = formatAuthUserLabel({
-      email: user.email,
-      user_metadata: user.user_metadata as {
-        first_name?: string;
-        last_name?: string;
-        full_name?: string;
-        display_name?: string;
-      },
-    });
-
+    const resolvedAuthor = await resolveActorDisplayName(supabase, user);
     const profile =
       (await loadProfilesByIds(supabase, [user.id])).get(user.id) ?? null;
     const fields = resolveMemberDisplayFields(profile, user.email ?? null);
-    const resolvedAuthor =
-      formatPersonName(profile, user.email ?? null) || authorName;
 
     return {
       success: true,
       comment: mapComment(
         data,
         {
-          name: resolvedAuthor || authorName,
+          name: resolvedAuthor,
           avatarUrl: fields.avatarUrl,
           email: fields.email,
         },

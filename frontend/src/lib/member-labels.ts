@@ -29,6 +29,7 @@ const PLACEHOLDER_LABELS = new Set([
   "kullanıcı yükleniyor...",
   "kullanıcı yükleniyor",
   "kullanıcı",
+  "bir kullanıcı",
   "hesap",
   "user",
   "loading",
@@ -166,6 +167,50 @@ export function formatAuthUserLabel(input?: {
       email: input.email,
     },
     input.email,
+  );
+}
+
+/**
+ * Bildirim / aktivite logları için aktör adı.
+ * Auth metadata → profiles → e-posta → "Bilinmeyen Kullanıcı"
+ */
+export async function resolveActorDisplayName(
+  supabase: SupabaseClient,
+  user: {
+    id: string;
+    email?: string | null;
+    user_metadata?: Record<string, unknown> | null;
+  },
+): Promise<string> {
+  const meta = user.user_metadata ?? {};
+  const fromAuth = formatAuthUserLabel({
+    email: user.email,
+    user_metadata: {
+      first_name:
+        typeof meta.first_name === "string" ? meta.first_name : undefined,
+      last_name:
+        typeof meta.last_name === "string" ? meta.last_name : undefined,
+      full_name:
+        typeof meta.full_name === "string" ? meta.full_name : undefined,
+      display_name:
+        typeof meta.display_name === "string" ? meta.display_name : undefined,
+    },
+  });
+  if (fromAuth) return fromAuth;
+
+  try {
+    const profiles = await loadProfilesByIds(supabase, [user.id]);
+    const profile = profiles.get(user.id) ?? null;
+    const fromProfile = formatPersonName(profile, user.email ?? null);
+    if (fromProfile) return fromProfile;
+  } catch (error) {
+    console.warn("[resolveActorDisplayName] profile lookup:", error);
+  }
+
+  return (
+    emailLocalPart(user.email) ||
+    cleanText(user.email) ||
+    "Bilinmeyen Kullanıcı"
   );
 }
 

@@ -5,9 +5,9 @@ import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-logger";
 import { createTaskAssignedNotification } from "@/app/actions/notifications";
 import {
-  formatAuthUserLabel,
   formatPersonName,
   loadProfilesByIds,
+  resolveActorDisplayName,
   resolveMemberDisplayFields,
 } from "@/lib/member-labels";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
@@ -256,6 +256,7 @@ export async function updateTask(
       "görev";
 
     if (workspaceId) {
+      const actorName = await resolveActorDisplayName(supabase, user);
       const oldStatus = normalizeTaskStatusInput(existing.status);
       const newStatus = normalizeTaskStatusInput(row.status);
       if (
@@ -270,6 +271,7 @@ export async function updateTask(
           taskId,
           userId: user.id,
           actionType: "status_changed",
+          actorName,
           details: {
             old_value: oldStatus,
             new_value: newStatus,
@@ -292,6 +294,7 @@ export async function updateTask(
           taskId,
           userId: user.id,
           actionType: "priority_changed",
+          actorName,
           details: {
             old_value: oldPriority,
             new_value: newPriority,
@@ -328,6 +331,7 @@ export async function updateTask(
             taskId,
             userId: user.id,
             actionType: "assignee_changed",
+            actorName,
             details: {
               old_value: oldAssignee,
               new_value: newAssignee,
@@ -337,15 +341,6 @@ export async function updateTask(
           });
 
           if (newAssignee && newAssignee !== user.id && projectId) {
-            const actorName = formatAuthUserLabel({
-              email: user.email,
-              user_metadata: user.user_metadata as {
-                first_name?: string;
-                last_name?: string;
-                full_name?: string;
-                display_name?: string;
-              },
-            });
             await createTaskAssignedNotification({
               workspaceId,
               projectId,
@@ -369,6 +364,7 @@ export async function updateTask(
           taskId,
           userId: user.id,
           actionType: "task_updated",
+          actorName,
           details: { task_title: taskTitle },
         });
       }

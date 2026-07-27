@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cleanText } from "@/lib/member-labels";
 
 export type ActivityActionType =
   | "task_created"
@@ -19,6 +20,8 @@ export type LogActivityInput = {
   taskId?: string | null;
   userId: string;
   actionType: ActivityActionType | string;
+  /** Realtime ve UI için details.actor_name olarak saklanır */
+  actorName?: string | null;
   details?: Record<string, unknown>;
 };
 
@@ -39,12 +42,22 @@ export async function logActivity(
 
     const projectId = input.projectId?.trim() || null;
     const taskId = input.taskId?.trim() || null;
+    const actorName =
+      cleanText(input.actorName) ||
+      cleanText(input.details?.actor_name) ||
+      cleanText(input.details?.actorName) ||
+      null;
+
+    const details: Record<string, unknown> = {
+      ...(input.details ?? {}),
+      ...(actorName ? { actor_name: actorName } : {}),
+    };
 
     const fullPayload: Record<string, unknown> = {
       workspace_id: workspaceId,
       user_id: userId,
       action_type: actionType,
-      details: input.details ?? {},
+      details,
       // Nest uyumluluğu
       entity_type: taskId ? "task" : projectId ? "project" : "workspace",
       entity_id: taskId || projectId || workspaceId,
@@ -72,7 +85,7 @@ export async function logActivity(
         entity_id: taskId || projectId || workspaceId,
         action: actionType,
         details: {
-          ...(input.details ?? {}),
+          ...details,
           ...(projectId ? { project_id: projectId } : {}),
           ...(taskId ? { task_id: taskId } : {}),
           action_type: actionType,
