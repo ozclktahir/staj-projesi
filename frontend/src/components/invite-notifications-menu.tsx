@@ -24,14 +24,16 @@ import {
   type PendingInvitationItem,
 } from "@/app/actions/notifications";
 import {
+  approveTaskDeletion,
+  rejectTaskDeletion,
   respondToTaskClaim,
-  respondToTaskDeletion,
 } from "@/app/actions/task-workflows";
 import {
   getNotificationKind,
   invitationIdFromNotification,
   isActionableTaskNotification,
   isWorkspaceInviteNotification,
+  taskIdFromNotification,
   taskLinkFromNotification,
 } from "@/lib/notification-utils";
 import { Button } from "@/components/ui/button";
@@ -116,6 +118,9 @@ export function InviteNotificationsMenu({
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const [resolvedActionIds, setResolvedActionIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const knownIdsRef = useRef<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
@@ -370,16 +375,24 @@ export function InviteNotificationsMenu({
     const kind = getNotificationKind(notification);
     setBusyId(notification.id);
     try {
-      const result =
-        kind === "task_deletion_request"
-          ? await respondToTaskDeletion(notification.id, action)
-          : await respondToTaskClaim(notification.id, action);
+      let result: { success: boolean; message?: string; error?: string };
+
+      if (kind === "task_deletion_request") {
+        const taskId = taskIdFromNotification(notification) ?? "";
+        result =
+          action === "accept"
+            ? await approveTaskDeletion(taskId, notification.id)
+            : await rejectTaskDeletion(taskId, notification.id);
+      } else {
+        result = await respondToTaskClaim(notification.id, action);
+      }
 
       if (!result.success) {
         toast.error(result.error ?? "İşlem başarısız");
         return;
       }
 
+      setResolvedActionIds((prev) => new Set(prev).add(notification.id));
       setNotifications((prev) =>
         prev.map((n) =>
           n.id === notification.id ? { ...n, isRead: true } : n,
@@ -592,7 +605,9 @@ export function InviteNotificationsMenu({
 
               const n = entry.item;
               const kind = getNotificationKind(n);
-              const actionable = isActionableTaskNotification(n);
+              const actionable =
+                isActionableTaskNotification(n) &&
+                !resolvedActionIds.has(n.id);
               const Icon =
                 kind === "task_assigned" || kind === "task_claim_request"
                   ? ClipboardList
@@ -613,7 +628,7 @@ export function InviteNotificationsMenu({
                       ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400"
                       : "bg-muted text-muted-foreground";
 
-              if (actionable && !n.isRead) {
+              if (actionable) {
                 return (
                   <li
                     key={entry.key}
@@ -652,7 +667,7 @@ export function InviteNotificationsMenu({
                             {busyId === n.id
                               ? "…"
                               : kind === "task_deletion_request"
-                                ? "Onayla"
+                                ? "Silmeyi Onayla"
                                 : "Kabul Et"}
                           </Button>
                           <Button

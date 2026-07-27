@@ -157,7 +157,17 @@ async function taskHasProgress(
   status: string | null,
 ): Promise<boolean> {
   const canonical = normalizeTaskStatusInput(status);
+  // TODO dışındaki her durum = ilerleme
   if (canonical && canonical !== "TODO") return true;
+  // Tanınmayan ama boş/"todo" olmayan status de ilerleme sayılır
+  if (
+    typeof status === "string" &&
+    status.trim() &&
+    !canonical &&
+    status.trim().toLowerCase() !== "todo"
+  ) {
+    return true;
+  }
 
   const { count: commentCount } = await supabase
     .from("task_comments")
@@ -178,11 +188,98 @@ async function taskHasProgress(
     .select("*", { count: "exact", head: true })
     .eq("parent_task_id", taskId);
 
-  return (subtaskCount ?? 0) > 0;
+  if ((subtaskCount ?? 0) > 0) return true;
+
+  return false;
+}
+
+export type TaskDeletionPreview = {
+  success: true;
+  hasProgress: boolean;
+  isAdmin: boolean;
+  requiresApproval: boolean;
+  approvalTarget: "admin" | "assignee" | null;
+  message: string;
+} | { success: false; error: string };
+
+/** Silme modalı için önizleme — UI uyarı metni */
+export async function getTaskDeletionPreview(
+  taskId: string,
+): Promise<TaskDeletionPreview> {
+  try {
+    const id = taskId?.trim() ?? "";
+    if (!id) return { success: false, error: "Görev kimliği zorunludur." };
+
+    const auth = await getAuthenticatedUser();
+    if (!auth) return { success: false, error: "Oturum bulunamadı." };
+
+    const { supabase, user } = auth;
+    const { data: existing, error } = await supabase
+      .from("tasks")
+      .select("id, status, workspace_id, assignee_id, assigned_to, deletion_status")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error || !existing) {
+      return { success: false, error: "Görev bulunamadı." };
+    }
+
+    const workspaceId =
+      typeof existing.workspace_id === "string" ? existing.workspace_id : null;
+    let isAdmin = false;
+    if (workspaceId) {
+      const roleCtx = await resolveWorkspaceRole(
+        supabase,
+        workspaceId,
+        user.id,
+      );
+      isAdmin = roleCtx.isAdmin;
+    }
+
+    const hasProgress = await taskHasProgress(
+      supabase,
+      id,
+      typeof existing.status === "string" ? existing.status : null,
+    );
+
+    if (!hasProgress) {
+      return {
+        success: true,
+        hasProgress: false,
+        isAdmin,
+        requiresApproval: false,
+        approvalTarget: null,
+        message: "Bu görevde ilerleme yok; silme işlemi doğrudan gerçekleşir.",
+      };
+    }
+
+    return {
+      success: true,
+      hasProgress: true,
+      isAdmin,
+      requiresApproval: true,
+      approvalTarget: isAdmin ? "assignee" : "admin",
+      message: isAdmin
+        ? "Bu görevde ilerleme olduğu için silme talebi atanan kullanıcıya iletilecektir."
+        : "Bu görevde ilerleme olduğu için silme talebi yöneticiye iletilecektir.",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: logActionError(
+        "getTaskDeletionPreview",
+        error,
+        "Silme önizlemesi alınamadı.",
+      ),
+    };
+  }
 }
 
 /**
- * Silme iş akışı: doğrudan sil veya karşılıklı onay iste.
+ * Silme iş akışı (kurşun geçirmez):
+ * - İlerleme yok → doğrudan sil
+ * - İlerleme + üye → pending_admin_approval + admin bildirimi (ASLA silme)
+ * - İlerleme + admin → pending_user_approval + atanan bildirimi (ASLA silme)
  */
 export async function requestOrDeleteTask(
   taskId: string,
@@ -199,6 +296,7 @@ export async function requestOrDeleteTask(
     }
 
     const { supabase, user } = auth;
+    const currentUserId = user.id;
 
     const { data: existing, error: fetchError } = await supabase
       .from("tasks")
@@ -223,20 +321,29 @@ export async function requestOrDeleteTask(
     const title =
       typeof existing.title === "string" ? existing.title : "görev";
 
-    let isAdmin = false;
-    if (workspaceId) {
-      const roleCtx = await resolveWorkspaceRole(
-        supabase,
-        workspaceId,
-        user.id,
-      );
-      isAdmin = roleCtx.isAdmin;
-      if (!isAdmin && assignee !== user.id && existing.created_by !== user.id) {
-        return { success: false, error: "Bu görevi silme yetkiniz yok." };
-      }
+    if (!workspaceId) {
+      return {
+        success: false,
+        error: "Workspace bilgisi olmayan görev silinemez.",
+      };
     }
 
-    const currentDeletion = String(existing.deletion_status ?? "none");
+    const roleCtx = await resolveWorkspaceRole(
+      supabase,
+      workspaceId,
+      currentUserId,
+    );
+    const isAdmin = roleCtx.isAdmin;
+
+    if (
+      !isAdmin &&
+      assignee !== currentUserId &&
+      existing.created_by !== currentUserId
+    ) {
+      return { success: false, error: "Bu görevi silme yetkiniz yok." };
+    }
+
+    const currentDeletion = String(existing.deletion_status ?? "none").toLowerCase();
     if (
       currentDeletion === "pending_admin_approval" ||
       currentDeletion === "pending_user_approval"
@@ -253,20 +360,18 @@ export async function requestOrDeleteTask(
       typeof existing.status === "string" ? existing.status : null,
     );
 
-    // İlerleme yok → doğrudan sil
+    // ── Durum A: İlerleme yok → doğrudan sil ──
     if (!hasProgress) {
-      if (workspaceId) {
-        const actorName = await resolveActorDisplayName(supabase, user);
-        await logActivity(supabase, {
-          workspaceId,
-          projectId,
-          taskId: id,
-          userId: user.id,
-          actionType: "task_deleted",
-          actorName,
-          details: { task_title: title, mode: "direct" },
-        });
-      }
+      const actorName = await resolveActorDisplayName(supabase, user);
+      await logActivity(supabase, {
+        workspaceId,
+        projectId,
+        taskId: id,
+        userId: currentUserId,
+        actionType: "task_deleted",
+        actorName,
+        details: { task_title: title, mode: "direct_no_progress" },
+      });
 
       const { error } = await hardOrSoftDeleteTask(supabase, id);
       if (error) {
@@ -283,65 +388,41 @@ export async function requestOrDeleteTask(
       };
     }
 
-    if (!workspaceId) {
-      return {
-        success: false,
-        error: "Workspace bilgisi olmadan onaylı silme yapılamaz.",
-      };
-    }
-
+    // ── Durum B: İlerleme var → ASLA doğrudan silme ──
     const actorName = await resolveActorDisplayName(supabase, user);
-
     const link = projectId
       ? `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`
       : null;
+    const requestedAt = new Date().toISOString();
 
     if (isAdmin) {
-      // Admin → kullanıcı onayı
+      // Admin → kullanıcı onayı zorunlu
       if (!assignee) {
-        // Atanan yoksa admin doğrudan silebilir
-        await logActivity(supabase, {
-          workspaceId,
-          projectId,
-          taskId: id,
-          userId: user.id,
-          actionType: "task_deleted",
-          actorName,
-          details: { task_title: title, mode: "admin_direct_no_assignee" },
-        });
-        const { error } = await hardOrSoftDeleteTask(supabase, id);
-        if (error) return { success: false, error: error.message };
-        revalidateTaskPaths(projectId);
         return {
-          success: true,
-          taskId: id,
-          projectId,
-          mode: "deleted",
-          message: "Görev silindi.",
+          success: false,
+          error:
+            "Bu görevde ilerleme var ancak atanan kullanıcı yok. Onaylı silme için önce bir kullanıcı atayın.",
         };
       }
 
       const { error } = await supabase
         .from("tasks")
         .update({
-          deletion_status: "pending_user_approval",
-          deletion_requested_by: user.id,
-          deletion_requested_at: new Date().toISOString(),
+          deletion_status: "pending_user_approval" satisfies TaskDeletionStatus,
+          deletion_requested_by: currentUserId,
+          deletion_requested_at: requestedAt,
         })
         .eq("id", id);
 
       if (error) {
-        // Sütun yoksa doğrudan sil (migration uygulanmamış olabilir)
-        if (error.message.includes("deletion_status")) {
-          const del = await hardOrSoftDeleteTask(supabase, id);
-          if (del.error) return { success: false, error: del.error.message };
-          revalidateTaskPaths(projectId);
+        if (
+          error.message.includes("deletion_status") ||
+          error.message.includes("deletion_requested")
+        ) {
           return {
-            success: true,
-            taskId: id,
-            projectId,
-            mode: "deleted",
-            message: "Görev silindi.",
+            success: false,
+            error:
+              "Silme onay sütunları henüz yok. add_task_approval_workflows.sql migration'ını Supabase'te çalıştırın.",
           };
         }
         return { success: false, error: error.message };
@@ -352,7 +433,7 @@ export async function requestOrDeleteTask(
         userId: assignee,
         type: "task_deletion_request",
         title: "Silme onayı gerekli",
-        message: `${actorName} '${title}' görevini silmek/kapatmak istiyor. Onaylıyor musun?`,
+        message: `${actorName} (Admin), '${title}' görevini silmek istiyor. Onaylıyor musun?`,
         link,
         payload: {
           task_id: id,
@@ -360,6 +441,7 @@ export async function requestOrDeleteTask(
           workspace_id: workspaceId,
           task_title: title,
           action: "deletion_user_approval",
+          requested_by: currentUserId,
         },
       });
 
@@ -371,34 +453,55 @@ export async function requestOrDeleteTask(
         mode: "approval_requested",
         deletionStatus: "pending_user_approval",
         message:
-          "Silme isteği atanan kullanıcıya gönderildi. Onay bekleniyor.",
+          "Silme isteği atanan kullanıcıya gönderildi. Onay bekleniyor — görev silinmedi.",
       };
     }
 
-    // Üye → admin onayı
+    // Üye → admin onayı zorunlu (görev SİLİNMEZ)
     const { error } = await supabase
       .from("tasks")
       .update({
-        deletion_status: "pending_admin_approval",
-        deletion_requested_by: user.id,
-        deletion_requested_at: new Date().toISOString(),
+        deletion_status: "pending_admin_approval" satisfies TaskDeletionStatus,
+        deletion_requested_by: currentUserId,
+        deletion_requested_at: requestedAt,
       })
       .eq("id", id);
 
     if (error) {
-      if (error.message.includes("deletion_status")) {
+      if (
+        error.message.includes("deletion_status") ||
+        error.message.includes("deletion_requested")
+      ) {
         return {
           success: false,
           error:
-            "Silme onay sütunları henüz yok. add_task_approval_workflows.sql migration'ını çalıştırın.",
+            "Silme onay sütunları henüz yok. add_task_approval_workflows.sql migration'ını Supabase'te çalıştırın.",
         };
       }
       return { success: false, error: error.message };
     }
 
     const adminIds = (await getWorkspaceAdminIds(supabase, workspaceId)).filter(
-      (uid) => uid !== user.id,
+      (uid) => uid !== currentUserId,
     );
+
+    if (adminIds.length === 0) {
+      // Rollback pending status — onaylayacak admin yok
+      await supabase
+        .from("tasks")
+        .update({
+          deletion_status: "none",
+          deletion_requested_by: null,
+          deletion_requested_at: null,
+        })
+        .eq("id", id);
+
+      return {
+        success: false,
+        error:
+          "Onaylayacak yönetici bulunamadı. Silme isteği oluşturulamadı; görev silinmedi.",
+      };
+    }
 
     await Promise.all(
       adminIds.map((adminId) =>
@@ -407,7 +510,7 @@ export async function requestOrDeleteTask(
           userId: adminId,
           type: "task_deletion_request",
           title: "Silme onayı gerekli",
-          message: `${actorName} '${title}' görevini silmek istiyor. Onaylıyor musunuz?`,
+          message: `${actorName}, '${title}' görevini silmek için onay istiyor.`,
           link,
           payload: {
             task_id: id,
@@ -415,6 +518,7 @@ export async function requestOrDeleteTask(
             workspace_id: workspaceId,
             task_title: title,
             action: "deletion_admin_approval",
+            requested_by: currentUserId,
           },
         }),
       ),
@@ -427,7 +531,8 @@ export async function requestOrDeleteTask(
       projectId,
       mode: "approval_requested",
       deletionStatus: "pending_admin_approval",
-      message: "Silme isteği yöneticilere iletildi. Onay bekleniyor.",
+      message:
+        "Silme isteği yöneticilere iletildi. Onay bekleniyor — görev silinmedi.",
     };
   } catch (error) {
     return {
@@ -471,6 +576,15 @@ export async function respondToTaskDeletion(
       return { success: false, error: "Bildirim bulunamadı." };
     }
 
+    const notifType = String(notif.type ?? "").toLowerCase();
+    if (
+      notifType &&
+      !notifType.includes("deletion") &&
+      notifType !== "task_deletion_request"
+    ) {
+      // Tip boş olabilir; metadata ile devam et
+    }
+
     const meta =
       (notif.payload && typeof notif.payload === "object"
         ? (notif.payload as Record<string, unknown>)
@@ -502,36 +616,47 @@ export async function respondToTaskDeletion(
     const projectId =
       typeof task.project_id === "string" ? task.project_id : null;
     const title = typeof task.title === "string" ? task.title : "görev";
-    const deletionStatus = String(task.deletion_status ?? "none");
+    const deletionStatus = String(task.deletion_status ?? "none").toLowerCase();
 
-    if (workspaceId) {
-      const roleCtx = await resolveWorkspaceRole(
-        supabase,
-        workspaceId,
-        user.id,
-      );
-      const assignee =
-        (typeof task.assignee_id === "string" && task.assignee_id) ||
-        (typeof task.assigned_to === "string" && task.assigned_to) ||
-        null;
+    if (
+      deletionStatus !== "pending_admin_approval" &&
+      deletionStatus !== "pending_user_approval"
+    ) {
+      return {
+        success: false,
+        error: "Bu görev için bekleyen bir silme onayı yok.",
+      };
+    }
 
-      if (deletionStatus === "pending_admin_approval" && !roleCtx.isAdmin) {
-        return { success: false, error: "Bu onay yalnızca yöneticilere açık." };
-      }
-      if (
-        deletionStatus === "pending_user_approval" &&
-        assignee !== user.id &&
-        !roleCtx.isAdmin
-      ) {
-        return {
-          success: false,
-          error: "Bu onay yalnızca atanan kullanıcıya açık.",
-        };
-      }
+    if (!workspaceId) {
+      return { success: false, error: "Workspace bilgisi eksik." };
+    }
+
+    const roleCtx = await resolveWorkspaceRole(
+      supabase,
+      workspaceId,
+      user.id,
+    );
+    const assignee =
+      (typeof task.assignee_id === "string" && task.assignee_id) ||
+      (typeof task.assigned_to === "string" && task.assigned_to) ||
+      null;
+
+    if (deletionStatus === "pending_admin_approval" && !roleCtx.isAdmin) {
+      return { success: false, error: "Bu onay yalnızca yöneticilere açık." };
+    }
+    if (
+      deletionStatus === "pending_user_approval" &&
+      assignee !== user.id
+    ) {
+      return {
+        success: false,
+        error: "Bu onay yalnızca atanan kullanıcıya açık.",
+      };
     }
 
     if (decision === "decline") {
-      await supabase
+      const { error: resetError } = await supabase
         .from("tasks")
         .update({
           deletion_status: "none",
@@ -540,23 +665,27 @@ export async function respondToTaskDeletion(
         })
         .eq("id", taskId);
 
+      if (resetError) {
+        return { success: false, error: resetError.message };
+      }
+
       await supabase
         .from("notifications")
         .update({ is_read: true })
         .eq("id", notifId);
 
-      // İsteği yapan kişiye bilgi
       const requester =
         typeof task.deletion_requested_by === "string"
           ? task.deletion_requested_by
           : null;
-      if (requester && workspaceId && requester !== user.id) {
+      if (requester && requester !== user.id) {
+        const rejectorName = await resolveActorDisplayName(supabase, user);
         await insertNotification(supabase, {
           workspaceId,
           userId: requester,
           type: "task_deletion_rejected",
           title: "Silme isteği reddedildi",
-          message: `'${title}' görevi için silme onayı reddedildi.`,
+          message: `${rejectorName}, '${title}' görevi için silme onayını reddetti.`,
           link: projectId
             ? `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`
             : null,
@@ -565,22 +694,24 @@ export async function respondToTaskDeletion(
       }
 
       revalidateTaskPaths(projectId);
-      return { success: true, message: "Silme isteği reddedildi." };
+      return { success: true, message: "Silme isteği reddedildi. Görev duruyor." };
     }
 
     // Accept → sil
-    if (workspaceId) {
-      const actorName = await resolveActorDisplayName(supabase, user);
-      await logActivity(supabase, {
-        workspaceId,
-        projectId,
-        taskId,
-        userId: user.id,
-        actionType: "task_deleted",
-        actorName,
-        details: { task_title: title, mode: "approved_deletion" },
-      });
-    }
+    const actorName = await resolveActorDisplayName(supabase, user);
+    await logActivity(supabase, {
+      workspaceId,
+      projectId,
+      taskId,
+      userId: user.id,
+      actionType: "task_deleted",
+      actorName,
+      details: {
+        task_title: title,
+        mode: "approved_deletion",
+        message: `${actorName}, '${title}' görevinin silinmesini onayladı.`,
+      },
+    });
 
     const { error } = await hardOrSoftDeleteTask(supabase, taskId);
     if (error) return { success: false, error: error.message };
@@ -602,6 +733,24 @@ export async function respondToTaskDeletion(
       ),
     };
   }
+}
+
+/** Açık API: silme onayını kabul et */
+export async function approveTaskDeletion(
+  taskId: string,
+  notificationId: string,
+): Promise<RespondResult> {
+  void taskId;
+  return respondToTaskDeletion(notificationId, "accept");
+}
+
+/** Açık API: silme onayını reddet */
+export async function rejectTaskDeletion(
+  taskId: string,
+  notificationId: string,
+): Promise<RespondResult> {
+  void taskId;
+  return respondToTaskDeletion(notificationId, "decline");
 }
 
 export async function respondToTaskClaim(

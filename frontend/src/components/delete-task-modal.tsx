@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { deleteTask } from "@/app/actions/delete-task";
+import { getTaskDeletionPreview } from "@/app/actions/task-workflows";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,7 +26,10 @@ type DeleteTaskModalProps = {
   /** true ise metinler admin silme onayı diline kayar */
   isAdmin?: boolean;
   onDeleted?: (taskId: string) => void;
-  onApprovalRequested?: (taskId: string, deletionStatus: TaskDeletionStatus) => void;
+  onApprovalRequested?: (
+    taskId: string,
+    deletionStatus: TaskDeletionStatus,
+  ) => void;
 };
 
 export function DeleteTaskModal({
@@ -37,16 +41,51 @@ export function DeleteTaskModal({
   onApprovalRequested,
 }: DeleteTaskModalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [previewMessage, setPreviewMessage] = useState<string | null>(null);
+  const [requiresApproval, setRequiresApproval] = useState(false);
 
   const pending =
     task?.deletion_status === "pending_admin_approval" ||
     task?.deletion_status === "pending_user_approval";
+
+  useEffect(() => {
+    if (!open || !task?.id || pending) {
+      setPreviewMessage(null);
+      setRequiresApproval(false);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const preview = await getTaskDeletionPreview(task.id);
+      if (cancelled) return;
+      if (!preview.success) {
+        setPreviewMessage(null);
+        setRequiresApproval(false);
+        return;
+      }
+      setRequiresApproval(preview.requiresApproval);
+      setPreviewMessage(preview.message);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, task?.id, pending]);
 
   const onConfirm = async () => {
     if (!task?.id || pending) return;
     setIsDeleting(true);
 
     try {
+      if (requiresApproval) {
+        toast.message(
+          isAdmin
+            ? "Bu görevde ilerleme olduğu için silme talebi kullanıcıya iletilecektir."
+            : "Bu görevde ilerleme olduğu için silme talebi yöneticiye iletilecektir.",
+        );
+      }
+
       const result = await deleteTask(task.id);
       if (!result.success) {
         console.error("[DeleteTaskModal]", result.error);
@@ -85,11 +124,19 @@ export function DeleteTaskModal({
       <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-destructive">
-            {isAdmin ? "Görevi Sil / Kapat" : "Silme İsteği"}
+            {pending
+              ? "Onay Bekleniyor"
+              : requiresApproval
+                ? isAdmin
+                  ? "Silme Onayı İste"
+                  : "Silme İsteği Gönder"
+                : "Görevi Sil"}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {pending ? (
               <>Bu görev için zaten bir silme onayı bekleniyor.</>
+            ) : previewMessage ? (
+              <>{previewMessage}</>
             ) : isAdmin ? (
               <>
                 Görevde ilerleme varsa atanan kullanıcıdan onay istenir; yoksa
@@ -130,9 +177,11 @@ export function DeleteTaskModal({
           >
             {isDeleting
               ? "İşleniyor..."
-              : isAdmin
-                ? "Sil / Onay İste"
-                : "Silme İsteği Gönder"}
+              : requiresApproval
+                ? isAdmin
+                  ? "Kullanıcıdan Onay İste"
+                  : "Yöneticiye İstek Gönder"
+                : "Sil"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -740,8 +740,8 @@ export function TaskDetailSheet({
                   task.deletion_status === "pending_user_approval"
                     ? "Bu görev için silme onayı bekleniyor."
                     : isAdmin
-                      ? "İlerleme varsa atanan kullanıcıdan onay istenir."
-                      : "İlerleme varsa yöneticilerden onay istenir; aksi halde doğrudan silinir."}
+                      ? "İlerleme varsa silme talebi atanan kullanıcıya iletilir; görev onaylanmadan silinmez."
+                      : "İlerleme varsa silme talebi yöneticiye iletilir; görev onaylanmadan silinmez."}
                 </p>
                 <Button
                   type="button"

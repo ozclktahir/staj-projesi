@@ -394,3 +394,4 @@
 - Bug Fix: Kullanıcı bir görevi reddettiğinde görevin veritabanından/arayüzden tamamen silinmesi (iptal edilmesi) sağlandı. Giriş (Auth) sayfaları tamamen Dark Mode arayüzüne zorlandı.
 - Kullanıcı deneyimi için Toast bildirimlerine manuel kapatma (X) butonu eklendi. Görev kabul etme ve reddetme aksiyonları Activity Log (Aktivite Günlüğü) tablosuna entegre edildi.
 - Bug Fix: Bildirimlerde ve Aktivite Günlüğünde "Bir kullanıcı" yerine aksiyonu gerçekleştiren kişinin gerçek adının (dinamik olarak) gösterilmesi sağlandı.
+- Bug Fix: Görev silme onay mekanizması (Admin/Kullanıcı karşılıklı istek ve onay akışı) Server Action ve Bildirim butonları düzeyinde kurşun geçirmez hale getirildi.
