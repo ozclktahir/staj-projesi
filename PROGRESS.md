@@ -395,3 +395,4 @@
 - Kullanıcı deneyimi için Toast bildirimlerine manuel kapatma (X) butonu eklendi. Görev kabul etme ve reddetme aksiyonları Activity Log (Aktivite Günlüğü) tablosuna entegre edildi.
 - Bug Fix: Bildirimlerde ve Aktivite Günlüğünde "Bir kullanıcı" yerine aksiyonu gerçekleştiren kişinin gerçek adının (dinamik olarak) gösterilmesi sağlandı.
 - Bug Fix: Görev silme onay mekanizması (Admin/Kullanıcı karşılıklı istek ve onay akışı) Server Action ve Bildirim butonları düzeyinde kurşun geçirmez hale getirildi.
+- Bug Fix: Next.js 'failed-to-find-server-action' hatası giderildi. Bildirim onay/red Server Action bağlantıları doğrudan import yapısına geçirilerek güncellendi.

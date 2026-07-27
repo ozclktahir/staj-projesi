@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -26,8 +26,8 @@ import {
 import {
   approveTaskDeletion,
   rejectTaskDeletion,
-  respondToTaskClaim,
-} from "@/app/actions/task-workflows";
+} from "@/app/actions/task-deletion-approval";
+import { respondToTaskClaim } from "@/app/actions/task-workflows";
 import {
   getNotificationKind,
   invitationIdFromNotification,
@@ -121,6 +121,7 @@ export function InviteNotificationsMenu({
   const [resolvedActionIds, setResolvedActionIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [, startTransition] = useTransition();
   const knownIdsRef = useRef<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
@@ -374,39 +375,50 @@ export function InviteNotificationsMenu({
   ) => {
     const kind = getNotificationKind(notification);
     setBusyId(notification.id);
-    try {
-      let result: { success: boolean; message?: string; error?: string };
 
-      if (kind === "task_deletion_request") {
-        const taskId = taskIdFromNotification(notification) ?? "";
-        result =
-          action === "accept"
-            ? await approveTaskDeletion(taskId, notification.id)
-            : await rejectTaskDeletion(taskId, notification.id);
-      } else {
-        result = await respondToTaskClaim(notification.id, action);
-      }
+    startTransition(() => {
+      void (async () => {
+        try {
+          let result: { success: boolean; message?: string; error?: string };
 
-      if (!result.success) {
-        toast.error(result.error ?? "İşlem başarısız");
-        return;
-      }
+          if (kind === "task_deletion_request") {
+            const taskId = taskIdFromNotification(notification) ?? "";
+            result =
+              action === "accept"
+                ? await approveTaskDeletion(taskId, notification.id)
+                : await rejectTaskDeletion(taskId, notification.id);
+          } else {
+            result = await respondToTaskClaim(notification.id, action);
+          }
 
-      setResolvedActionIds((prev) => new Set(prev).add(notification.id));
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notification.id ? { ...n, isRead: true } : n,
-        ),
-      );
-      toast.success(result.message);
-      router.refresh();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "İşlem başarısız oldu.",
-      );
-    } finally {
-      setBusyId(null);
-    }
+          if (!result.success) {
+            toast.error(result.error ?? "İşlem başarısız");
+            return;
+          }
+
+          setResolvedActionIds((prev) => new Set(prev).add(notification.id));
+          setNotifications((prev) =>
+            prev.map((n) =>
+              n.id === notification.id ? { ...n, isRead: true } : n,
+            ),
+          );
+          toast.success(
+            result.message ??
+              (kind === "task_deletion_request" && action === "accept"
+                ? "Silme talebi onaylandı"
+                : "İşlem tamamlandı"),
+          );
+          router.refresh();
+        } catch (error) {
+          console.error("[handleTaskWorkflowRespond]", error);
+          toast.error(
+            error instanceof Error ? error.message : "İşlem başarısız oldu",
+          );
+        } finally {
+          setBusyId(null);
+        }
+      })();
+    });
   };
 
   const handleMarkAllRead = async () => {
