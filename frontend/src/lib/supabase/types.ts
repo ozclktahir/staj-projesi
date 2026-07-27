@@ -41,6 +41,12 @@ export type TaskAssignee = {
   initials: string;
 };
 
+export type TaskAssignmentStatus = "pending" | "accepted" | "rejected";
+export type TaskDeletionStatus =
+  | "none"
+  | "pending_admin_approval"
+  | "pending_user_approval";
+
 export type ProjectTask = {
   id: string;
   title: string;
@@ -58,6 +64,11 @@ export type ProjectTask = {
   project_name?: string | null;
   /** Görevlerim panosu: workspace adı (join) */
   workspace_name?: string | null;
+  /** Atama kabul durumu */
+  assignment_status?: TaskAssignmentStatus | null;
+  /** Silme onay durumu */
+  deletion_status?: TaskDeletionStatus | null;
+  assignment_pending_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   created_by?: string | null;

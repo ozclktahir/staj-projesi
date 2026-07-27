@@ -597,6 +597,30 @@ function normalizeTaskPriority(priority: unknown): TaskPriority {
   return "MEDIUM";
 }
 
+function normalizeAssignmentStatusField(
+  value: unknown,
+): "pending" | "accepted" | "rejected" | null {
+  if (typeof value !== "string") return "accepted";
+  const v = value.trim().toLowerCase();
+  if (v === "pending" || v === "accepted" || v === "rejected") return v;
+  return "accepted";
+}
+
+function normalizeDeletionStatusField(
+  value: unknown,
+): "none" | "pending_admin_approval" | "pending_user_approval" | null {
+  if (typeof value !== "string") return "none";
+  const v = value.trim().toLowerCase();
+  if (
+    v === "none" ||
+    v === "pending_admin_approval" ||
+    v === "pending_user_approval"
+  ) {
+    return v;
+  }
+  return "none";
+}
+
 export async function getProjectTasks(
   projectId: string,
   workspaceId?: string | null,
@@ -640,9 +664,9 @@ export async function getProjectTasks(
     }
 
     const selectFull =
-      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to, assignee:profiles!assignee_id(id, email, full_name, avatar_url)";
+      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to, assignment_status, deletion_status, assignment_pending_at, assignee:profiles!assignee_id(id, email, full_name, avatar_url)";
     const selectFullNoJoin =
-      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to";
+      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to, assignment_status, deletion_status, assignment_pending_at";
 
     async function fetchTasks(opts: {
       withWorkspace: boolean;
@@ -803,6 +827,12 @@ export async function getProjectTasks(
             : null,
         assignee_id: assigneeId,
         assignee,
+        assignment_status: normalizeAssignmentStatusField(row.assignment_status),
+        deletion_status: normalizeDeletionStatusField(row.deletion_status),
+        assignment_pending_at:
+          "assignment_pending_at" in row
+            ? ((row.assignment_pending_at as string | null) ?? null)
+            : null,
         created_at: (row.created_at as string | null) ?? null,
         created_by: (row.created_by as string | null) ?? null,
         subtask_done: 0,

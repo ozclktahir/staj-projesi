@@ -63,7 +63,7 @@ export async function getTaskDetails(
     let { data, error } = await supabase
       .from("tasks")
       .select(
-        "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to",
+        "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to, assignment_status, deletion_status, assignment_pending_at",
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -73,12 +73,14 @@ export async function getTaskDetails(
       error?.message?.includes("deleted_at") ||
       error?.message?.includes("due_date") ||
       error?.message?.includes("assignee_id") ||
-      error?.message?.includes("assigned_to")
+      error?.message?.includes("assigned_to") ||
+      error?.message?.includes("assignment_status") ||
+      error?.message?.includes("deletion_status")
     ) {
       ({ data, error } = await supabase
         .from("tasks")
         .select(
-          "id, title, description, status, priority, project_id, workspace_id, created_at, created_by",
+          "id, title, description, status, priority, project_id, workspace_id, created_at, created_by, assignee_id, assigned_to",
         )
         .eq("id", id)
         .maybeSingle());
@@ -94,6 +96,14 @@ export async function getTaskDetails(
     }
 
     const row = data as Record<string, unknown>;
+    const assignmentRaw =
+      typeof row.assignment_status === "string"
+        ? row.assignment_status.toLowerCase()
+        : "accepted";
+    const deletionRaw =
+      typeof row.deletion_status === "string"
+        ? row.deletion_status.toLowerCase()
+        : "none";
 
     return {
       success: true,
@@ -112,6 +122,20 @@ export async function getTaskDetails(
           (row.assignee_id as string | null | undefined) ??
           (row.assigned_to as string | null | undefined) ??
           null,
+        assignment_status:
+          assignmentRaw === "pending" ||
+          assignmentRaw === "accepted" ||
+          assignmentRaw === "rejected"
+            ? assignmentRaw
+            : "accepted",
+        deletion_status:
+          deletionRaw === "pending_admin_approval" ||
+          deletionRaw === "pending_user_approval" ||
+          deletionRaw === "none"
+            ? deletionRaw
+            : "none",
+        assignment_pending_at:
+          (row.assignment_pending_at as string | null) ?? null,
         created_at: (row.created_at as string | null) ?? null,
         created_by: (row.created_by as string | null) ?? null,
       },

@@ -4,6 +4,8 @@ import {
   normalizeTaskStatusInput,
   TASK_PRIORITIES,
   type ProjectTask,
+  type TaskAssignmentStatus,
+  type TaskDeletionStatus,
   type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
@@ -67,6 +69,28 @@ function normalizePriority(value: unknown): TaskPriority {
   return "MEDIUM";
 }
 
+function normalizeAssignmentStatus(
+  value: unknown,
+): TaskAssignmentStatus | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  if (v === "pending" || v === "accepted" || v === "rejected") return v;
+  return null;
+}
+
+function normalizeDeletionStatus(value: unknown): TaskDeletionStatus | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  if (
+    v === "none" ||
+    v === "pending_admin_approval" ||
+    v === "pending_user_approval"
+  ) {
+    return v;
+  }
+  return null;
+}
+
 /** Realtime task satırını ProjectTask'a dönüştür */
 export function mapRealtimeTaskRow(
   row: Record<string, unknown>,
@@ -117,6 +141,16 @@ export function mapRealtimeTaskRow(
     assignee: keepAssignee,
     project_name: previous?.project_name ?? null,
     workspace_name: previous?.workspace_name ?? null,
+    assignment_status: normalizeAssignmentStatus(
+      row.assignment_status ?? previous?.assignment_status,
+    ),
+    deletion_status: normalizeDeletionStatus(
+      row.deletion_status ?? previous?.deletion_status,
+    ),
+    assignment_pending_at:
+      row.assignment_pending_at === undefined
+        ? (previous?.assignment_pending_at ?? null)
+        : ((row.assignment_pending_at as string | null) ?? null),
     created_at:
       (typeof row.created_at === "string" && row.created_at) ||
       previous?.created_at ||

@@ -16,6 +16,8 @@ export type NotificationItem = {
 export type NotificationKind =
   | "workspace_invite"
   | "task_assigned"
+  | "task_claim_request"
+  | "task_deletion_request"
   | "due_date_warning"
   | "generic";
 
@@ -35,6 +37,20 @@ export function isWorkspaceInviteNotification(n: NotificationItem): boolean {
 export function getNotificationKind(n: NotificationItem): NotificationKind {
   const t = n.type.trim().toLowerCase();
   if (isInviteType(t)) return "workspace_invite";
+  if (
+    t === "task_claim_request" ||
+    t === "task_claim" ||
+    t === "assignment_claim"
+  ) {
+    return "task_claim_request";
+  }
+  if (
+    t === "task_deletion_request" ||
+    t === "task_delete_request" ||
+    t === "deletion_approval"
+  ) {
+    return "task_deletion_request";
+  }
   if (
     t === "task_assigned" ||
     t === "task_assignment" ||
@@ -60,6 +76,20 @@ export function invitationIdFromNotification(
   if (!meta) return null;
   const id = meta.invitation_id ?? meta.invite_id;
   return typeof id === "string" && id.trim() ? id : null;
+}
+
+export function taskIdFromNotification(n: NotificationItem): string | null {
+  const meta = n.payload ?? n.metadata;
+  if (!meta) return null;
+  const id = meta.task_id;
+  return typeof id === "string" && id.trim() ? id : null;
+}
+
+export function isActionableTaskNotification(n: NotificationItem): boolean {
+  const kind = getNotificationKind(n);
+  return (
+    kind === "task_claim_request" || kind === "task_deletion_request"
+  );
 }
 
 export function taskLinkFromNotification(n: NotificationItem): string | null {

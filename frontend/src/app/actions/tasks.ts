@@ -80,6 +80,21 @@ function mapTaskRow(row: Record<string, unknown>): ProjectTask {
     assignee: null,
     project_name: projectName,
     workspace_name: workspaceName,
+    assignment_status:
+      typeof row.assignment_status === "string"
+        ? (row.assignment_status.toLowerCase() as
+            | "pending"
+            | "accepted"
+            | "rejected")
+        : "accepted",
+    deletion_status:
+      typeof row.deletion_status === "string"
+        ? (row.deletion_status.toLowerCase() as
+            | "none"
+            | "pending_admin_approval"
+            | "pending_user_approval")
+        : "none",
+    assignment_pending_at: (row.assignment_pending_at as string | null) ?? null,
     created_at: (row.created_at as string | null) ?? null,
     created_by: (row.created_by as string | null) ?? null,
     subtask_done: 0,
@@ -182,9 +197,9 @@ export async function getMyTasks(): Promise<GetMyTasksResult> {
     const { supabase, user } = auth;
 
     const selectWithJoin =
-      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to, deleted_at, projects:project_id(id, name, workspace_id, workspaces:workspace_id(name))";
+      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to, deleted_at, assignment_status, deletion_status, assignment_pending_at, projects:project_id(id, name, workspace_id, workspaces:workspace_id(name))";
     const selectPlain =
-      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to, deleted_at";
+      "id, title, description, status, priority, project_id, workspace_id, due_date, parent_task_id, created_at, created_by, assignee_id, assigned_to, deleted_at, assignment_status, deletion_status, assignment_pending_at";
 
     let rows: Record<string, unknown>[] | null = null;
 

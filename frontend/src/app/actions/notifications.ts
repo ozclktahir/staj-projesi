@@ -366,7 +366,7 @@ export async function createTaskAssignedNotification(input: {
       "Bir kullanıcı";
 
     const taskTitle = input.taskTitle?.trim() || "görev";
-    const message = `${actor} sana '${taskTitle}' görevini atadı.`;
+    const message = `${actor} sana '${taskTitle}' görevini atadı. Kabul ediyor musunuz?`;
     const link = `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`;
     const payload = {
       project_id: projectId,
@@ -374,13 +374,14 @@ export async function createTaskAssignedNotification(input: {
       task_title: taskTitle,
       workspace_id: workspaceId,
       assigned_by: auth.user.id,
+      action: "task_claim",
     };
 
     const { error } = await auth.supabase.from("notifications").insert({
       workspace_id: workspaceId,
       user_id: assigneeId,
-      type: "task_assigned",
-      title: "Yeni Görev Atandı",
+      type: "task_claim_request",
+      title: "Görev ataması — onayınız gerekli",
       message,
       metadata: payload,
       payload,
@@ -396,8 +397,8 @@ export async function createTaskAssignedNotification(input: {
         const fallback = await auth.supabase.from("notifications").insert({
           workspace_id: workspaceId,
           user_id: assigneeId,
-          type: "task_assigned",
-          title: "Yeni Görev Atandı",
+          type: "task_claim_request",
+          title: "Görev ataması — onayınız gerekli",
           message,
           metadata: payload,
           is_read: false,

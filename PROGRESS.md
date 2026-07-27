@@ -387,3 +387,6 @@
 - Projedeki tüm veri çekme ve gönderme fonksiyonları asenkron (async/await) yapıya geçirildi ve try/catch bloklarıyla detaylı hata yönetimi (error handling) entegre edildi.
 - Kullanıcıya özel gizli Kişisel Alan (Personal Workspace) sayfası eklendi. Kişisel notlar, zamanlanmış yapılacaklar listesi (todos) ve Supabase Storage destekli dosya/fotoğraf yükleme özellikleri entegre edildi.
 - Kişisel Alan sayfasına kullanıcının projelerdeki atanmış görevleri varsayılan liste olarak eklendi. Kişisel notlar, zamanlanmış yapılacaklar ve dosya yükleme modülleriyle birleştirildi.
+
+### [27 Temmuz 2026] - Kurumsal onay iş akışları
+- Kurumsal iş mantıkları eklendi: Görevler üzerinde ilerleme varsa silme işlemleri için Karşılıklı Onay Sistemi (Admin/User Approval) kuruldu. Yeni atanan görevler için Sahiplenme/Kabul Etme (Task Claim) ve zaman aşımı bildirimleri entegre edildi.

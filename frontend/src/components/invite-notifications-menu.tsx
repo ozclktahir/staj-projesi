@@ -6,9 +6,12 @@ import {
   AlertTriangle,
   Bell,
   BellOff,
+  Check,
   CheckCheck,
   ClipboardList,
+  Trash2,
   UserPlus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -21,8 +24,13 @@ import {
   type PendingInvitationItem,
 } from "@/app/actions/notifications";
 import {
+  respondToTaskClaim,
+  respondToTaskDeletion,
+} from "@/app/actions/task-workflows";
+import {
   getNotificationKind,
   invitationIdFromNotification,
+  isActionableTaskNotification,
   isWorkspaceInviteNotification,
   taskLinkFromNotification,
 } from "@/lib/notification-utils";
@@ -355,6 +363,39 @@ export function InviteNotificationsMenu({
     }
   };
 
+  const handleTaskWorkflowRespond = async (
+    notification: NotificationItem,
+    action: "accept" | "decline",
+  ) => {
+    const kind = getNotificationKind(notification);
+    setBusyId(notification.id);
+    try {
+      const result =
+        kind === "task_deletion_request"
+          ? await respondToTaskDeletion(notification.id, action)
+          : await respondToTaskClaim(notification.id, action);
+
+      if (!result.success) {
+        toast.error(result.error ?? "İşlem başarısız");
+        return;
+      }
+
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notification.id ? { ...n, isRead: true } : n,
+        ),
+      );
+      toast.success(result.message);
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "İşlem başarısız oldu.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleMarkAllRead = async () => {
     setMarkingAll(true);
     try {
@@ -551,21 +592,88 @@ export function InviteNotificationsMenu({
 
               const n = entry.item;
               const kind = getNotificationKind(n);
+              const actionable = isActionableTaskNotification(n);
               const Icon =
-                kind === "task_assigned"
+                kind === "task_assigned" || kind === "task_claim_request"
                   ? ClipboardList
-                  : kind === "due_date_warning"
-                    ? AlertTriangle
-                    : kind === "workspace_invite"
-                      ? UserPlus
-                      : Bell;
+                  : kind === "task_deletion_request"
+                    ? Trash2
+                    : kind === "due_date_warning"
+                      ? AlertTriangle
+                      : kind === "workspace_invite"
+                        ? UserPlus
+                        : Bell;
 
               const iconWrap =
                 kind === "due_date_warning"
                   ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400"
-                  : kind === "task_assigned"
-                    ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400"
-                    : "bg-muted text-muted-foreground";
+                  : kind === "task_deletion_request"
+                    ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400"
+                    : kind === "task_assigned" || kind === "task_claim_request"
+                      ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400"
+                      : "bg-muted text-muted-foreground";
+
+              if (actionable && !n.isRead) {
+                return (
+                  <li
+                    key={entry.key}
+                    className="rounded-lg border border-border bg-accent/40 p-3"
+                  >
+                    <div className="flex gap-2.5">
+                      <span
+                        className={cn(
+                          "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full",
+                          iconWrap,
+                        )}
+                      >
+                        <Icon className="size-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {n.title || "Bildirim"}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {n.message}
+                        </p>
+                        <p className="mt-1 text-[10px] text-muted-foreground/80">
+                          {formatRelativeTime(n.createdAt)}
+                        </p>
+                        <div className="mt-2.5 flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-7 flex-1 gap-1 rounded-md text-xs"
+                            disabled={busyId === n.id}
+                            onClick={() =>
+                              void handleTaskWorkflowRespond(n, "accept")
+                            }
+                          >
+                            <Check className="size-3.5" />
+                            {busyId === n.id
+                              ? "…"
+                              : kind === "task_deletion_request"
+                                ? "Onayla"
+                                : "Kabul Et"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 flex-1 gap-1 rounded-md text-xs"
+                            disabled={busyId === n.id}
+                            onClick={() =>
+                              void handleTaskWorkflowRespond(n, "decline")
+                            }
+                          >
+                            <X className="size-3.5" />
+                            Reddet
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              }
 
               return (
                 <li key={entry.key}>

@@ -213,6 +213,17 @@ export async function createTask(
     if (assigneeId) {
       basePayload.assignee_id = assigneeId;
       basePayload.assigned_to = assigneeId;
+      // Başkasına atama → sahiplenme onayı bekler
+      if (assigneeId !== authUid) {
+        basePayload.assignment_status = "pending";
+        basePayload.assignment_pending_at = new Date().toISOString();
+      } else {
+        basePayload.assignment_status = "accepted";
+        basePayload.assignment_pending_at = null;
+      }
+    } else {
+      basePayload.assignment_status = "accepted";
+      basePayload.assignment_pending_at = null;
     }
 
     console.info("[createTask] insert", {
@@ -242,6 +253,21 @@ export async function createTask(
       if (toPlainErrorMessage(insertError).includes("assignee_id")) {
         delete retry.assignee_id;
       }
+      ({ data: inserted, error: insertError } = await supabase
+        .from("tasks")
+        .insert(retry)
+        .select("id")
+        .single());
+    }
+
+    if (
+      insertError &&
+      (toPlainErrorMessage(insertError).includes("assignment_status") ||
+        toPlainErrorMessage(insertError).includes("assignment_pending_at"))
+    ) {
+      const retry = { ...basePayload };
+      delete retry.assignment_status;
+      delete retry.assignment_pending_at;
       ({ data: inserted, error: insertError } = await supabase
         .from("tasks")
         .insert(retry)

@@ -51,6 +51,7 @@ import {
 } from "@/lib/supabase/realtime";
 import { createAuthedRealtimeClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { isAssignmentClaimOverdue } from "@/lib/task-workflow-ui";
 
 type ProjectTaskBoardProps = {
   tasks: ProjectTask[];
@@ -305,8 +306,46 @@ const TaskCard = memo(function TaskCard({
   onStatusChange,
   onDeleteRequest,
 }: TaskCardProps) {
+  const claimPending = task.assignment_status === "pending";
+  const claimOverdue =
+    claimPending &&
+    isAssignmentClaimOverdue(
+      task.assignment_pending_at,
+      task.created_at,
+    );
+  const deletionPending =
+    task.deletion_status === "pending_admin_approval" ||
+    task.deletion_status === "pending_user_approval";
+
   return (
-    <div className="rounded-lg border-2 border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/50 hover:shadow-md dark:border dark:hover:border-primary/40">
+    <div
+      className={cn(
+        "rounded-lg border-2 border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/50 hover:shadow-md dark:border dark:hover:border-primary/40",
+        claimPending && "opacity-60",
+        claimOverdue && "border-red-400/80 opacity-100 ring-1 ring-red-400/40",
+      )}
+    >
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {claimPending ? (
+          <span
+            className={cn(
+              "rounded-md border px-2 py-0.5 text-[10px] font-semibold",
+              claimOverdue
+                ? "border-red-300 bg-red-100 text-red-700 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-300"
+                : "border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300",
+            )}
+          >
+            {claimOverdue
+              ? "Kullanıcı henüz görevi kabul etmedi! (SLA)"
+              : "Onay bekliyor"}
+          </span>
+        ) : null}
+        {deletionPending ? (
+          <span className="rounded-md border border-orange-300 bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-800 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-300">
+            Silme onayı bekleniyor
+          </span>
+        ) : null}
+      </div>
       <div className="flex items-start justify-between gap-2">
         <button
           type="button"
@@ -368,7 +407,7 @@ const TaskCard = memo(function TaskCard({
         <select
           aria-label="Görev durumu"
           value={task.status}
-          disabled={updating}
+          disabled={updating || claimPending}
           onClick={(event) => event.stopPropagation()}
           onChange={(event) => {
             onStatusChange(task.id, event.target.value as TaskStatus);

@@ -654,17 +654,31 @@ export function TaskDetailSheet({
 
               <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
                 <p className="mb-2 text-xs text-muted-foreground">
-                  Görevi kalıcı olarak kaldırmak için silme işlemini kullanın.
+                  {task.deletion_status === "pending_admin_approval" ||
+                  task.deletion_status === "pending_user_approval"
+                    ? "Bu görev için silme onayı bekleniyor."
+                    : isAdmin
+                      ? "İlerleme varsa atanan kullanıcıdan onay istenir."
+                      : "İlerleme varsa yöneticilerden onay istenir; aksi halde doğrudan silinir."}
                 </p>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
                   onClick={() => setDeleteOpen(true)}
+                  disabled={
+                    task.deletion_status === "pending_admin_approval" ||
+                    task.deletion_status === "pending_user_approval"
+                  }
                   className="rounded-lg border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
                   <Trash2 className="size-3.5" />
-                  Görevi Sil
+                  {task.deletion_status === "pending_admin_approval" ||
+                  task.deletion_status === "pending_user_approval"
+                    ? "Onay Bekleniyor"
+                    : isAdmin
+                      ? "Sil / Onay İste"
+                      : "Silme İsteği Gönder"}
                 </Button>
               </div>
             </section>
@@ -776,11 +790,29 @@ export function TaskDetailSheet({
       <DeleteTaskModal
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        task={task ? { id: task.id, title: task.title } : null}
+        isAdmin={isAdmin}
+        task={
+          task
+            ? {
+                id: task.id,
+                title: task.title,
+                deletion_status: task.deletion_status,
+              }
+            : null
+        }
         onDeleted={(deletedId) => {
           invalidateCachedTask(deletedId);
           onOpenChange(false);
           onTaskDeleted?.(deletedId);
+          router.refresh();
+        }}
+        onApprovalRequested={(taskId, deletionStatus) => {
+          setTask((prev) =>
+            prev && prev.id === taskId
+              ? { ...prev, deletion_status: deletionStatus }
+              : prev,
+          );
+          onTaskUpdated?.({ id: taskId, deletion_status: deletionStatus });
           router.refresh();
         }}
       />

@@ -192,6 +192,13 @@ export async function updateTask(
 
       patch.assignee_id = assigneeId;
       patch.assigned_to = assigneeId;
+      if (assigneeId && assigneeId !== user.id) {
+        patch.assignment_status = "pending";
+        patch.assignment_pending_at = new Date().toISOString();
+      } else {
+        patch.assignment_status = "accepted";
+        patch.assignment_pending_at = null;
+      }
     }
 
     if (Object.keys(patch).length === 0) {
