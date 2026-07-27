@@ -10,6 +10,7 @@ import {
   type TaskAssignmentStatus,
   type TaskDeletionStatus,
 } from "@/lib/supabase/types";
+import { purgeAndDeleteTask } from "@/lib/task-delete";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -124,31 +125,7 @@ async function hardOrSoftDeleteTask(
   supabase: SupabaseClient,
   taskId: string,
 ): Promise<{ error: { message: string } | null }> {
-  const deletedAt = new Date().toISOString();
-  let { error } = await supabase
-    .from("tasks")
-    .update({
-      deleted_at: deletedAt,
-      deletion_status: "none",
-      deletion_requested_by: null,
-      deletion_requested_at: null,
-    })
-    .eq("id", taskId);
-
-  if (error?.message?.includes("deleted_at")) {
-    ({ error } = await supabase.from("tasks").delete().eq("id", taskId));
-  } else if (
-    error &&
-    (error.message.includes("deletion_status") ||
-      error.message.includes("deletion_requested"))
-  ) {
-    ({ error } = await supabase
-      .from("tasks")
-      .update({ deleted_at: deletedAt })
-      .eq("id", taskId));
-  }
-
-  return { error };
+  return purgeAndDeleteTask(supabase, taskId);
 }
 
 async function taskHasProgress(

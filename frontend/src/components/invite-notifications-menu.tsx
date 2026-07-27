@@ -392,23 +392,34 @@ export function InviteNotificationsMenu({
           }
 
           if (!result.success) {
-            toast.error(result.error ?? "İşlem başarısız");
+            toast.error(
+              result.error ??
+                "Silme işlemi veritabanı engeli nedeniyle başarısız oldu",
+            );
             return;
           }
 
           setResolvedActionIds((prev) => new Set(prev).add(notification.id));
           setNotifications((prev) =>
-            prev.map((n) =>
-              n.id === notification.id ? { ...n, isRead: true } : n,
-            ),
+            prev.filter((n) => n.id !== notification.id),
           );
           toast.success(
             result.message ??
               (kind === "task_deletion_request" && action === "accept"
-                ? "Silme talebi onaylandı"
+                ? "Silme talebi onaylandı — görev kaldırıldı"
                 : "İşlem tamamlandı"),
           );
+
+          // Kanban / listeleri anında yenile
           router.refresh();
+          if (
+            kind === "task_deletion_request" &&
+            action === "accept" &&
+            typeof window !== "undefined"
+          ) {
+            // Soft cache'li client sayfalar için ikinci bir yenileme
+            window.setTimeout(() => router.refresh(), 150);
+          }
         } catch (error) {
           console.error("[handleTaskWorkflowRespond]", error);
           toast.error(

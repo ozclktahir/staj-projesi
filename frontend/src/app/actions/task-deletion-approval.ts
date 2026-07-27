@@ -5,19 +5,25 @@ import { logActionError } from "@/lib/action-result";
 import { logActivity } from "@/lib/activity-logger";
 import { resolveActorDisplayName } from "@/lib/member-labels";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { purgeAndDeleteTask } from "@/lib/task-delete";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type TaskDeletionRespondResult =
-  | { success: true; message: string }
+  | { success: true; message: string; deletedTaskId?: string | null }
   | { success: false; error: string };
 
 function revalidateTaskPaths(projectId: string | null) {
-  if (projectId) revalidatePath(`/project/${projectId}`);
+  if (projectId) {
+    revalidatePath(`/project/${projectId}`);
+    revalidatePath(`/projects/${projectId}`);
+  }
   revalidatePath("/");
   revalidatePath("/projects");
+  revalidatePath("/workspace");
   revalidatePath("/my-tasks");
   revalidatePath("/personal");
+  revalidatePath("/dashboard");
 }
 
 async function insertNotification(
@@ -68,37 +74,6 @@ async function insertNotification(
   if (error) {
     console.error("[insertNotification]", error.message);
   }
-}
-
-async function hardOrSoftDeleteTask(
-  supabase: SupabaseClient,
-  taskId: string,
-): Promise<{ error: { message: string } | null }> {
-  const deletedAt = new Date().toISOString();
-  let { error } = await supabase
-    .from("tasks")
-    .update({
-      deleted_at: deletedAt,
-      deletion_status: "none",
-      deletion_requested_by: null,
-      deletion_requested_at: null,
-    })
-    .eq("id", taskId);
-
-  if (error?.message?.includes("deleted_at")) {
-    ({ error } = await supabase.from("tasks").delete().eq("id", taskId));
-  } else if (
-    error &&
-    (error.message.includes("deletion_status") ||
-      error.message.includes("deletion_requested"))
-  ) {
-    ({ error } = await supabase
-      .from("tasks")
-      .update({ deleted_at: deletedAt })
-      .eq("id", taskId));
-  }
-
-  return { error };
 }
 
 /**
@@ -237,31 +212,55 @@ export async function respondToTaskDeletion(
       };
     }
 
+    // ── Onay: önce log (görev hâlâ var), sonra cascade + sil ──
     const actorName = await resolveActorDisplayName(supabase, user);
-    await logActivity(supabase, {
-      workspaceId,
-      projectId,
-      taskId: taskIdFromMeta,
-      userId: user.id,
-      actionType: "task_deleted",
-      actorName,
-      details: {
-        task_title: title,
-        mode: "approved_deletion",
-        message: `${actorName}, '${title}' görevinin silinmesini onayladı.`,
-      },
-    });
+    try {
+      await logActivity(supabase, {
+        workspaceId,
+        projectId,
+        taskId: taskIdFromMeta,
+        userId: user.id,
+        actionType: "task_deleted",
+        actorName,
+        details: {
+          task_title: title,
+          mode: "approved_deletion",
+          message: `${actorName}, '${title}' görevinin silinmesini onayladı.`,
+        },
+      });
+    } catch (logError) {
+      console.warn("[respondToTaskDeletion] activity log:", logError);
+    }
 
-    const { error } = await hardOrSoftDeleteTask(supabase, taskIdFromMeta);
-    if (error) return { success: false, error: error.message };
+    const { error: deleteError } = await purgeAndDeleteTask(
+      supabase,
+      taskIdFromMeta,
+    );
+    if (deleteError) {
+      console.error(
+        "Görev silinirken veritabanı hatası oluştu:",
+        deleteError,
+      );
+      return {
+        success: false,
+        error:
+          deleteError.message ||
+          "Silme işlemi veritabanı engeli nedeniyle başarısız oldu",
+      };
+    }
 
+    // Bildirimi okundu yap (purge silmemişse)
     await supabase
       .from("notifications")
       .update({ is_read: true })
       .eq("id", notifId);
 
     revalidateTaskPaths(projectId);
-    return { success: true, message: "Görev onaylandıktan sonra silindi." };
+    return {
+      success: true,
+      message: "Görev onaylandıktan sonra silindi.",
+      deletedTaskId: taskIdFromMeta,
+    };
   } catch (error) {
     return {
       success: false,
@@ -283,14 +282,8 @@ export async function approveTaskDeletion(
   if (!notifId) {
     return { success: false, error: "Bildirim kimliği zorunlu." };
   }
-
-  const result = await respondToTaskDeletion(notifId, "accept");
-
-  // taskId verilmişse bildirimdeki görevle eşleşmesini doğrula (opsiyonel güvenlik)
-  if (result.success && taskId?.trim()) {
-    return result;
-  }
-  return result;
+  void taskId;
+  return respondToTaskDeletion(notifId, "accept");
 }
 
 /** Silme talebini reddet — bildirim menüsünden doğrudan import edilir */
