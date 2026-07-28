@@ -14,21 +14,22 @@ type ProjectsPageProps = {
 export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
   const params = await searchParams;
   const workspaceId = await resolveActiveWorkspaceId(params.workspaceId ?? null);
-  const { userName, projects } = await getCurrentUserProjects(workspaceId);
-  const stats = await getDashboardTaskStats(projects.map((p) => p.id));
 
-  let canCreateProject = false;
-  if (workspaceId) {
-    const auth = await getAuthenticatedUser();
-    if (auth) {
-      const roleCtx = await resolveWorkspaceRole(
-        auth.supabase,
-        workspaceId,
-        auth.user.id,
-      );
-      canCreateProject = roleCtx.isAdmin;
-    }
-  }
+  const [{ userName, projects }, auth] = await Promise.all([
+    getCurrentUserProjects(workspaceId),
+    getAuthenticatedUser(),
+  ]);
+
+  const projectIds = projects.map((p) => p.id);
+
+  const [stats, roleCtx] = await Promise.all([
+    getDashboardTaskStats(projectIds),
+    workspaceId && auth
+      ? resolveWorkspaceRole(auth.supabase, workspaceId, auth.user.id)
+      : Promise.resolve(null),
+  ]);
+
+  const canCreateProject = Boolean(roleCtx?.isAdmin);
 
   return (
     <DashboardHome

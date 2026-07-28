@@ -27,11 +27,11 @@ export async function ensureWorkspaceAccess(): Promise<WorkspaceAccessResult> {
     const [{ count: ownedCount }, { count: memberCount }] = await Promise.all([
       supabase
         .from("workspaces")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact", head: true })
         .eq("owner_id", user.id),
       supabase
         .from("workspace_members")
-        .select("*", { count: "exact", head: true })
+        .select("user_id", { count: "exact", head: true })
         .eq("user_id", user.id),
     ]);
 

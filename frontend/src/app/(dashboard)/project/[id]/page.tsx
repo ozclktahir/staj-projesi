@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { CreateTaskModal } from "@/components/CreateTaskModal";
+import { CreateTaskModalLazy } from "@/components/CreateTaskModal.lazy";
 import { DeleteProjectButton } from "@/components/delete-project-button";
 import { ProjectActivityDrawer } from "@/components/project/project-activity-panel";
 import { ProjectTaskBoard } from "@/components/project/project-task-board";
@@ -111,7 +111,7 @@ export default async function ProjectDetailPage({
               projectId={project.id}
               workspaceId={effectiveWorkspaceId}
             />
-            <CreateTaskModal
+            <CreateTaskModalLazy
               projectId={project.id}
               workspaceId={effectiveWorkspaceId}
             />

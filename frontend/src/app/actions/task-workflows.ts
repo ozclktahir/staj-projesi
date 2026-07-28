@@ -146,25 +146,24 @@ async function taskHasProgress(
     return true;
   }
 
-  const { count: commentCount } = await supabase
-    .from("task_comments")
-    .select("*", { count: "exact", head: true })
-    .eq("task_id", taskId);
+  const [{ count: commentCount }, { count: attachmentCount }, { count: subtaskCount }] =
+    await Promise.all([
+      supabase
+        .from("task_comments")
+        .select("id", { count: "exact", head: true })
+        .eq("task_id", taskId),
+      supabase
+        .from("task_attachments")
+        .select("id", { count: "exact", head: true })
+        .eq("task_id", taskId),
+      supabase
+        .from("tasks")
+        .select("id", { count: "exact", head: true })
+        .eq("parent_task_id", taskId),
+    ]);
 
   if ((commentCount ?? 0) > 0) return true;
-
-  const { count: attachmentCount } = await supabase
-    .from("task_attachments")
-    .select("*", { count: "exact", head: true })
-    .eq("task_id", taskId);
-
   if ((attachmentCount ?? 0) > 0) return true;
-
-  const { count: subtaskCount } = await supabase
-    .from("tasks")
-    .select("*", { count: "exact", head: true })
-    .eq("parent_task_id", taskId);
-
   if ((subtaskCount ?? 0) > 0) return true;
 
   return false;

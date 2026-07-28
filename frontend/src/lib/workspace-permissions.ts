@@ -20,12 +20,20 @@ export async function resolveWorkspaceRole(
   const wsId = workspaceId.trim();
   const uid = userId.trim();
 
-  const { data: owned } = await supabase
-    .from("workspaces")
-    .select("id")
-    .eq("id", wsId)
-    .eq("owner_id", uid)
-    .maybeSingle();
+  const [{ data: owned }, { data: membership }] = await Promise.all([
+    supabase
+      .from("workspaces")
+      .select("id")
+      .eq("id", wsId)
+      .eq("owner_id", uid)
+      .maybeSingle(),
+    supabase
+      .from("workspace_members")
+      .select("role")
+      .eq("workspace_id", wsId)
+      .eq("user_id", uid)
+      .maybeSingle(),
+  ]);
 
   if (owned?.id) {
     return {
@@ -36,13 +44,6 @@ export async function resolveWorkspaceRole(
       isAdmin: true,
     };
   }
-
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("role")
-    .eq("workspace_id", wsId)
-    .eq("user_id", uid)
-    .maybeSingle();
 
   const role = (membership?.role as string | null) ?? null;
 

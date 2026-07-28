@@ -1,16 +1,45 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import type { ActivityLogItem } from "@/app/actions/activity-logs";
 import type { AnalyticsData } from "@/app/actions/analytics";
 import type { UpcomingDeadlineItem } from "@/types/personal-workspace";
 import { AnalyticsStatCards } from "@/components/analytics/analytics-stat-cards";
-import {
-  PriorityBarCard,
-  StatusDonutCard,
-  WorkloadBarCard,
-} from "@/components/analytics/chart-cards";
 import { QuickActivityFeed } from "@/components/analytics/quick-activity-feed";
 import { UpcomingDeadlines } from "@/components/analytics/upcoming-deadlines";
+
+const StatusDonutCard = dynamic(
+  () =>
+    import("@/components/analytics/chart-cards").then((m) => m.StatusDonutCard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[280px] animate-pulse rounded-lg border border-border bg-muted/40" />
+    ),
+  },
+);
+
+const PriorityBarCard = dynamic(
+  () =>
+    import("@/components/analytics/chart-cards").then((m) => m.PriorityBarCard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[280px] animate-pulse rounded-lg border border-border bg-muted/40" />
+    ),
+  },
+);
+
+const WorkloadBarCard = dynamic(
+  () =>
+    import("@/components/analytics/chart-cards").then((m) => m.WorkloadBarCard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[280px] animate-pulse rounded-lg border border-border bg-muted/40" />
+    ),
+  },
+);
 
 type AnalyticsDashboardProps = {
   data: AnalyticsData;

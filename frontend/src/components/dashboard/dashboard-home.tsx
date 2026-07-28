@@ -1,9 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { CheckCircle2, CircleDashed, FolderKanban, ListTodo } from "lucide-react";
 import type { AdminMemberOverview } from "@/app/actions/admin-overview";
-import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { AdminOverviewPanel } from "@/components/dashboard/admin-overview-panel";
 import {
   Card,
@@ -14,6 +14,12 @@ import {
 } from "@/components/ui/card";
 import type { DashboardProject, DashboardTaskStats } from "@/lib/supabase/types";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
+
+const CreateProjectModal = dynamic(
+  () =>
+    import("@/components/CreateProjectModal").then((m) => m.CreateProjectModal),
+  { ssr: false },
+);
 
 type DashboardHomeProps = {
   userName: string;

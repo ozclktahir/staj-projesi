@@ -102,7 +102,7 @@ function normalizePriority(value: unknown): TaskPriority {
 
 type TaskRow = {
   id: string;
-  title: string;
+  title?: string | null;
   status: unknown;
   priority: unknown;
   due_date: string | null;
@@ -289,7 +289,7 @@ async function fetchTaskRows(
   let query = supabase
     .from("tasks")
     .select(
-      "id, title, status, priority, due_date, assignee_id, assigned_to, project_id, parent_task_id, deleted_at",
+      "id, status, priority, due_date, assignee_id, assigned_to, project_id, parent_task_id, deleted_at",
     )
     .limit(2000);
 
@@ -307,7 +307,7 @@ async function fetchTaskRows(
     let retry = supabase
       .from("tasks")
       .select(
-        "id, title, status, priority, due_date, assignee_id, assigned_to, project_id, parent_task_id",
+        "id, status, priority, due_date, assignee_id, assigned_to, project_id, parent_task_id",
       )
       .limit(2000);
     if (filters.projectId) {
@@ -327,7 +327,7 @@ async function fetchTaskRows(
     let retry = supabase
       .from("tasks")
       .select(
-        "id, title, status, priority, assignee_id, assigned_to, project_id, parent_task_id",
+        "id, status, priority, assignee_id, assigned_to, project_id, parent_task_id",
       )
       .limit(2000);
     if (filters.projectId) {
