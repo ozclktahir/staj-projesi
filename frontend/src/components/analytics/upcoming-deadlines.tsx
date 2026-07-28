@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useMemo, useState, type MouseEvent } from "react";
+import { useRouter } from "next/navigation";
 import { CalendarClock, Filter } from "lucide-react";
 import type { UpcomingDeadlineItem } from "@/types/personal-workspace";
 import {
@@ -83,6 +83,7 @@ function taskHref(item: UpcomingDeadlineItem): string | null {
 }
 
 export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) {
+  const router = useRouter();
   const { t, locale } = useTranslation();
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
@@ -185,13 +186,39 @@ export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) 
           <Accordion type="multiple" className="w-full">
             {filtered.slice(0, 12).map((item) => {
               const href = taskHref(item);
+
+              const handleNavigate = () => {
+                if (!href) return;
+                router.push(href);
+              };
+
               return (
                 <AccordionItem
                   key={`${item.kind}-${item.id}`}
                   value={`${item.kind}-${item.id}`}
+                  className="border-b border-border last:border-b-0"
                 >
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 pr-2">
+                  <div className="flex items-start gap-1">
+                    <div
+                      role={href ? "link" : undefined}
+                      tabIndex={href ? 0 : undefined}
+                      onClick={href ? handleNavigate : undefined}
+                      onKeyDown={
+                        href
+                          ? (event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                handleNavigate();
+                              }
+                            }
+                          : undefined
+                      }
+                      className={cn(
+                        "flex min-w-0 flex-1 items-start justify-between gap-2 rounded-md p-3 transition-colors",
+                        href &&
+                          "cursor-pointer hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                      )}
+                    >
                       <div className="min-w-0 text-left">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <Badge variant="outline" className="text-[10px]">
@@ -203,19 +230,9 @@ export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) 
                             </Badge>
                           ) : null}
                         </div>
-                        {href ? (
-                          <Link
-                            href={href}
-                            onClick={(event) => event.stopPropagation()}
-                            className="mt-1 block truncate text-sm font-medium text-foreground underline-offset-2 hover:text-primary hover:underline"
-                          >
-                            {item.title}
-                          </Link>
-                        ) : (
-                          <p className="mt-1 truncate text-sm font-medium text-foreground">
-                            {item.title}
-                          </p>
-                        )}
+                        <p className="mt-1 truncate text-sm font-medium text-foreground">
+                          {item.title}
+                        </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {item.projectName
                             ? `${item.projectName} · `
@@ -229,7 +246,7 @@ export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) 
                             : TASK_STATUS_LABELS[item.status]}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="shrink-0 text-right">
                         <p className="text-sm font-medium text-foreground">
                           {formatDue(item.dueDate, locale)}
                         </p>
@@ -245,15 +262,28 @@ export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) 
                         </p>
                       </div>
                     </div>
-                  </AccordionTrigger>
+
+                    <div
+                      className="shrink-0 pt-2"
+                      onClick={(event: MouseEvent) => {
+                        event.stopPropagation();
+                      }}
+                    >
+                      <AccordionTrigger
+                        aria-label={t("deadlines.subtasks")}
+                        className="size-9 items-center justify-center rounded-md p-0 hover:bg-muted hover:no-underline [&[data-state=open]>svg]:rotate-180"
+                      />
+                    </div>
+                  </div>
+
                   <AccordionContent>
                     {item.kind === "task" ? (
                       item.subtasks.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="px-3 text-xs text-muted-foreground">
                           {t("deadlines.noSubtasks")}
                         </p>
                       ) : (
-                        <ul className="space-y-1.5 rounded-md border border-border bg-muted/30 p-2">
+                        <ul className="mx-3 space-y-1.5 rounded-md border border-border bg-muted/30 p-2">
                           <li className="px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                             {t("deadlines.subtasks")}
                           </li>
@@ -279,7 +309,7 @@ export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) 
                         </ul>
                       )
                     ) : (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="px-3 text-xs text-muted-foreground">
                         {item.kind === "subtask" && item.parentTaskTitle
                           ? item.parentTaskTitle
                           : kindLabel(item.kind, t)}
