@@ -502,4 +502,8 @@ export async function createProject(
   };
 }
 
-export const createProjectAction = createProject;
+export async function createProjectAction(
+  input: CreateProjectInput,
+): Promise<CreateProjectResult> {
+  return createProject(input);
+}

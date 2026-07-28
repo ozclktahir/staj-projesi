@@ -9,9 +9,7 @@ import {
   pickDefaultAdminWorkspace,
   resolveActorDisplayName,
 } from "@/lib/member-labels";
-import type { NotificationItem } from "@/lib/notification-utils";
-
-export type { NotificationItem } from "@/lib/notification-utils";
+import type { NotificationItem, PendingInvitationItem } from "@/lib/notification-utils";
 
 /**
  * Giriş sonrası yönlendirme:
@@ -50,21 +48,15 @@ export async function resolvePostLoginRedirect(): Promise<{
   }
 }
 
-export type PendingInvitationItem = {
-  id: string;
-  workspaceId: string;
-  workspaceName: string;
-  role: string | null;
-  email: string;
-  createdAt: string | null;
-};
-
-export type GetPendingInvitationsResult =
-  | { success: true; invitations: PendingInvitationItem[] }
-  | { success: false; error: string; invitations: [] };
-
 /** Kullanıcının e-postasına gelen bekleyen workspace davetleri. */
-export async function getMyPendingInvitations(): Promise<GetPendingInvitationsResult> {
+export async function getMyPendingInvitations(): Promise<{
+  success: true;
+  invitations: PendingInvitationItem[];
+} | {
+  success: false;
+  error: string;
+  invitations: [];
+}> {
   try {
     const auth = await getAuthenticatedUser();
     if (!auth) {
@@ -584,13 +576,19 @@ export async function clearAllNotifications(): Promise<{
 }
 
 /** Alias: getNotifications */
-export const getNotifications = getMyNotifications;
+export async function getNotifications(limit = 20) {
+  return getMyNotifications(limit);
+}
 
 /** Alias: markNotificationAsRead */
-export const markNotificationAsRead = markNotificationRead;
+export async function markNotificationAsRead(notificationId: string) {
+  return markNotificationRead(notificationId);
+}
 
 /** Alias: markAllNotificationsAsRead */
-export const markAllNotificationsAsRead = markAllNotificationsRead;
+export async function markAllNotificationsAsRead() {
+  return markAllNotificationsRead();
+}
 
 /**
  * Workspace davetine kabul/ret — invitations aksiyonlarını sarmalar.

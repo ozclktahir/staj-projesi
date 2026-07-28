@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { CalendarClock, Filter } from "lucide-react";
-import type { UpcomingDeadlineItem } from "@/app/actions/upcoming-deadlines";
+import type { UpcomingDeadlineItem } from "@/types/personal-workspace";
 import {
   Accordion,
   AccordionContent,
@@ -69,6 +70,16 @@ function kindLabel(
   if (kind === "task") return t("deadlines.typeTask");
   if (kind === "subtask") return t("deadlines.typeSubtask");
   return t("deadlines.typeTodo");
+}
+
+function taskHref(item: UpcomingDeadlineItem): string | null {
+  if (!item.projectId) return null;
+  if (item.kind === "todo") return null;
+  const taskId =
+    item.kind === "subtask" && item.parentTaskId
+      ? item.parentTaskId
+      : item.id;
+  return `/project/${item.projectId}?taskId=${encodeURIComponent(taskId)}`;
 }
 
 export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) {
@@ -172,96 +183,112 @@ export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) 
           </p>
         ) : (
           <Accordion type="multiple" className="w-full">
-            {filtered.slice(0, 12).map((item) => (
-              <AccordionItem key={`${item.kind}-${item.id}`} value={`${item.kind}-${item.id}`}>
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 pr-2">
-                    <div className="min-w-0 text-left">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant="outline" className="text-[10px]">
-                          {kindLabel(item.kind, t)}
-                        </Badge>
-                        {item.priority ? (
-                          <Badge variant="secondary" className="text-[10px]">
-                            {TASK_PRIORITY_LABELS[item.priority]}
+            {filtered.slice(0, 12).map((item) => {
+              const href = taskHref(item);
+              return (
+                <AccordionItem
+                  key={`${item.kind}-${item.id}`}
+                  value={`${item.kind}-${item.id}`}
+                >
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 pr-2">
+                      <div className="min-w-0 text-left">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge variant="outline" className="text-[10px]">
+                            {kindLabel(item.kind, t)}
                           </Badge>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 truncate text-sm font-medium text-foreground">
-                        {item.title}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {item.projectName
-                          ? `${item.projectName} · `
-                          : item.parentTaskTitle
-                            ? `${item.parentTaskTitle} · `
-                            : ""}
-                        {item.status === "OPEN" || item.status === "DONE"
-                          ? item.completed
-                            ? t("common.statusDone")
-                            : t("common.statusTodo")
-                          : TASK_STATUS_LABELS[item.status]}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-foreground">
-                        {formatDue(item.dueDate, locale)}
-                      </p>
-                      <p
-                        className={cn(
-                          "text-[11px]",
-                          item.completed
-                            ? "text-muted-foreground"
-                            : "text-amber-700 dark:text-amber-400",
-                        )}
-                      >
-                        {daysUntilLabel(item.dueDate, t)}
-                      </p>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  {item.kind === "task" ? (
-                    item.subtasks.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        {t("deadlines.noSubtasks")}
-                      </p>
-                    ) : (
-                      <ul className="space-y-1.5 rounded-md border border-border bg-muted/30 p-2">
-                        <li className="px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                          {t("deadlines.subtasks")}
-                        </li>
-                        {item.subtasks.map((sub) => (
-                          <li
-                            key={sub.id}
-                            className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm"
-                          >
-                            <span
-                              className={cn(
-                                "truncate",
-                                sub.completed &&
-                                  "text-muted-foreground line-through",
-                              )}
-                            >
-                              {sub.title}
-                            </span>
-                            <Badge variant="outline" className="text-[10px]">
-                              {TASK_STATUS_LABELS[sub.status]}
+                          {item.priority ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {TASK_PRIORITY_LABELS[item.priority]}
                             </Badge>
+                          ) : null}
+                        </div>
+                        {href ? (
+                          <Link
+                            href={href}
+                            onClick={(event) => event.stopPropagation()}
+                            className="mt-1 block truncate text-sm font-medium text-foreground underline-offset-2 hover:text-primary hover:underline"
+                          >
+                            {item.title}
+                          </Link>
+                        ) : (
+                          <p className="mt-1 truncate text-sm font-medium text-foreground">
+                            {item.title}
+                          </p>
+                        )}
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {item.projectName
+                            ? `${item.projectName} · `
+                            : item.parentTaskTitle
+                              ? `${item.parentTaskTitle} · `
+                              : ""}
+                          {item.status === "OPEN" || item.status === "DONE"
+                            ? item.completed
+                              ? t("common.statusDone")
+                              : t("common.statusTodo")
+                            : TASK_STATUS_LABELS[item.status]}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-foreground">
+                          {formatDue(item.dueDate, locale)}
+                        </p>
+                        <p
+                          className={cn(
+                            "text-[11px]",
+                            item.completed
+                              ? "text-muted-foreground"
+                              : "text-amber-700 dark:text-amber-400",
+                          )}
+                        >
+                          {daysUntilLabel(item.dueDate, t)}
+                        </p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {item.kind === "task" ? (
+                      item.subtasks.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          {t("deadlines.noSubtasks")}
+                        </p>
+                      ) : (
+                        <ul className="space-y-1.5 rounded-md border border-border bg-muted/30 p-2">
+                          <li className="px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            {t("deadlines.subtasks")}
                           </li>
-                        ))}
-                      </ul>
-                    )
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      {item.kind === "subtask" && item.parentTaskTitle
-                        ? item.parentTaskTitle
-                        : kindLabel(item.kind, t)}
-                    </p>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
+                          {item.subtasks.map((sub) => (
+                            <li
+                              key={sub.id}
+                              className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm"
+                            >
+                              <span
+                                className={cn(
+                                  "truncate",
+                                  sub.completed &&
+                                    "text-muted-foreground line-through",
+                                )}
+                              >
+                                {sub.title}
+                              </span>
+                              <Badge variant="outline" className="text-[10px]">
+                                {TASK_STATUS_LABELS[sub.status]}
+                              </Badge>
+                            </li>
+                          ))}
+                        </ul>
+                      )
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {item.kind === "subtask" && item.parentTaskTitle
+                          ? item.parentTaskTitle
+                          : kindLabel(item.kind, t)}
+                      </p>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
           </Accordion>
         )}
       </CardContent>

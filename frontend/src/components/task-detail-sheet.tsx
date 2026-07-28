@@ -16,7 +16,7 @@ import {
 import { updateTask } from "@/app/actions/update-task";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { getWorkspaceMembers } from "@/app/actions/workspace-members";
-import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
+import type { WorkspaceMemberOption } from "@/lib/member-labels";
 import { cleanText, emailLocalPart, formatPersonName } from "@/lib/member-labels";
 import { DeleteTaskModal } from "@/components/delete-task-modal";
 import { TaskActivityFeed } from "@/components/task/task-activity-feed";

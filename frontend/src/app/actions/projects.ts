@@ -15,8 +15,6 @@ import {
 } from "@/app/actions/delete-project";
 import { logActionError } from "@/lib/action-result";
 
-export type { CreateProjectInput, CreateProjectResult, DeleteProjectResult };
-
 export async function createProject(
   input: CreateProjectInput,
 ): Promise<CreateProjectResult> {

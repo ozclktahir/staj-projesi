@@ -2,7 +2,7 @@
 
 import type { ActivityLogItem } from "@/app/actions/activity-logs";
 import type { AnalyticsData } from "@/app/actions/analytics";
-import type { UpcomingDeadlineItem } from "@/app/actions/upcoming-deadlines";
+import type { UpcomingDeadlineItem } from "@/types/personal-workspace";
 import { AnalyticsStatCards } from "@/components/analytics/analytics-stat-cards";
 import {
   PriorityBarCard,

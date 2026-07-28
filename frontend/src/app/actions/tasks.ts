@@ -8,6 +8,7 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
+import type { AssignedTaskWithSubtasks } from "@/types/personal-workspace";
 
 export type GetMyTasksResult =
   | { success: true; tasks: ProjectTask[] }
@@ -282,16 +283,6 @@ export async function getMyTasks(): Promise<GetMyTasksResult> {
     };
   }
 }
-
-export type AssignedTaskWithSubtasks = ProjectTask & {
-  subtasks: Array<{
-    id: string;
-    title: string;
-    status: TaskStatus;
-    priority: TaskPriority;
-    due_date: string | null;
-  }>;
-};
 
 export type GetAssignedTasksResult =
   | { success: true; tasks: AssignedTaskWithSubtasks[] }

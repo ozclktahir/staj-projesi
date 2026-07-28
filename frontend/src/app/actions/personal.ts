@@ -3,33 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { logActionError } from "@/lib/action-result";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
-
-export type PersonalNote = {
-  id: string;
-  title: string;
-  content: string;
-  taskId: string | null;
-  taskTitle: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-};
-
-export type PersonalTodo = {
-  id: string;
-  task: string;
-  dueDate: string | null;
-  isCompleted: boolean;
-  createdAt: string | null;
-};
-
-export type PersonalFile = {
-  id: string;
-  fileName: string;
-  fileUrl: string;
-  storagePath: string | null;
-  fileSize: number | null;
-  createdAt: string | null;
-};
+import type {
+  PersonalFile,
+  PersonalNote,
+  PersonalTodo,
+} from "@/types/personal-workspace";
 
 type SimpleResult = { success: true } | { success: false; error: string };
 
@@ -52,7 +30,7 @@ export async function getPersonalNotes(): Promise<{
 
     const primary = await auth.supabase
       .from("personal_notes")
-      .select("id, title, content, task_id, created_at, updated_at")
+      .select("id, title, content, task_id, is_completed, created_at, updated_at")
       .eq("user_id", auth.user.id)
       .order("updated_at", { ascending: false });
 
@@ -60,14 +38,26 @@ export async function getPersonalNotes(): Promise<{
       (primary.data as Array<Record<string, unknown>> | null) ?? [];
     let error = primary.error;
 
-    if (error && /task_id/i.test(error.message)) {
+    if (error && /(task_id|is_completed)/i.test(error.message)) {
       const fallback = await auth.supabase
         .from("personal_notes")
-        .select("id, title, content, created_at, updated_at")
+        .select("id, title, content, task_id, created_at, updated_at")
         .eq("user_id", auth.user.id)
         .order("updated_at", { ascending: false });
-      rows = (fallback.data as Array<Record<string, unknown>> | null) ?? [];
-      error = fallback.error;
+      if (!fallback.error) {
+        rows = (fallback.data as Array<Record<string, unknown>> | null) ?? [];
+        error = null;
+      } else if (/task_id/i.test(fallback.error.message)) {
+        const legacy = await auth.supabase
+          .from("personal_notes")
+          .select("id, title, content, created_at, updated_at")
+          .eq("user_id", auth.user.id)
+          .order("updated_at", { ascending: false });
+        rows = (legacy.data as Array<Record<string, unknown>> | null) ?? [];
+        error = legacy.error;
+      } else {
+        error = fallback.error;
+      }
     }
 
     if (error) {
@@ -114,6 +104,7 @@ export async function getPersonalNotes(): Promise<{
         content: String(row.content ?? ""),
         taskId,
         taskTitle: taskId ? (taskTitleById.get(taskId) ?? null) : null,
+        isCompleted: Boolean(row.is_completed),
         createdAt: (row.created_at as string | null) ?? null,
         updatedAt: (row.updated_at as string | null) ?? null,
       };
@@ -155,8 +146,9 @@ export async function createPersonalNote(input: {
         title,
         content,
         task_id: taskId,
+        is_completed: false,
       })
-      .select("id, title, content, task_id, created_at, updated_at")
+      .select("id, title, content, task_id, is_completed, created_at, updated_at")
       .single();
 
     if (error || !data) {
@@ -186,6 +178,7 @@ export async function createPersonalNote(input: {
         content: String(data.content ?? content),
         taskId: (data.task_id as string | null) ?? null,
         taskTitle,
+        isCompleted: Boolean(data.is_completed),
         createdAt: (data.created_at as string | null) ?? null,
         updatedAt: (data.updated_at as string | null) ?? null,
       },
@@ -251,6 +244,47 @@ export async function updatePersonalNote(input: {
         "updatePersonalNote",
         error,
         "Not güncellenirken bir hata oluştu.",
+      ),
+    };
+  }
+}
+
+export async function toggleNoteCompletion(
+  id: string,
+  isCompleted: boolean,
+): Promise<SimpleResult> {
+  try {
+    const auth = await getAuthenticatedUser();
+    if (!auth) {
+      return { success: false, error: "Oturum bulunamadı." };
+    }
+
+    const noteId = id?.trim();
+    if (!noteId) return { success: false, error: "Not kimliği zorunludur." };
+
+    const { error } = await auth.supabase
+      .from("personal_notes")
+      .update({
+        is_completed: isCompleted,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", noteId)
+      .eq("user_id", auth.user.id);
+
+    if (error) {
+      console.error("[toggleNoteCompletion]", error.message);
+      return { success: false, error: "Not durumu güncellenemedi." };
+    }
+
+    revalidatePersonal();
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: logActionError(
+        "toggleNoteCompletion",
+        error,
+        "Not durumu güncellenirken bir hata oluştu.",
       ),
     };
   }

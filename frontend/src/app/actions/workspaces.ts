@@ -6,8 +6,6 @@ import { cookies } from "next/headers";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/auth-session";
 import type { WorkspaceListItem } from "@/lib/supabase/types";
 
-export type { WorkspaceListItem } from "@/lib/supabase/types";
-
 export type GetWorkspacesResult =
   | { success: true; workspaces: WorkspaceListItem[] }
   | { success: false; error: string };

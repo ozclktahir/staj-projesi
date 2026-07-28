@@ -5,19 +5,21 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
   type DragEvent,
 } from "react";
 import {
   CalendarDays,
+  Check,
   CheckSquare,
   Download,
-  FileText,
   Flag,
   ImageIcon,
   ListTodo,
   Loader2,
   NotebookPen,
   Plus,
+  RotateCcw,
   StickyNote,
   Trash2,
   Upload,
@@ -29,14 +31,11 @@ import {
   deletePersonalFile,
   deletePersonalNote,
   deletePersonalTodo,
+  toggleNoteCompletion,
   togglePersonalTodo,
   updatePersonalNote,
   uploadPersonalFile,
-  type PersonalFile,
-  type PersonalNote,
-  type PersonalTodo,
 } from "@/app/actions/personal";
-import type { AssignedTaskWithSubtasks } from "@/app/actions/tasks";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
 import {
   Accordion,
@@ -46,6 +45,14 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -70,6 +77,12 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
+import type {
+  AssignedTaskWithSubtasks,
+  PersonalFile,
+  PersonalNote,
+  PersonalTodo,
+} from "@/types/personal-workspace";
 import { cn } from "@/lib/utils";
 
 type TabId = "assigned" | "notes" | "todos" | "files";
@@ -120,6 +133,15 @@ function priorityClass(priority: ProjectTask["priority"]): string {
     default:
       return "text-amber-600 dark:text-amber-400";
   }
+}
+
+function formatNoteDateTime(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  // gg.aa.yyyy ss:dd
+  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function formatTaskDue(value: string | null | undefined): string | null {
@@ -198,7 +220,8 @@ export function PersonalWorkspace({
   initialTodos: PersonalTodo[];
   initialFiles: PersonalFile[];
 }) {
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
+  const [, startTransition] = useTransition();
   const [tab, setTab] = useState<TabId>("assigned");
   const [assignedTasks, setAssignedTasks] = useState(initialAssignedTasks);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -258,6 +281,8 @@ export function PersonalWorkspace({
   const [noteTaskId, setNoteTaskId] = useState<string>("none");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteBusy, setNoteBusy] = useState(false);
+  const [notePendingId, setNotePendingId] = useState<string | null>(null);
+  const [noteToDelete, setNoteToDelete] = useState<PersonalNote | null>(null);
 
   const [todoText, setTodoText] = useState("");
   const [todoDue, setTodoDue] = useState("");
@@ -342,6 +367,12 @@ export function PersonalWorkspace({
     }
   }
 
+  function onSaveNoteClick() {
+    startTransition(() => {
+      void handleSaveNote();
+    });
+  }
+
   async function handleDeleteNote(id: string) {
     setNoteBusy(true);
     try {
@@ -352,12 +383,59 @@ export function PersonalWorkspace({
       }
       setNotes((prev) => prev.filter((n) => n.id !== id));
       if (editingNoteId === id) resetNoteForm();
-      toast.success("Not silindi");
+      toast.success(t("notes.deleted"));
     } catch (error) {
       console.error("[PersonalWorkspace] note delete:", error);
-      toast.error("Not silinirken bir hata oluştu.");
+      toast.error(t("notes.saveError"));
     } finally {
       setNoteBusy(false);
+    }
+  }
+
+  function onDeleteNoteClick(id: string) {
+    const note = notes.find((n) => n.id === id) ?? null;
+    setNoteToDelete(note);
+  }
+
+  function onConfirmDeleteNote() {
+    if (!noteToDelete) return;
+    const id = noteToDelete.id;
+    setNoteToDelete(null);
+    startTransition(() => {
+      void handleDeleteNote(id);
+    });
+  }
+
+  async function handleToggleNoteCompletion(note: PersonalNote) {
+    if (notePendingId) return;
+    const next = !note.isCompleted;
+    setNotePendingId(note.id);
+    setNotes((prev) =>
+      prev.map((n) =>
+        n.id === note.id ? { ...n, isCompleted: next } : n,
+      ),
+    );
+    try {
+      const result = await toggleNoteCompletion(note.id, next);
+      if (!result.success) {
+        setNotes((prev) =>
+          prev.map((n) =>
+            n.id === note.id ? { ...n, isCompleted: note.isCompleted } : n,
+          ),
+        );
+        toast.error(result.error);
+        return;
+      }
+    } catch (error) {
+      console.error("[PersonalWorkspace] note toggle:", error);
+      setNotes((prev) =>
+        prev.map((n) =>
+          n.id === note.id ? { ...n, isCompleted: note.isCompleted } : n,
+        ),
+      );
+      toast.error(t("notes.saveError"));
+    } finally {
+      setNotePendingId(null);
     }
   }
 
@@ -792,7 +870,7 @@ export function PersonalWorkspace({
                 <Button
                   type="button"
                   disabled={noteBusy || (!noteTitle.trim() && !noteContent.trim())}
-                  onClick={() => void handleSaveNote()}
+                  onClick={() => onSaveNoteClick()}
                   className="gap-2"
                 >
                   {noteBusy ? (
@@ -825,58 +903,93 @@ export function PersonalWorkspace({
               notes.map((note) => (
                 <Card
                   key={note.id}
-                  className="rounded-lg border-border shadow-sm"
+                  className={cn(
+                    "rounded-lg border-border shadow-sm",
+                    note.isCompleted && "opacity-80",
+                  )}
                 >
-                  <CardHeader className="flex-row items-start justify-between gap-2 space-y-0 pb-2">
-                    <div className="min-w-0">
-                      <CardTitle className="truncate text-sm">
-                        {note.title || t("notes.untitled")}
-                      </CardTitle>
-                      {note.taskId && note.taskTitle ? (
-                        <Badge variant="secondary" className="mt-1.5 text-[11px]">
-                          {t("notes.linkedBadge", { task: note.taskTitle })}
-                        </Badge>
-                      ) : null}
-                      <CardDescription className="text-xs">
-                        {note.updatedAt
-                          ? new Date(note.updatedAt).toLocaleString(
-                              locale === "en" ? "en-US" : "tr-TR",
-                            )
-                          : ""}
-                      </CardDescription>
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        {note.taskId && note.taskTitle ? (
+                          <Badge
+                            variant="secondary"
+                            className="max-w-full truncate text-[11px]"
+                          >
+                            {t("notes.linkedBadge", { task: note.taskTitle })}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[11px]">
+                            {t("notes.independent")}
+                          </Badge>
+                        )}
+                      </div>
+                      <time className="shrink-0 text-xs text-muted-foreground">
+                        {formatNoteDateTime(
+                          note.updatedAt ?? note.createdAt,
+                        )}
+                      </time>
                     </div>
-                    <div className="flex shrink-0 gap-1">
+
+                    <button
+                      type="button"
+                      className={cn(
+                        "w-full space-y-1 text-left",
+                        note.isCompleted && "line-through opacity-60",
+                      )}
+                      onClick={() => {
+                        setEditingNoteId(note.id);
+                        setNoteTitle(note.title);
+                        setNoteContent(note.content);
+                        setNoteTaskId(note.taskId ?? "none");
+                      }}
+                    >
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {note.title || t("notes.untitled")}
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                        {note.content || "—"}
+                      </p>
+                    </button>
+
+                    <div className="flex items-center justify-end gap-1.5">
                       <Button
                         type="button"
-                        size="icon-sm"
-                        variant="ghost"
+                        size="sm"
+                        variant="outline"
+                        disabled={notePendingId === note.id || noteBusy}
                         onClick={() => {
-                          setEditingNoteId(note.id);
-                          setNoteTitle(note.title);
-                          setNoteContent(note.content);
-                          setNoteTaskId(note.taskId ?? "none");
+                          startTransition(() => {
+                            void handleToggleNoteCompletion(note);
+                          });
                         }}
-                        aria-label="Düzenle"
+                        className="gap-1.5"
+                        aria-label={
+                          note.isCompleted ? "Geri Al" : "Tamamla"
+                        }
                       >
-                        <FileText className="size-3.5" />
+                        {notePendingId === note.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : note.isCompleted ? (
+                          <RotateCcw className="size-3.5" />
+                        ) : (
+                          <Check className="size-3.5" />
+                        )}
+                        {note.isCompleted ? "Geri Al" : "Tamamla"}
                       </Button>
                       <Button
                         type="button"
-                        size="icon-sm"
+                        size="sm"
                         variant="ghost"
                         disabled={noteBusy}
-                        onClick={() => void handleDeleteNote(note.id)}
-                        className="text-destructive hover:text-destructive"
+                        onClick={() => onDeleteNoteClick(note.id)}
+                        className="gap-1.5 text-destructive hover:text-destructive"
                         aria-label="Sil"
                       >
                         <Trash2 className="size-3.5" />
+                        Sil
                       </Button>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                      {note.content || "—"}
-                    </p>
                   </CardContent>
                 </Card>
               ))
@@ -885,24 +998,58 @@ export function PersonalWorkspace({
         </div>
       ) : null}
 
+      <Dialog
+        open={Boolean(noteToDelete)}
+        onOpenChange={(open) => {
+          if (!open) setNoteToDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Notu sil</DialogTitle>
+            <DialogDescription>
+              “{noteToDelete?.title || t("notes.untitled")}” notunu silmek
+              istediğine emin misin? Bu işlem geri alınamaz.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setNoteToDelete(null)}
+            >
+              İptal
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={noteBusy}
+              onClick={() => onConfirmDeleteNote()}
+            >
+              Sil
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {tab === "todos" ? (
-        <div className="space-y-4">
+        <div className="space-y-2">
           <Card className="rounded-lg border-border shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <CalendarDays className="size-4 text-primary" />
+            <CardHeader className="space-y-1 p-3 pb-1">
+              <CardTitle className="flex items-center gap-1.5 text-sm">
+                <CalendarDays className="size-3.5 text-primary" />
                 Akıllı yapılacaklar
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs">
                 Teslim tarihi yaklaşan veya geçmiş görevler vurgulanır
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3 sm:flex-row">
+            <CardContent className="flex flex-col gap-2 p-3 pt-2 sm:flex-row sm:items-center">
               <Input
                 value={todoText}
                 onChange={(e) => setTodoText(e.target.value)}
                 placeholder="Yeni kişisel görev…"
-                className="flex-1"
+                className="h-8 flex-1 text-sm"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -914,18 +1061,23 @@ export function PersonalWorkspace({
                 type="date"
                 value={todoDue}
                 onChange={(e) => setTodoDue(e.target.value)}
-                className="w-full sm:w-44"
+                className="h-8 w-full text-sm sm:w-36"
               />
               <Button
                 type="button"
+                size="sm"
                 disabled={todoBusy || !todoText.trim()}
-                onClick={() => void handleAddTodo()}
-                className="gap-2"
+                onClick={() => {
+                  startTransition(() => {
+                    void handleAddTodo();
+                  });
+                }}
+                className="h-8 gap-1.5"
               >
                 {todoBusy ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <Loader2 className="size-3.5 animate-spin" />
                 ) : (
-                  <Plus className="size-4" />
+                  <Plus className="size-3.5" />
                 )}
                 Ekle
               </Button>
@@ -933,18 +1085,18 @@ export function PersonalWorkspace({
           </Card>
 
           {sortedTodos.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-card/60 px-4 py-12 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border bg-card/60 px-3 py-6 text-center text-xs text-muted-foreground">
               Henüz kişisel görev yok.
             </div>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-1.5">
               {sortedTodos.map((todo) => {
                 const tone = dueTone(todo.dueDate, todo.isCompleted);
                 return (
                   <li
                     key={todo.id}
                     className={cn(
-                      "flex items-start gap-3 rounded-lg border border-border bg-card px-3 py-3 shadow-sm",
+                      "flex items-start gap-2 rounded-md border border-border bg-card px-2.5 py-2 shadow-sm",
                       todo.isCompleted && "opacity-70",
                     )}
                   >
@@ -952,13 +1104,17 @@ export function PersonalWorkspace({
                       type="checkbox"
                       checked={todo.isCompleted}
                       disabled={todoActionId === todo.id}
-                      onChange={() => void handleToggleTodo(todo)}
-                      className="mt-1 size-4 rounded border-border accent-primary"
+                      onChange={() => {
+                        startTransition(() => {
+                          void handleToggleTodo(todo);
+                        });
+                      }}
+                      className="mt-0.5 size-3.5 rounded border-border accent-primary"
                     />
                     <div className="min-w-0 flex-1">
                       <p
                         className={cn(
-                          "text-sm font-medium text-foreground",
+                          "text-xs font-medium text-foreground",
                           todo.isCompleted &&
                             "text-muted-foreground line-through",
                         )}
@@ -968,7 +1124,7 @@ export function PersonalWorkspace({
                       {tone ? (
                         <span
                           className={cn(
-                            "mt-1.5 inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium",
+                            "mt-1 inline-flex rounded border px-1.5 py-0.5 text-[10px] font-medium",
                             tone.className,
                           )}
                         >
@@ -981,14 +1137,18 @@ export function PersonalWorkspace({
                       size="icon-sm"
                       variant="ghost"
                       disabled={todoActionId === todo.id}
-                      onClick={() => void handleDeleteTodo(todo.id)}
-                      className="text-destructive hover:text-destructive"
+                      onClick={() => {
+                        startTransition(() => {
+                          void handleDeleteTodo(todo.id);
+                        });
+                      }}
+                      className="size-7 text-destructive hover:text-destructive"
                       aria-label="Görevi sil"
                     >
                       {todoActionId === todo.id ? (
-                        <Loader2 className="size-3.5 animate-spin" />
+                        <Loader2 className="size-3 animate-spin" />
                       ) : (
-                        <Trash2 className="size-3.5" />
+                        <Trash2 className="size-3" />
                       )}
                     </Button>
                   </li>
@@ -1111,7 +1271,11 @@ export function PersonalWorkspace({
                         size="sm"
                         variant="ghost"
                         disabled={fileBusy}
-                        onClick={() => void handleDeleteFile(file.id)}
+                        onClick={() => {
+                          startTransition(() => {
+                            void handleDeleteFile(file.id);
+                          });
+                        }}
                         className="text-destructive hover:text-destructive"
                         aria-label="Dosyayı sil"
                       >

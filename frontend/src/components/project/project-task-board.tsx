@@ -8,7 +8,7 @@ import {
   useState,
   type MouseEvent,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowUpDown,
   Check,
@@ -501,6 +501,7 @@ export function ProjectTaskBoard({
   projectId,
 }: ProjectTaskBoardProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tasks, setTasks] = useState(initialTasks);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -519,6 +520,12 @@ export function ProjectTaskBoard({
   useEffect(() => {
     setTasks(initialTasks);
   }, [initialTasks]);
+
+  useEffect(() => {
+    const taskId = searchParams.get("taskId")?.trim() || null;
+    if (!taskId) return;
+    setSelectedTaskId(taskId);
+  }, [searchParams]);
 
   // Realtime: project tasks
   useEffect(() => {

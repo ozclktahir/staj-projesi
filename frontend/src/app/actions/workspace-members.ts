@@ -5,10 +5,8 @@ import {
   loadProfilesByIds,
   resolveMemberDisplayFields,
 } from "@/lib/member-labels";
-import {
-  resolveWorkspaceRole,
-  type WorkspaceMemberOption,
-} from "@/lib/workspace-permissions";
+import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
+import type { WorkspaceMemberOption } from "@/lib/member-labels";
 
 export type GetWorkspaceMembersResult =
   | { success: true; members: WorkspaceMemberOption[]; isAdmin: boolean }

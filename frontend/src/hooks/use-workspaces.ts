@@ -3,16 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { setActiveWorkspaceCookie, clearActiveWorkspaceCookie } from "@/app/actions/set-active-workspace";
-import {
-  getWorkspaces,
-  type WorkspaceListItem,
-} from "@/app/actions/workspaces";
+import { getWorkspaces } from "@/app/actions/workspaces";
 import {
   ACTIVE_WORKSPACE_COOKIE,
   WORKSPACE_QUERY_KEY,
   withWorkspaceQuery,
 } from "@/lib/active-workspace";
 import { pickDefaultAdminWorkspace } from "@/lib/member-labels";
+import type { WorkspaceListItem } from "@/lib/supabase/types";
 
 export const ACTIVE_WORKSPACE_KEY = "active_workspace_id";
 

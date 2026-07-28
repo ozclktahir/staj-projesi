@@ -19,11 +19,9 @@ import {
   deleteNotification,
   getMyNotifications,
   getMyPendingInvitations,
-  markAllNotificationsAsRead,
-  markNotificationAsRead,
+  markAllNotificationsRead,
+  markNotificationRead,
   respondToWorkspaceInvite,
-  type NotificationItem,
-  type PendingInvitationItem,
 } from "@/app/actions/notifications";
 import {
   approveTaskDeletion,
@@ -37,6 +35,8 @@ import {
   isWorkspaceInviteNotification,
   taskIdFromNotification,
   taskLinkFromNotification,
+  type NotificationItem,
+  type PendingInvitationItem,
 } from "@/lib/notification-utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -438,7 +438,7 @@ export function InviteNotificationsMenu({
   const handleMarkAllRead = async () => {
     setMarkingAll(true);
     try {
-      const result = await markAllNotificationsAsRead();
+      const result = await markAllNotificationsRead();
       if (!result.success) {
         toast.error(result.error ?? "İşlem başarısız");
         return;
@@ -514,7 +514,7 @@ export function InviteNotificationsMenu({
         ),
       );
       try {
-        const result = await markNotificationAsRead(n.id);
+        const result = await markNotificationRead(n.id);
         if (!result.success) {
           setNotifications((prev) =>
             prev.map((item) =>

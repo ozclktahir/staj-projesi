@@ -1,5 +1,5 @@
 import type { ProjectTask } from "@/lib/supabase/types";
-import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
+import type { WorkspaceMemberOption } from "@/lib/member-labels";
 
 const TTL_MS = 45_000;
 

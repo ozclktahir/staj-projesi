@@ -5,31 +5,8 @@ import { getAuthenticatedUser } from "@/lib/supabase/server";
 import {
   normalizeTaskStatusInput,
   type TaskPriority,
-  type TaskStatus,
 } from "@/lib/supabase/types";
-
-export type UpcomingItemKind = "task" | "subtask" | "todo";
-
-export type UpcomingDeadlineItem = {
-  id: string;
-  kind: UpcomingItemKind;
-  title: string;
-  dueDate: string;
-  status: TaskStatus | "OPEN" | "DONE";
-  priority: TaskPriority | null;
-  projectId: string | null;
-  projectName: string | null;
-  parentTaskId: string | null;
-  parentTaskTitle: string | null;
-  completed: boolean;
-  subtasks: Array<{
-    id: string;
-    title: string;
-    status: TaskStatus;
-    dueDate: string | null;
-    completed: boolean;
-  }>;
-};
+import type { UpcomingDeadlineItem } from "@/types/personal-workspace";
 
 export type GetUpcomingDeadlinesResult =
   | { success: true; items: UpcomingDeadlineItem[] }

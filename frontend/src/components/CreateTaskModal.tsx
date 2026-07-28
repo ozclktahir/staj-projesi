@@ -11,7 +11,7 @@ import {
   type RejectedTaskItem,
 } from "@/app/actions/reassign-rejected-task";
 import { getWorkspaceMembers } from "@/app/actions/workspace-members";
-import type { WorkspaceMemberOption } from "@/lib/workspace-permissions";
+import type { WorkspaceMemberOption } from "@/lib/member-labels";
 import {
   getCachedWorkspaceMembers,
   setCachedWorkspaceMembers,

@@ -13,6 +13,15 @@ export type NotificationItem = {
   payload: Record<string, unknown> | null;
 };
 
+export type PendingInvitationItem = {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  role: string | null;
+  email: string;
+  createdAt: string | null;
+};
+
 export type NotificationKind =
   | "workspace_invite"
   | "task_assigned"
