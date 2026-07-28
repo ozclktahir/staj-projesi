@@ -86,8 +86,11 @@
   - [x] Task (Görev) yönetimi ve detay ekranları
     - (20 Temmuz 2026) Task Detail Sheet (Slide-over) bileşeni geliştirildi, Kanban kartlarına tıklandığında sağ taraftan açılan panel entegre edildi.
 - [ ] **Faz 8: Mobil Uygulama Geliştirme (Flutter)**
-  - [ ] Flutter proje kurulumu ve mimari yapılandırma (Web fazı tamamlandıktan sonra başlanacak)
-  - [ ] Mobil için Auth, Workspace ve Task ekranlarının geliştirilmesi
+  - [ ] **Adım 1:** Flutter Proje Kurulumu ve Feature-first Mimari Yapılandırması (dio, riverpod, go_router, secure_storage)
+  - [ ] **Adım 2:** Auth Modülü, Login/Register Ekranları ve NestJS API Entegrasyonu (JWT & Auth Guard)
+  - [ ] **Adım 3:** Workspace ve Proje Yönetimi Ekranları (Workspace Switcher & Proje Listesi)
+  - [ ] **Adım 4:** Görev (Task) Yönetimi ve Kanban Panosu (Durum Yönetimi, Görev Detayları)
+  - [ ] **Adım 5:** Gelişmiş Özellikler (Yorumlar, Dosya Ekleri, Bildirimler ve Realtime)
 
 ### 🔮 Gelecek Planları (Zaman Kalırsa eklenecekler)
 - [ ] AI ile görev önerileri, özeti ve deadline tahmini.
@@ -408,3 +411,6 @@
 - Performans Optimizasyonu: Server Component'lerdeki veri çekme işlemleri Promise.all ile paralelleştirildi. Supabase select sorguları daraltıldı. Ağır UI bileşenlerine next/dynamic (Lazy Loading) uygulandı ve "use client" sınırları daraltılarak render süreleri iyileştirildi.
 - Performans ve UX İyileştirmesi: Ekleme/silme/tamamlama işlemleri için useOptimistic (Optimistic UI) mimarisi kuruldu, tepki süresi 0ms'ye indirildi. Sayfa geçişlerindeki donmaları önlemek için loading.tsx dosyaları eklendi ve ağır bileşenler Suspense ile sarmalanarak Streaming aktif edildi.
 - Altyapı Optimizasyonu: Supabase tablolarına performans indeksleri eklendi. Ağır sorgulara LIMIT (Sayfalama) getirildi. Sık değişmeyen veriler Next.js önbelleğine alındı ve filtrelemelere Debounce uygulanarak sunucu yükü %80 oranında hafifletildi.
+
+### [28 Temmuz 2026] - Faz 8 mobil yol haritası
+- Genel Yol Haritası’na **Faz 8: Mobil Uygulama Geliştirme (Flutter)** için Adım 1–5 alt planı eklendi (kurulum/mimari, auth, workspace/proje, görev/kanban, gelişmiş özellikler).
