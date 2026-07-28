@@ -1,6 +1,7 @@
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
 import { getWorkspaceAnalytics } from "@/app/actions/analytics";
 import { getWorkspaceActivityLogs } from "@/app/actions/activity-logs";
+import { getUpcomingDeadlinesItems } from "@/app/actions/upcoming-deadlines";
 import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
 
 type DashboardPageProps = {
@@ -25,9 +26,10 @@ export default async function DashboardPage({
     );
   }
 
-  const [analyticsResult, activityResult] = await Promise.all([
+  const [analyticsResult, activityResult, deadlinesResult] = await Promise.all([
     getWorkspaceAnalytics(workspaceId),
     getWorkspaceActivityLogs(workspaceId, 8),
+    getUpcomingDeadlinesItems(),
   ]);
 
   if (!analyticsResult.success) {
@@ -44,6 +46,7 @@ export default async function DashboardPage({
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <AnalyticsDashboard
         data={analyticsResult.data}
+        upcomingItems={deadlinesResult.success ? deadlinesResult.items : []}
         recentLogs={activityResult.success ? activityResult.logs : []}
         title="Dashboard"
         description="Workspace genel bakış: KPI’lar, görev grafikleri, iş yükü ve son aktiviteler."

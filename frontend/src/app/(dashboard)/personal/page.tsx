@@ -4,7 +4,7 @@ import {
   getPersonalNotes,
   getPersonalTodos,
 } from "@/app/actions/personal";
-import { getMyTasks } from "@/app/actions/tasks";
+import { getAssignedTasksByPriority } from "@/app/actions/tasks";
 import { PersonalWorkspace } from "@/components/personal/personal-workspace";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 
@@ -21,7 +21,7 @@ export default async function PersonalPage() {
 
   const [assignedResult, notesResult, todosResult, filesResult] =
     await Promise.all([
-      getMyTasks(),
+      getAssignedTasksByPriority(),
       getPersonalNotes(),
       getPersonalTodos(),
       getPersonalFiles(),
@@ -60,6 +60,10 @@ export default async function PersonalPage() {
             {errors[0]} Gerekirse Supabase&apos;de{" "}
             <code className="rounded bg-background/60 px-1">
               add_personal_workspace.sql
+            </code>{" "}
+            /{" "}
+            <code className="rounded bg-background/60 px-1">
+              add_personal_notes_task_id.sql
             </code>{" "}
             migration&apos;ını çalıştır.
           </p>

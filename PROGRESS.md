@@ -399,3 +399,6 @@
 - Bug Fix: Görev silme onayındaki veritabanı ilişkili kayıt (foreign key) engeli giderildi ve revalidatePath entegrasyonuyla silinen görevlerin anında arayüzden kalkması sağlandı.
 - Bildirim yönetim sistemi geliştirildi: Zil menüsündeki bildirimler için tek tek silme ve "Tümünü Temizle" özellikleri ile Server Action entegrasyonu sağlandı.
 - Görev reddetme akışı güncellendi: Reddedilen görevler silinmek yerine arşivlendi. "Yeni Görev Ekle" modalına reddedilen görevleri hızlıca seçip başka kullanıcılara yeniden atama (re-assign) desteği getirildi.
+
+### [28 Temmuz 2026] - UI Cleanup, filtreler, not-görev ilişkisi ve i18n
+- Kapsamlı UI revizyonu yapıldı: My Tasks ve Favorites sayfaları kaldırıldı, Header sadeleştirildi. Yaklaşan Tarihler ve Atanan Görevler listelerine açılır-kapanır alt görev (Accordion) desteği, öncelik/tarih bazlı sıralama ve filtreleme eklendi. Kişisel notlar görevlerle ilişkilendirilebilir hale getirildi. Ayarlar sayfasına İngilizce/Türkçe dil seçeneği (i18n altyapısı) eklendi. Tüm Server Action'lar asenkron kurallarına uygun revize edildi.

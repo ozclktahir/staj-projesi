@@ -3,12 +3,11 @@
 import { Suspense, useState } from "react";
 import { LogOut, Menu, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { CreateProjectModal } from "@/components/CreateProjectModal";
 import { InviteNotificationsMenu } from "@/components/invite-notifications-menu";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/i18n/use-translation";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { clearAuthSession } from "@/lib/auth-session";
-import { isAdminRole } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 
 type AppHeaderProps = {
@@ -34,8 +33,8 @@ function AppHeaderInner({
   onOpenMobileNav,
 }: AppHeaderProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const { activeWorkspace, activeWorkspaceId, refresh } = useWorkspaces();
-  const canCreateProject = isAdminRole(activeWorkspace?.role);
+  const { refresh } = useWorkspaces();
+  const { t } = useTranslation();
 
   // DB'den gelen ad-soyad olduğu gibi; boşsa e-posta
   const displayName = userName.trim() || userEmail?.trim() || "";
@@ -51,10 +50,10 @@ function AppHeaderInner({
     setIsLoggingOut(true);
     try {
       await clearAuthSession();
-      toast.success("Çıkış yapıldı");
+      toast.success(t("header.logoutSuccess"));
       window.location.assign("/login");
     } catch {
-      toast.error("Çıkış yapılamadı. Tekrar deneyin.");
+      toast.error(t("header.logoutError"));
       setIsLoggingOut(false);
     }
   }
@@ -69,28 +68,20 @@ function AppHeaderInner({
             size="icon"
             className="shrink-0 md:hidden"
             onClick={onOpenMobileNav}
-            aria-label="Menüyü aç"
+            aria-label={t("header.openMenu")}
           >
             <Menu className="size-5" />
           </Button>
         ) : null}
         <div className="min-w-0">
-          <p className="text-sm text-muted-foreground">Genel bakış</p>
+          <p className="text-sm text-muted-foreground">{t("header.overview")}</p>
           <h1 className="truncate text-base font-semibold tracking-tight text-foreground">
-            Çalışma alanı
+            {t("header.workspace")}
           </h1>
         </div>
       </div>
 
       <div className="flex items-center gap-2">
-        {canCreateProject ? (
-          <CreateProjectModal
-            triggerLabel="Yeni Proje"
-            workspaceId={activeWorkspaceId}
-            triggerClassName="hidden rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90 sm:inline-flex"
-          />
-        ) : null}
-
         <InviteNotificationsMenu
           onAccepted={() => {
             void refresh();
@@ -132,11 +123,11 @@ function AppHeaderInner({
           onClick={handleLogout}
           disabled={isLoggingOut}
           className="rounded-[var(--radius)] gap-1.5"
-          aria-label="Çıkış yap"
+          aria-label={t("header.logout")}
         >
           <LogOut className="size-4" />
           <span className="hidden sm:inline">
-            {isLoggingOut ? "Çıkılıyor…" : "Çıkış"}
+            {isLoggingOut ? t("header.loggingOut") : t("header.logout")}
           </span>
         </Button>
       </div>

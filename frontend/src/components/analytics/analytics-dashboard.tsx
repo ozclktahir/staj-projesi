@@ -2,6 +2,7 @@
 
 import type { ActivityLogItem } from "@/app/actions/activity-logs";
 import type { AnalyticsData } from "@/app/actions/analytics";
+import type { UpcomingDeadlineItem } from "@/app/actions/upcoming-deadlines";
 import { AnalyticsStatCards } from "@/components/analytics/analytics-stat-cards";
 import {
   PriorityBarCard,
@@ -13,6 +14,7 @@ import { UpcomingDeadlines } from "@/components/analytics/upcoming-deadlines";
 
 type AnalyticsDashboardProps = {
   data: AnalyticsData;
+  upcomingItems?: UpcomingDeadlineItem[];
   recentLogs?: ActivityLogItem[];
   title?: string;
   description?: string;
@@ -20,11 +22,28 @@ type AnalyticsDashboardProps = {
 
 export function AnalyticsDashboard({
   data,
+  upcomingItems,
   recentLogs = [],
   title = "Workspace Komuta Merkezi",
   description = "Tüm projelerin özet metrikleri, grafikler ve son hareketler.",
 }: AnalyticsDashboardProps) {
-  const deadlines = data.upcomingDeadlines.slice(0, 5);
+  const deadlines =
+    upcomingItems && upcomingItems.length > 0
+      ? upcomingItems
+      : data.upcomingDeadlines.map((item) => ({
+          id: item.id,
+          kind: "task" as const,
+          title: item.title,
+          dueDate: item.dueDate,
+          status: item.status,
+          priority: null,
+          projectId: item.projectId,
+          projectName: item.projectName,
+          parentTaskId: null,
+          parentTaskTitle: null,
+          completed: item.status === "DONE",
+          subtasks: [],
+        }));
 
   return (
     <div className="flex w-full flex-col gap-4">

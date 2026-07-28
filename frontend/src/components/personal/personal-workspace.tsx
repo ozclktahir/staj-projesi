@@ -36,10 +36,25 @@ import {
   type PersonalNote,
   type PersonalTodo,
 } from "@/app/actions/personal";
+import type { AssignedTaskWithSubtasks } from "@/app/actions/tasks";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -47,10 +62,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/i18n/use-translation";
 import {
   TASK_PRIORITY_LABELS,
   TASK_STATUS_LABELS,
   type ProjectTask,
+  type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
@@ -176,11 +193,12 @@ export function PersonalWorkspace({
   initialTodos,
   initialFiles,
 }: {
-  initialAssignedTasks: ProjectTask[];
+  initialAssignedTasks: AssignedTaskWithSubtasks[];
   initialNotes: PersonalNote[];
   initialTodos: PersonalTodo[];
   initialFiles: PersonalFile[];
 }) {
+  const { t, locale } = useTranslation();
   const [tab, setTab] = useState<TabId>("assigned");
   const [assignedTasks, setAssignedTasks] = useState(initialAssignedTasks);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -188,13 +206,56 @@ export function PersonalWorkspace({
   const [todos, setTodos] = useState(initialTodos);
   const [files, setFiles] = useState(initialFiles);
 
+  const [priorityFilter, setPriorityFilter] = useState<"all" | TaskPriority>(
+    "all",
+  );
+  const [statusFilter, setStatusFilter] = useState<"all" | TaskStatus>("all");
+  const [dateFilter, setDateFilter] = useState<
+    "all" | "hasDue" | "noDue" | "overdue"
+  >("all");
+
   const selectedTask = useMemo(
-    () => assignedTasks.find((t) => t.id === selectedTaskId) ?? null,
+    () =>
+      assignedTasks.find(
+        (t) => t.id === selectedTaskId && !t.id.startsWith("todo:"),
+      ) ?? null,
     [assignedTasks, selectedTaskId],
   );
 
+  const activeTasksForNotes = useMemo(
+    () =>
+      assignedTasks.filter(
+        (task) =>
+          !task.id.startsWith("todo:") &&
+          task.status !== "DONE" &&
+          task.assignment_status !== "rejected",
+      ),
+    [assignedTasks],
+  );
+
+  const filteredAssigned = useMemo(() => {
+    const now = Date.now();
+    return assignedTasks.filter((task) => {
+      if (priorityFilter !== "all" && task.priority !== priorityFilter) {
+        return false;
+      }
+      if (statusFilter !== "all" && task.status !== statusFilter) {
+        return false;
+      }
+      if (dateFilter === "hasDue" && !task.due_date) return false;
+      if (dateFilter === "noDue" && task.due_date) return false;
+      if (dateFilter === "overdue") {
+        if (!task.due_date || task.status === "DONE") return false;
+        const due = new Date(task.due_date).getTime();
+        if (Number.isNaN(due) || due >= now) return false;
+      }
+      return true;
+    });
+  }, [assignedTasks, priorityFilter, statusFilter, dateFilter]);
+
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
+  const [noteTaskId, setNoteTaskId] = useState<string>("none");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteBusy, setNoteBusy] = useState(false);
 
@@ -220,17 +281,23 @@ export function PersonalWorkspace({
     setEditingNoteId(null);
     setNoteTitle("");
     setNoteContent("");
+    setNoteTaskId("none");
   }, []);
 
   async function handleSaveNote() {
     if (noteBusy) return;
     setNoteBusy(true);
+    const linkedTaskId = noteTaskId === "none" ? null : noteTaskId;
+    const linkedTaskTitle =
+      activeTasksForNotes.find((task) => task.id === linkedTaskId)?.title ??
+      null;
     try {
       if (editingNoteId) {
         const result = await updatePersonalNote({
           id: editingNoteId,
           title: noteTitle,
           content: noteContent,
+          taskId: linkedTaskId,
         });
         if (!result.success) {
           toast.error(result.error);
@@ -241,14 +308,16 @@ export function PersonalWorkspace({
             n.id === editingNoteId
               ? {
                   ...n,
-                  title: noteTitle.trim() || "Başlıksız not",
+                  title: noteTitle.trim() || t("notes.untitled"),
                   content: noteContent.trim(),
+                  taskId: linkedTaskId,
+                  taskTitle: linkedTaskTitle,
                   updatedAt: new Date().toISOString(),
                 }
               : n,
           ),
         );
-        toast.success("Not güncellendi");
+        toast.success(t("notes.updated"));
         resetNoteForm();
         return;
       }
@@ -256,17 +325,18 @@ export function PersonalWorkspace({
       const result = await createPersonalNote({
         title: noteTitle,
         content: noteContent,
+        taskId: linkedTaskId,
       });
       if (!result.success) {
         toast.error(result.error);
         return;
       }
       setNotes((prev) => [result.note, ...prev]);
-      toast.success("Not eklendi");
+      toast.success(t("notes.saved"));
       resetNoteForm();
     } catch (error) {
       console.error("[PersonalWorkspace] note save:", error);
-      toast.error("Not kaydedilirken bir hata oluştu.");
+      toast.error(t("notes.saveError"));
     } finally {
       setNoteBusy(false);
     }
@@ -449,88 +519,194 @@ export function PersonalWorkspace({
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <ListTodo className="size-4 text-primary" />
-                Atanan proje görevleri
+                {t("assigned.title")}
               </CardTitle>
-              <CardDescription>
-                Tüm projelerde sana atanmış görevler — tıklayarak detayı aç
-              </CardDescription>
+              <CardDescription>{t("assigned.description")}</CardDescription>
             </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              <Select
+                value={priorityFilter}
+                onValueChange={(v) =>
+                  setPriorityFilter(v as "all" | TaskPriority)
+                }
+              >
+                <SelectTrigger className="w-[160px]" size="sm">
+                  <SelectValue placeholder={t("assigned.filterPriority")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("assigned.allPriorities")}</SelectItem>
+                  <SelectItem value="HIGH">{TASK_PRIORITY_LABELS.HIGH}</SelectItem>
+                  <SelectItem value="MEDIUM">
+                    {TASK_PRIORITY_LABELS.MEDIUM}
+                  </SelectItem>
+                  <SelectItem value="LOW">{TASK_PRIORITY_LABELS.LOW}</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={statusFilter}
+                onValueChange={(v) =>
+                  setStatusFilter(v as "all" | TaskStatus)
+                }
+              >
+                <SelectTrigger className="w-[160px]" size="sm">
+                  <SelectValue placeholder={t("assigned.filterStatus")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("assigned.allStatuses")}</SelectItem>
+                  <SelectItem value="TODO">{TASK_STATUS_LABELS.TODO}</SelectItem>
+                  <SelectItem value="IN_PROGRESS">
+                    {TASK_STATUS_LABELS.IN_PROGRESS}
+                  </SelectItem>
+                  <SelectItem value="DONE">{TASK_STATUS_LABELS.DONE}</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={dateFilter}
+                onValueChange={(v) =>
+                  setDateFilter(
+                    v as "all" | "hasDue" | "noDue" | "overdue",
+                  )
+                }
+              >
+                <SelectTrigger className="w-[160px]" size="sm">
+                  <SelectValue placeholder={t("assigned.filterDate")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("assigned.allDates")}</SelectItem>
+                  <SelectItem value="hasDue">{t("assigned.hasDue")}</SelectItem>
+                  <SelectItem value="noDue">{t("assigned.noDueFilter")}</SelectItem>
+                  <SelectItem value="overdue">{t("assigned.overdue")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardContent>
           </Card>
 
-          {assignedTasks.length === 0 ? (
+          {filteredAssigned.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border bg-card/60 px-4 py-12 text-center text-sm text-muted-foreground">
-              Henüz sana atanmış proje görevi yok.
+              {t("assigned.empty")}
             </div>
           ) : (
-            <ul className="space-y-2">
-              {assignedTasks.map((task) => {
-                const projectLabel = task.project_name?.trim() || "Proje";
+            <Accordion type="multiple" className="space-y-2">
+              {filteredAssigned.map((task) => {
+                const projectLabel =
+                  task.project_name?.trim() || t("common.project");
                 const dueLabel = formatTaskDue(task.due_date);
+                const isTodoItem = task.id.startsWith("todo:");
                 return (
-                  <li key={task.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTaskId(task.id)}
-                      className="flex w-full flex-col gap-2 rounded-lg border border-border bg-card px-3 py-3 text-left shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/30"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
+                  <AccordionItem
+                    key={task.id}
+                    value={task.id}
+                    className="rounded-lg border border-border bg-card px-3 shadow-sm"
+                  >
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex min-w-0 flex-1 flex-col gap-2 pr-2 text-left">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <span
+                              className={cn(
+                                "mb-1.5 inline-flex max-w-full truncate rounded-md border px-2 py-0.5 text-[11px] font-semibold",
+                                projectBadgeClass(task.project_id),
+                              )}
+                            >
+                              {projectLabel}
+                            </span>
+                            <p className="text-sm font-semibold text-foreground">
+                              {task.title}
+                            </p>
+                          </div>
                           <span
                             className={cn(
-                              "mb-1.5 inline-flex max-w-full truncate rounded-md border px-2 py-0.5 text-[11px] font-semibold",
-                              projectBadgeClass(task.project_id),
+                              "shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-medium",
+                              statusClass(task.status),
                             )}
-                            title={
-                              task.workspace_name
-                                ? `${projectLabel} · ${task.workspace_name}`
-                                : projectLabel
-                            }
                           >
-                            {projectLabel}
+                            {TASK_STATUS_LABELS[task.status]}
                           </span>
-                          <p className="text-sm font-semibold text-foreground">
-                            {task.title}
-                          </p>
                         </div>
-                        <span
-                          className={cn(
-                            "shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-medium",
-                            statusClass(task.status),
-                          )}
-                        >
-                          {TASK_STATUS_LABELS[task.status]}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 font-medium",
-                            priorityClass(task.priority),
-                          )}
-                        >
-                          <Flag className="size-3.5" />
-                          {TASK_PRIORITY_LABELS[task.priority] ??
-                            TASK_PRIORITY_LABELS.MEDIUM}
-                        </span>
-                        {dueLabel ? (
-                          <span className="inline-flex items-center gap-1">
-                            <CalendarDays className="size-3.5" />
-                            {dueLabel}
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 font-medium",
+                              priorityClass(task.priority),
+                            )}
+                          >
+                            <Flag className="size-3.5" />
+                            {TASK_PRIORITY_LABELS[task.priority] ??
+                              TASK_PRIORITY_LABELS.MEDIUM}
                           </span>
-                        ) : (
-                          <span className="text-muted-foreground/70">
-                            Teslim tarihi yok
-                          </span>
-                        )}
+                          {dueLabel ? (
+                            <span className="inline-flex items-center gap-1">
+                              <CalendarDays className="size-3.5" />
+                              {dueLabel}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/70">
+                              {t("assigned.noDue")}
+                            </span>
+                          )}
+                          {!isTodoItem && task.subtasks?.length ? (
+                            <Badge variant="outline" className="text-[10px]">
+                              {task.subtasks.length} {t("assigned.subtasks")}
+                            </Badge>
+                          ) : null}
+                        </div>
                       </div>
-                    </button>
-                  </li>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-3">
+                        {!isTodoItem ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedTaskId(task.id)}
+                          >
+                            Detay
+                          </Button>
+                        ) : null}
+                        {!isTodoItem ? (
+                          task.subtasks?.length ? (
+                            <ul className="space-y-1.5 rounded-md border border-border bg-muted/30 p-2">
+                              {task.subtasks.map((sub) => (
+                                <li
+                                  key={sub.id}
+                                  className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm"
+                                >
+                                  <span className="truncate">{sub.title}</span>
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-[10px]"
+                                    >
+                                      {TASK_PRIORITY_LABELS[sub.priority]}
+                                    </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px]"
+                                    >
+                                      {TASK_STATUS_LABELS[sub.status]}
+                                    </Badge>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              {t("assigned.noSubtasks")}
+                            </p>
+                          )
+                        ) : null}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
                 );
               })}
-            </ul>
+            </Accordion>
           )}
 
-          {selectedTaskId ? (
+          {selectedTaskId && selectedTask ? (
             <TaskDetailSheet
               taskId={selectedTaskId}
               initialTask={selectedTask}
@@ -547,6 +723,7 @@ export function PersonalWorkspace({
                           ...partial,
                           project_name: t.project_name,
                           workspace_name: t.workspace_name,
+                          subtasks: t.subtasks,
                         }
                       : t,
                   ),
@@ -569,32 +746,47 @@ export function PersonalWorkspace({
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <StickyNote className="size-4 text-primary" />
-                {editingNoteId ? "Notu düzenle" : "Yeni not"}
+                {editingNoteId ? t("notes.editNote") : t("notes.newNote")}
               </CardTitle>
-              <CardDescription>
-                Sadece senin görebileceğin kişisel notlar
-              </CardDescription>
+              <CardDescription>{t("notes.privateDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-1.5">
-                <Label htmlFor="note-title">Başlık</Label>
+                <Label htmlFor="note-title">{t("notes.title")}</Label>
                 <Input
                   id="note-title"
                   value={noteTitle}
                   onChange={(e) => setNoteTitle(e.target.value)}
-                  placeholder="Not başlığı"
+                  placeholder={t("notes.titlePlaceholder")}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="note-content">İçerik</Label>
+                <Label htmlFor="note-content">{t("notes.content")}</Label>
                 <textarea
                   id="note-content"
                   value={noteContent}
                   onChange={(e) => setNoteContent(e.target.value)}
                   rows={8}
-                  placeholder="Notunu buraya yaz…"
+                  placeholder={t("notes.contentPlaceholder")}
                   className="flex w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("notes.linkTask")}</Label>
+                <Select value={noteTaskId} onValueChange={setNoteTaskId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={t("notes.independent")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{t("notes.independent")}</SelectItem>
+                    {activeTasksForNotes.map((task) => (
+                      <SelectItem key={task.id} value={task.id}>
+                        {task.title}
+                        {task.project_name ? ` · ${task.project_name}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -608,7 +800,7 @@ export function PersonalWorkspace({
                   ) : (
                     <Plus className="size-4" />
                   )}
-                  {editingNoteId ? "Güncelle" : "Ekle"}
+                  {editingNoteId ? t("notes.update") : t("notes.add")}
                 </Button>
                 {editingNoteId ? (
                   <Button
@@ -617,7 +809,7 @@ export function PersonalWorkspace({
                     disabled={noteBusy}
                     onClick={resetNoteForm}
                   >
-                    İptal
+                    {t("notes.cancel")}
                   </Button>
                 ) : null}
               </div>
@@ -627,7 +819,7 @@ export function PersonalWorkspace({
           <div className="space-y-3">
             {notes.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border bg-card/60 px-4 py-12 text-center text-sm text-muted-foreground">
-                Henüz not yok. Soldan ilk notunu ekle.
+                {t("notes.empty")}
               </div>
             ) : (
               notes.map((note) => (
@@ -638,11 +830,18 @@ export function PersonalWorkspace({
                   <CardHeader className="flex-row items-start justify-between gap-2 space-y-0 pb-2">
                     <div className="min-w-0">
                       <CardTitle className="truncate text-sm">
-                        {note.title || "Başlıksız not"}
+                        {note.title || t("notes.untitled")}
                       </CardTitle>
+                      {note.taskId && note.taskTitle ? (
+                        <Badge variant="secondary" className="mt-1.5 text-[11px]">
+                          {t("notes.linkedBadge", { task: note.taskTitle })}
+                        </Badge>
+                      ) : null}
                       <CardDescription className="text-xs">
                         {note.updatedAt
-                          ? new Date(note.updatedAt).toLocaleString("tr-TR")
+                          ? new Date(note.updatedAt).toLocaleString(
+                              locale === "en" ? "en-US" : "tr-TR",
+                            )
                           : ""}
                       </CardDescription>
                     </div>
@@ -655,6 +854,7 @@ export function PersonalWorkspace({
                           setEditingNoteId(note.id);
                           setNoteTitle(note.title);
                           setNoteContent(note.content);
+                          setNoteTaskId(note.taskId ?? "none");
                         }}
                         aria-label="Düzenle"
                       >

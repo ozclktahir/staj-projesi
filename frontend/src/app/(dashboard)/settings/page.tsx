@@ -1,5 +1,8 @@
-import { Monitor, Settings } from "lucide-react";
+"use client";
+
+import { Languages, Monitor, Settings } from "lucide-react";
 import { ThemeSelector } from "@/components/theme-selector";
+import { LanguageSelector } from "@/components/language-selector";
 import {
   Card,
   CardContent,
@@ -7,14 +10,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/i18n/use-translation";
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <div>
-        <p className="text-sm text-muted-foreground">Settings</p>
+        <p className="text-sm text-muted-foreground">{t("settings.eyebrow")}</p>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Ayarlar
+          {t("settings.title")}
         </h1>
       </div>
 
@@ -23,14 +29,28 @@ export default function SettingsPage() {
           <div className="mb-1 flex size-10 items-center justify-center rounded-[var(--radius)] bg-primary/15 text-primary">
             <Monitor className="size-5" />
           </div>
-          <CardTitle className="text-lg text-foreground">Görünüm</CardTitle>
-          <CardDescription>
-            Uygulama temasını seçin. Tercih tarayıcıda saklanır ve yenilemede
-            korunur.
-          </CardDescription>
+          <CardTitle className="text-lg text-foreground">
+            {t("settings.appearance")}
+          </CardTitle>
+          <CardDescription>{t("settings.appearanceDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <ThemeSelector />
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[var(--radius)] border-border bg-card shadow-sm">
+        <CardHeader>
+          <div className="mb-1 flex size-10 items-center justify-center rounded-[var(--radius)] bg-primary/15 text-primary">
+            <Languages className="size-5" />
+          </div>
+          <CardTitle className="text-lg text-foreground">
+            {t("settings.language")}
+          </CardTitle>
+          <CardDescription>{t("settings.languageDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <LanguageSelector />
         </CardContent>
       </Card>
 
@@ -40,10 +60,10 @@ export default function SettingsPage() {
             <Settings className="size-6" />
           </div>
           <CardTitle className="text-lg text-foreground">
-            Diğer hesap ayarları
+            {t("settings.otherTitle")}
           </CardTitle>
           <CardDescription className="max-w-md">
-            Profil ve bildirim tercihleri yakında burada yönetilecek.
+            {t("settings.otherDesc")}
           </CardDescription>
         </CardHeader>
       </Card>

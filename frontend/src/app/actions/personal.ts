@@ -8,6 +8,8 @@ export type PersonalNote = {
   id: string;
   title: string;
   content: string;
+  taskId: string | null;
+  taskTitle: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -48,11 +50,25 @@ export async function getPersonalNotes(): Promise<{
       return { success: false, notes: [], error: "Oturum bulunamadı." };
     }
 
-    const { data, error } = await auth.supabase
+    const primary = await auth.supabase
       .from("personal_notes")
-      .select("id, title, content, created_at, updated_at")
+      .select("id, title, content, task_id, created_at, updated_at")
       .eq("user_id", auth.user.id)
       .order("updated_at", { ascending: false });
+
+    let rows: Array<Record<string, unknown>> =
+      (primary.data as Array<Record<string, unknown>> | null) ?? [];
+    let error = primary.error;
+
+    if (error && /task_id/i.test(error.message)) {
+      const fallback = await auth.supabase
+        .from("personal_notes")
+        .select("id, title, content, created_at, updated_at")
+        .eq("user_id", auth.user.id)
+        .order("updated_at", { ascending: false });
+      rows = (fallback.data as Array<Record<string, unknown>> | null) ?? [];
+      error = fallback.error;
+    }
 
     if (error) {
       console.error("[getPersonalNotes]", error.message);
@@ -63,13 +79,45 @@ export async function getPersonalNotes(): Promise<{
       };
     }
 
-    const notes: PersonalNote[] = (data ?? []).map((row) => ({
-      id: String(row.id),
-      title: String(row.title ?? ""),
-      content: String(row.content ?? ""),
-      createdAt: (row.created_at as string | null) ?? null,
-      updatedAt: (row.updated_at as string | null) ?? null,
-    }));
+    const taskIds = [
+      ...new Set(
+        rows
+          .map((row) =>
+            typeof row.task_id === "string" ? row.task_id : null,
+          )
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    const taskTitleById = new Map<string, string>();
+    if (taskIds.length > 0) {
+      const { data: tasks } = await auth.supabase
+        .from("tasks")
+        .select("id, title")
+        .in("id", taskIds);
+      for (const task of tasks ?? []) {
+        if (typeof task.id === "string") {
+          taskTitleById.set(
+            task.id,
+            (typeof task.title === "string" && task.title) || "Görev",
+          );
+        }
+      }
+    }
+
+    const notes: PersonalNote[] = rows.map((row) => {
+      const taskId =
+        typeof row.task_id === "string" ? row.task_id : null;
+      return {
+        id: String(row.id),
+        title: String(row.title ?? ""),
+        content: String(row.content ?? ""),
+        taskId,
+        taskTitle: taskId ? (taskTitleById.get(taskId) ?? null) : null,
+        createdAt: (row.created_at as string | null) ?? null,
+        updatedAt: (row.updated_at as string | null) ?? null,
+      };
+    });
 
     return { success: true, notes };
   } catch (error) {
@@ -88,6 +136,7 @@ export async function getPersonalNotes(): Promise<{
 export async function createPersonalNote(input: {
   title: string;
   content: string;
+  taskId?: string | null;
 }): Promise<{ success: true; note: PersonalNote } | { success: false; error: string }> {
   try {
     const auth = await getAuthenticatedUser();
@@ -97,6 +146,7 @@ export async function createPersonalNote(input: {
 
     const title = input.title?.trim() || "Başlıksız not";
     const content = input.content?.trim() ?? "";
+    const taskId = input.taskId?.trim() || null;
 
     const { data, error } = await auth.supabase
       .from("personal_notes")
@@ -104,13 +154,27 @@ export async function createPersonalNote(input: {
         user_id: auth.user.id,
         title,
         content,
+        task_id: taskId,
       })
-      .select("id, title, content, created_at, updated_at")
+      .select("id, title, content, task_id, created_at, updated_at")
       .single();
 
     if (error || !data) {
       console.error("[createPersonalNote]", error?.message);
       return { success: false, error: "Not oluşturulamadı." };
+    }
+
+    let taskTitle: string | null = null;
+    if (taskId) {
+      const { data: task } = await auth.supabase
+        .from("tasks")
+        .select("title")
+        .eq("id", taskId)
+        .maybeSingle();
+      taskTitle =
+        typeof task?.title === "string" && task.title.trim()
+          ? task.title.trim()
+          : "Görev";
     }
 
     revalidatePersonal();
@@ -120,6 +184,8 @@ export async function createPersonalNote(input: {
         id: String(data.id),
         title: String(data.title ?? title),
         content: String(data.content ?? content),
+        taskId: (data.task_id as string | null) ?? null,
+        taskTitle,
         createdAt: (data.created_at as string | null) ?? null,
         updatedAt: (data.updated_at as string | null) ?? null,
       },
@@ -140,6 +206,7 @@ export async function updatePersonalNote(input: {
   id: string;
   title: string;
   content: string;
+  taskId?: string | null;
 }): Promise<SimpleResult> {
   try {
     const auth = await getAuthenticatedUser();
@@ -150,13 +217,23 @@ export async function updatePersonalNote(input: {
     const id = input.id?.trim();
     if (!id) return { success: false, error: "Not kimliği zorunludur." };
 
+    const taskId =
+      input.taskId === undefined
+        ? undefined
+        : input.taskId?.trim() || null;
+
+    const payload: Record<string, unknown> = {
+      title: input.title?.trim() || "Başlıksız not",
+      content: input.content?.trim() ?? "",
+      updated_at: new Date().toISOString(),
+    };
+    if (taskId !== undefined) {
+      payload.task_id = taskId;
+    }
+
     const { error } = await auth.supabase
       .from("personal_notes")
-      .update({
-        title: input.title?.trim() || "Başlıksız not",
-        content: input.content?.trim() ?? "",
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq("id", id)
       .eq("user_id", auth.user.id);
 

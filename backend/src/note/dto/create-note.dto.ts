@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateNoteDto {
   @ApiProperty({
@@ -21,4 +27,13 @@ export class CreateNoteDto {
   @IsOptional()
   @IsObject()
   content?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    description: 'Opsiyonel ilişkili görev kimliği (nullable)',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUUID()
+  task_id?: string | null;
 }

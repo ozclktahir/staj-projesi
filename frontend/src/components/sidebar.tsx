@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Check,
-  CheckSquare,
   ChevronsUpDown,
   FolderKanban,
   LayoutDashboard,
@@ -14,7 +13,6 @@ import {
   PanelLeftOpen,
   Plus,
   Settings,
-  Star,
   Trash2,
   UserPlus,
 } from "lucide-react";
@@ -43,18 +41,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useTranslation } from "@/i18n/use-translation";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
 import { isAdminRole } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/my-tasks", label: "My Tasks", icon: CheckSquare },
-  { href: "/personal", label: "Kişisel Alan", icon: NotebookPen },
-  { href: "/favorites", label: "Favorites", icon: Star },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { href: "/projects", labelKey: "nav.projects", icon: FolderKanban },
+  { href: "/personal", labelKey: "nav.personal", icon: NotebookPen },
+  { href: "/settings", labelKey: "nav.settings", icon: Settings },
 ] as const;
 
 type SidebarProps = {
@@ -123,6 +120,7 @@ function SidebarInner({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const { t } = useTranslation();
   const {
     workspaces,
     activeWorkspace,
@@ -160,7 +158,7 @@ function SidebarInner({
                   ? "size-10 justify-center p-0"
                   : "w-full min-w-0 flex-1 gap-2 px-3 py-2.5",
               )}
-              aria-label="Workspace seç"
+              aria-label={t("sidebar.selectWorkspace")}
             >
               <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
                 {workspaceInitials}
@@ -168,13 +166,13 @@ function SidebarInner({
               <div className={cn("min-w-0 flex-1", collapsed && "hidden")}>
                 <p className="truncate text-sm font-semibold text-foreground">
                   {loading
-                    ? "Yükleniyor…"
-                    : (activeWorkspace?.name ?? "Workspace seç")}
+                    ? t("sidebar.loading")
+                    : (activeWorkspace?.name ?? t("sidebar.selectWorkspace"))}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {activeWorkspace?.role
-                    ? `Rol: ${activeWorkspace.role}`
-                    : "Çalışma alanı"}
+                    ? `${t("sidebar.role")}: ${activeWorkspace.role}`
+                    : t("sidebar.workspaceArea")}
                 </p>
               </div>
               <ChevronsUpDown
@@ -187,10 +185,10 @@ function SidebarInner({
           </DropdownMenuTrigger>
 
           <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+            <DropdownMenuLabel>{t("sidebar.workspaces")}</DropdownMenuLabel>
             {workspaces.length === 0 ? (
               <DropdownMenuItem disabled className="text-muted-foreground">
-                Henüz workspace yok
+                {t("sidebar.noWorkspaces")}
               </DropdownMenuItem>
             ) : (
               workspaces.map((workspace) => {
@@ -238,7 +236,7 @@ function SidebarInner({
                 }}
               >
                 <UserPlus className="size-4" />
-                Üye Davet Et
+                {t("sidebar.inviteMember")}
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuItem
@@ -249,7 +247,7 @@ function SidebarInner({
               }}
             >
               <Plus className="size-4" />
-              Create New Workspace
+              {t("sidebar.createWorkspace")}
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -260,7 +258,7 @@ function SidebarInner({
               }}
             >
               <Trash2 className="size-4" />
-              Workspace&apos;i Sil
+              {t("sidebar.deleteWorkspace")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -274,7 +272,7 @@ function SidebarInner({
                 size="icon"
                 className="shrink-0"
                 onClick={() => onCollapsedChange(!collapsed)}
-                aria-label={collapsed ? "Kenar çubuğunu aç" : "Kenar çubuğunu daralt"}
+                aria-label={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
               >
                 {collapsed ? (
                   <PanelLeftOpen className="size-4" />
@@ -284,7 +282,7 @@ function SidebarInner({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              {collapsed ? "Menüyü genişlet" : "Menüyü daralt"}
+              {collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
             </TooltipContent>
           </Tooltip>
         ) : null}
@@ -296,12 +294,13 @@ function SidebarInner({
           collapsed && "items-stretch",
         )}
       >
-        {navItems.map(({ href, label, icon }) => {
+        {navItems.map(({ href, labelKey, icon }) => {
           const isActive =
             href === "/"
               ? pathname === "/"
               : pathname === href || pathname.startsWith(`${href}/`);
           const hrefWithWs = withWorkspaceQuery(href, activeWorkspaceId);
+          const label = t(labelKey);
 
           return (
             <NavLinkItem
@@ -329,7 +328,7 @@ function SidebarInner({
             collapsed && "hidden",
           )}
         >
-          Workspace yönetimi
+          {t("sidebar.management")}
         </p>
         {collapsed ? (
           <Tooltip>
@@ -338,7 +337,7 @@ function SidebarInner({
                 WS
               </span>
             </TooltipTrigger>
-            <TooltipContent side="right">Workspace yönetimi</TooltipContent>
+            <TooltipContent side="right">{t("sidebar.management")}</TooltipContent>
           </Tooltip>
         ) : null}
       </div>
@@ -405,12 +404,13 @@ function SidebarMobile({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="w-72 max-w-[85vw] p-0 sm:max-w-xs">
         <SheetHeader className="sr-only">
-          <SheetTitle>Navigasyon</SheetTitle>
-          <SheetDescription>Ana menü ve workspace seçimi</SheetDescription>
+          <SheetTitle>{t("sidebar.navigation")}</SheetTitle>
+          <SheetDescription>{t("sidebar.navigationDesc")}</SheetDescription>
         </SheetHeader>
         <div className="flex h-full flex-col bg-card">
           <SidebarInner

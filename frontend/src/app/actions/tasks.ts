@@ -259,6 +259,16 @@ export async function getMyTasks(): Promise<GetMyTasksResult> {
     let tasks = filtered.map(mapTaskRow);
     tasks = await enrichProjectNames(supabase, tasks);
 
+    const priorityRank: Record<TaskPriority, number> = {
+      HIGH: 3,
+      MEDIUM: 2,
+      LOW: 1,
+    };
+    tasks.sort(
+      (a, b) =>
+        (priorityRank[b.priority] ?? 0) - (priorityRank[a.priority] ?? 0),
+    );
+
     return { success: true, tasks };
   } catch (error) {
     return {
@@ -272,3 +282,144 @@ export async function getMyTasks(): Promise<GetMyTasksResult> {
     };
   }
 }
+
+export type AssignedTaskWithSubtasks = ProjectTask & {
+  subtasks: Array<{
+    id: string;
+    title: string;
+    status: TaskStatus;
+    priority: TaskPriority;
+    due_date: string | null;
+  }>;
+};
+
+export type GetAssignedTasksResult =
+  | { success: true; tasks: AssignedTaskWithSubtasks[] }
+  | { success: false; error: string; tasks: [] };
+
+/**
+ * Kullanıcıya atanan görev + alt görev + yapılacakları önceliğe göre DESC sıralar.
+ */
+export async function getAssignedTasksByPriority(): Promise<GetAssignedTasksResult> {
+  try {
+    const base = await getMyTasks();
+    if (!base.success) {
+      return { success: false, error: base.error, tasks: [] };
+    }
+
+    const auth = await getAuthenticatedUser();
+    if (!auth) {
+      return {
+        success: false,
+        error: "Oturum bulunamadı. Lütfen tekrar giriş yapın.",
+        tasks: [],
+      };
+    }
+
+    const parentIds = base.tasks.map((t) => t.id);
+    const subtasksByParent = new Map<
+      string,
+      AssignedTaskWithSubtasks["subtasks"]
+    >();
+
+    if (parentIds.length > 0) {
+      const { data: subRows, error: subError } = await auth.supabase
+        .from("tasks")
+        .select(
+          "id, title, status, priority, due_date, parent_task_id, deleted_at",
+        )
+        .in("parent_task_id", parentIds)
+        .is("deleted_at", null)
+        .order("priority", { ascending: false });
+
+      if (subError) {
+        console.warn(
+          "[getAssignedTasksByPriority] subtasks:",
+          subError.message,
+        );
+      } else {
+        for (const row of subRows ?? []) {
+          const parentId =
+            typeof row.parent_task_id === "string" ? row.parent_task_id : null;
+          if (!parentId) continue;
+          const list = subtasksByParent.get(parentId) ?? [];
+          list.push({
+            id: String(row.id),
+            title:
+              (typeof row.title === "string" && row.title) || "Alt görev",
+            status: normalizeStatus(row.status),
+            priority: normalizePriority(row.priority),
+            due_date: (row.due_date as string | null) ?? null,
+          });
+          subtasksByParent.set(parentId, list);
+        }
+      }
+    }
+
+    // Kişisel yapılacakları da öncelik sıralamasına dahil etmek için
+    // "görev benzeri" sanal kayıt üretmiyoruz; UI filtrelerinde todos ayrı.
+    // İstek: görev, alt görev ve yapılacaklar — yapılacakları ayrı listede ekliyoruz.
+    const { data: todos } = await auth.supabase
+      .from("personal_todos")
+      .select("id, task, due_date, is_completed")
+      .eq("user_id", auth.user.id)
+      .eq("is_completed", false)
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .limit(50);
+
+    const todoAsTasks: AssignedTaskWithSubtasks[] = (todos ?? []).map(
+      (row) => ({
+        id: `todo:${String(row.id)}`,
+        title: String(row.task ?? "Yapılacak"),
+        description: null,
+        status: (row.is_completed ? "DONE" : "TODO") as TaskStatus,
+        priority: "MEDIUM" as TaskPriority,
+        project_id: null,
+        workspace_id: null,
+        due_date: (row.due_date as string | null) ?? null,
+        parent_task_id: null,
+        assignee_id: auth.user.id,
+        project_name: "Kişisel yapılacak",
+        workspace_name: null,
+        assignment_status: "accepted",
+        deletion_status: "none",
+        assignment_pending_at: null,
+        created_at: null,
+        created_by: null,
+        subtask_done: 0,
+        subtask_total: 0,
+        subtasks: [],
+      }),
+    );
+
+    const priorityRank: Record<TaskPriority, number> = {
+      HIGH: 3,
+      MEDIUM: 2,
+      LOW: 1,
+    };
+
+    const tasks: AssignedTaskWithSubtasks[] = [
+      ...base.tasks.map((task) => ({
+        ...task,
+        subtasks: subtasksByParent.get(task.id) ?? [],
+      })),
+      ...todoAsTasks,
+    ].sort(
+      (a, b) =>
+        (priorityRank[b.priority] ?? 0) - (priorityRank[a.priority] ?? 0),
+    );
+
+    return { success: true, tasks };
+  } catch (error) {
+    return {
+      success: false,
+      error: logActionError(
+        "getAssignedTasksByPriority",
+        error,
+        "Atanan görevler getirilirken bir hata oluştu.",
+      ),
+      tasks: [],
+    };
+  }
+}
+
