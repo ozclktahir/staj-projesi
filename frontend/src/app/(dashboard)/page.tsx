@@ -1,16 +1,20 @@
+import { Suspense } from "react";
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
 import { getWorkspaceAnalytics } from "@/app/actions/analytics";
 import { getWorkspaceActivityLogs } from "@/app/actions/activity-logs";
 import { getUpcomingDeadlinesItems } from "@/app/actions/upcoming-deadlines";
+import { DashboardSkeleton } from "@/components/loading/page-skeletons";
 import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
 
 type DashboardPageProps = {
   searchParams: Promise<{ workspaceId?: string }>;
 };
 
-export default async function DashboardPage({
+async function DashboardContent({
   searchParams,
-}: DashboardPageProps) {
+}: {
+  searchParams: Promise<{ workspaceId?: string }>;
+}) {
   const params = await searchParams;
   const workspaceId = await resolveActiveWorkspaceId(
     params.workspaceId ?? null,
@@ -52,5 +56,13 @@ export default async function DashboardPage({
         description="Workspace genel bakış: KPI’lar, görev grafikleri, iş yükü ve son aktiviteler."
       />
     </div>
+  );
+}
+
+export default function DashboardPage({ searchParams }: DashboardPageProps) {
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardContent searchParams={searchParams} />
+    </Suspense>
   );
 }

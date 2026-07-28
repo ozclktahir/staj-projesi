@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { CreateTaskModalLazy } from "@/components/CreateTaskModal.lazy";
 import { DeleteProjectButton } from "@/components/delete-project-button";
+import { KanbanSkeleton } from "@/components/loading/page-skeletons";
 import { ProjectActivityDrawer } from "@/components/project/project-activity-panel";
 import { ProjectTaskBoard } from "@/components/project/project-task-board";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
@@ -18,6 +20,17 @@ type ProjectDetailPageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ workspaceId?: string }>;
 };
+
+async function ProjectTaskBoardSection({
+  projectId,
+  workspaceId,
+}: {
+  projectId: string;
+  workspaceId: string | null;
+}) {
+  const tasks = await getProjectTasks(projectId, workspaceId);
+  return <ProjectTaskBoard projectId={projectId} tasks={tasks} />;
+}
 
 export default async function ProjectDetailPage({
   params,
@@ -44,16 +57,14 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const [tasks, roleCtx] = await Promise.all([
-    getProjectTasks(project.id, effectiveWorkspaceId),
+  const roleCtx =
     effectiveWorkspaceId && auth
-      ? resolveWorkspaceRole(
+      ? await resolveWorkspaceRole(
           auth.supabase,
           effectiveWorkspaceId,
           auth.user.id,
         )
-      : Promise.resolve(null),
-  ]);
+      : null;
 
   const canDeleteProject = Boolean(roleCtx?.isAdmin);
 
@@ -119,7 +130,12 @@ export default async function ProjectDetailPage({
         </div>
 
         <div className="w-full flex-1 overflow-x-auto">
-          <ProjectTaskBoard projectId={project.id} tasks={tasks} />
+          <Suspense fallback={<KanbanSkeleton />}>
+            <ProjectTaskBoardSection
+              projectId={project.id}
+              workspaceId={effectiveWorkspaceId}
+            />
+          </Suspense>
         </div>
       </section>
     </div>

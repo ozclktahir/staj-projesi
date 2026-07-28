@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { DashboardHome } from "@/components/dashboard/dashboard-home";
+import { ProjectsGridSkeleton } from "@/components/loading/page-skeletons";
 import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
 import {
   getAuthenticatedUser,
@@ -11,7 +13,11 @@ type ProjectsPageProps = {
   searchParams: Promise<{ workspaceId?: string }>;
 };
 
-export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
+async function ProjectsContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ workspaceId?: string }>;
+}) {
   const params = await searchParams;
   const workspaceId = await resolveActiveWorkspaceId(params.workspaceId ?? null);
 
@@ -39,5 +45,13 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
       workspaceId={workspaceId}
       canCreateProject={canCreateProject}
     />
+  );
+}
+
+export default function ProjectsPage({ searchParams }: ProjectsPageProps) {
+  return (
+    <Suspense fallback={<ProjectsGridSkeleton />}>
+      <ProjectsContent searchParams={searchParams} />
+    </Suspense>
   );
 }

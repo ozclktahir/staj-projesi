@@ -2,7 +2,9 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
+  useOptimistic,
   useRef,
   useState,
   useTransition,
@@ -229,6 +231,53 @@ export function PersonalWorkspace({
   const [todos, setTodos] = useState(initialTodos);
   const [files, setFiles] = useState(initialFiles);
 
+  useEffect(() => {
+    setAssignedTasks(initialAssignedTasks);
+  }, [initialAssignedTasks]);
+  useEffect(() => {
+    setNotes(initialNotes);
+  }, [initialNotes]);
+  useEffect(() => {
+    setTodos(initialTodos);
+  }, [initialTodos]);
+  useEffect(() => {
+    setFiles(initialFiles);
+  }, [initialFiles]);
+
+  type NoteOptimisticAction =
+    | { type: "delete"; id: string }
+    | { type: "toggle"; id: string; isCompleted: boolean };
+
+  type TodoOptimisticAction =
+    | { type: "delete"; id: string }
+    | { type: "toggle"; id: string; isCompleted: boolean };
+
+  const [optimisticNotes, applyNoteOptimistic] = useOptimistic(
+    notes,
+    (state, action: NoteOptimisticAction) => {
+      if (action.type === "delete") {
+        return state.filter((n) => n.id !== action.id);
+      }
+      return state.map((n) =>
+        n.id === action.id ? { ...n, isCompleted: action.isCompleted } : n,
+      );
+    },
+  );
+
+  const [optimisticTodos, applyTodoOptimistic] = useOptimistic(
+    todos,
+    (state, action: TodoOptimisticAction) => {
+      if (action.type === "delete") {
+        return state.filter((item) => item.id !== action.id);
+      }
+      return state.map((item) =>
+        item.id === action.id
+          ? { ...item, isCompleted: action.isCompleted }
+          : item,
+      );
+    },
+  );
+
   const [priorityFilter, setPriorityFilter] = useState<"all" | TaskPriority>(
     "all",
   );
@@ -294,13 +343,13 @@ export function PersonalWorkspace({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const sortedTodos = useMemo(() => {
-    return [...todos].sort((a, b) => {
+    return [...optimisticTodos].sort((a, b) => {
       if (a.isCompleted !== b.isCompleted) {
         return a.isCompleted ? 1 : -1;
       }
       return 0;
     });
-  }, [todos]);
+  }, [optimisticTodos]);
 
   const resetNoteForm = useCallback(() => {
     setEditingNoteId(null);
@@ -373,27 +422,8 @@ export function PersonalWorkspace({
     });
   }
 
-  async function handleDeleteNote(id: string) {
-    setNoteBusy(true);
-    try {
-      const result = await deletePersonalNote(id);
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
-      setNotes((prev) => prev.filter((n) => n.id !== id));
-      if (editingNoteId === id) resetNoteForm();
-      toast.success(t("notes.deleted"));
-    } catch (error) {
-      console.error("[PersonalWorkspace] note delete:", error);
-      toast.error(t("notes.saveError"));
-    } finally {
-      setNoteBusy(false);
-    }
-  }
-
   function onDeleteNoteClick(id: string) {
-    const note = notes.find((n) => n.id === id) ?? null;
+    const note = optimisticNotes.find((n) => n.id === id) ?? null;
     setNoteToDelete(note);
   }
 
@@ -402,41 +432,55 @@ export function PersonalWorkspace({
     const id = noteToDelete.id;
     setNoteToDelete(null);
     startTransition(() => {
-      void handleDeleteNote(id);
+      applyNoteOptimistic({ type: "delete", id });
+      void (async () => {
+        try {
+          const result = await deletePersonalNote(id);
+          if (!result.success) {
+            toast.error(result.error);
+            return;
+          }
+          setNotes((prev) => prev.filter((n) => n.id !== id));
+          if (editingNoteId === id) resetNoteForm();
+          toast.success(t("notes.deleted"));
+        } catch (error) {
+          console.error("[PersonalWorkspace] note delete:", error);
+          toast.error(t("notes.saveError"));
+        }
+      })();
     });
   }
 
-  async function handleToggleNoteCompletion(note: PersonalNote) {
+  function handleToggleNoteCompletion(note: PersonalNote) {
     if (notePendingId) return;
     const next = !note.isCompleted;
     setNotePendingId(note.id);
-    setNotes((prev) =>
-      prev.map((n) =>
-        n.id === note.id ? { ...n, isCompleted: next } : n,
-      ),
-    );
-    try {
-      const result = await toggleNoteCompletion(note.id, next);
-      if (!result.success) {
-        setNotes((prev) =>
-          prev.map((n) =>
-            n.id === note.id ? { ...n, isCompleted: note.isCompleted } : n,
-          ),
-        );
-        toast.error(result.error);
-        return;
-      }
-    } catch (error) {
-      console.error("[PersonalWorkspace] note toggle:", error);
-      setNotes((prev) =>
-        prev.map((n) =>
-          n.id === note.id ? { ...n, isCompleted: note.isCompleted } : n,
-        ),
-      );
-      toast.error(t("notes.saveError"));
-    } finally {
-      setNotePendingId(null);
-    }
+    startTransition(() => {
+      applyNoteOptimistic({
+        type: "toggle",
+        id: note.id,
+        isCompleted: next,
+      });
+      void (async () => {
+        try {
+          const result = await toggleNoteCompletion(note.id, next);
+          if (!result.success) {
+            toast.error(result.error);
+            return;
+          }
+          setNotes((prev) =>
+            prev.map((n) =>
+              n.id === note.id ? { ...n, isCompleted: next } : n,
+            ),
+          );
+        } catch (error) {
+          console.error("[PersonalWorkspace] note toggle:", error);
+          toast.error(t("notes.saveError"));
+        } finally {
+          setNotePendingId(null);
+        }
+      })();
+    });
   }
 
   async function handleAddTodo() {
@@ -463,53 +507,60 @@ export function PersonalWorkspace({
     }
   }
 
-  async function handleToggleTodo(todo: PersonalTodo) {
+  function handleToggleTodo(todo: PersonalTodo) {
     if (todoActionId) return;
-    setTodoActionId(todo.id);
     const next = !todo.isCompleted;
-    setTodos((prev) =>
-      prev.map((t) => (t.id === todo.id ? { ...t, isCompleted: next } : t)),
-    );
-    try {
-      const result = await togglePersonalTodo(todo.id, next);
-      if (!result.success) {
-        setTodos((prev) =>
-          prev.map((t) =>
-            t.id === todo.id ? { ...t, isCompleted: todo.isCompleted } : t,
-          ),
-        );
-        toast.error(result.error);
-      }
-    } catch (error) {
-      console.error("[PersonalWorkspace] todo toggle:", error);
-      setTodos((prev) =>
-        prev.map((t) =>
-          t.id === todo.id ? { ...t, isCompleted: todo.isCompleted } : t,
-        ),
-      );
-      toast.error("Görev güncellenirken bir hata oluştu.");
-    } finally {
-      setTodoActionId(null);
-    }
+    setTodoActionId(todo.id);
+    startTransition(() => {
+      applyTodoOptimistic({
+        type: "toggle",
+        id: todo.id,
+        isCompleted: next,
+      });
+      void (async () => {
+        try {
+          const result = await togglePersonalTodo(todo.id, next);
+          if (!result.success) {
+            toast.error(result.error);
+            return;
+          }
+          setTodos((prev) =>
+            prev.map((item) =>
+              item.id === todo.id ? { ...item, isCompleted: next } : item,
+            ),
+          );
+        } catch (error) {
+          console.error("[PersonalWorkspace] todo toggle:", error);
+          toast.error("Görev güncellenirken bir hata oluştu.");
+        } finally {
+          setTodoActionId(null);
+        }
+      })();
+    });
   }
 
-  async function handleDeleteTodo(id: string) {
+  function handleDeleteTodo(id: string) {
     if (todoActionId) return;
     setTodoActionId(id);
-    try {
-      const result = await deletePersonalTodo(id);
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
-      setTodos((prev) => prev.filter((t) => t.id !== id));
-      toast.success("Görev silindi");
-    } catch (error) {
-      console.error("[PersonalWorkspace] todo delete:", error);
-      toast.error("Görev silinirken bir hata oluştu.");
-    } finally {
-      setTodoActionId(null);
-    }
+    startTransition(() => {
+      applyTodoOptimistic({ type: "delete", id });
+      void (async () => {
+        try {
+          const result = await deletePersonalTodo(id);
+          if (!result.success) {
+            toast.error(result.error);
+            return;
+          }
+          setTodos((prev) => prev.filter((item) => item.id !== id));
+          toast.success("Görev silindi");
+        } catch (error) {
+          console.error("[PersonalWorkspace] todo delete:", error);
+          toast.error("Görev silinirken bir hata oluştu.");
+        } finally {
+          setTodoActionId(null);
+        }
+      })();
+    });
   }
 
   const uploadFiles = useCallback(
@@ -541,22 +592,26 @@ export function PersonalWorkspace({
     [fileBusy],
   );
 
-  async function handleDeleteFile(id: string) {
-    setFileBusy(true);
-    try {
-      const result = await deletePersonalFile(id);
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
-      setFiles((prev) => prev.filter((f) => f.id !== id));
-      toast.success("Dosya silindi");
-    } catch (error) {
-      console.error("[PersonalWorkspace] file delete:", error);
-      toast.error("Dosya silinirken bir hata oluştu.");
-    } finally {
-      setFileBusy(false);
-    }
+  function handleDeleteFile(id: string) {
+    const previous = files;
+    setFiles((prev) => prev.filter((f) => f.id !== id));
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await deletePersonalFile(id);
+          if (!result.success) {
+            setFiles(previous);
+            toast.error(result.error);
+            return;
+          }
+          toast.success("Dosya silindi");
+        } catch (error) {
+          console.error("[PersonalWorkspace] file delete:", error);
+          setFiles(previous);
+          toast.error("Dosya silinirken bir hata oluştu.");
+        }
+      })();
+    });
   }
 
   function onDrop(event: DragEvent) {
@@ -895,12 +950,12 @@ export function PersonalWorkspace({
           </Card>
 
           <div className="space-y-3">
-            {notes.length === 0 ? (
+            {optimisticNotes.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border bg-card/60 px-4 py-12 text-center text-sm text-muted-foreground">
                 {t("notes.empty")}
               </div>
             ) : (
-              notes.map((note) => (
+              optimisticNotes.map((note) => (
                 <Card
                   key={note.id}
                   className={cn(

@@ -5,7 +5,10 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useOptimistic,
+  useRef,
   useState,
+  useTransition,
   type MouseEvent,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -502,6 +505,7 @@ export function ProjectTaskBoard({
 }: ProjectTaskBoardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
   const [tasks, setTasks] = useState(initialTasks);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -516,6 +520,31 @@ export function ProjectTaskBoard({
     IN_PROGRESS: { ...DEFAULT_COLUMN_PREFS },
     DONE: { ...DEFAULT_COLUMN_PREFS },
   });
+  const pendingDeletesRef = useRef<Map<string, ProjectTask>>(new Map());
+
+  type TaskOptimisticAction =
+    | { type: "remove"; id: string }
+    | { type: "restore"; task: ProjectTask }
+    | { type: "status"; id: string; status: TaskStatus };
+
+  const [optimisticTasks, applyTaskOptimistic] = useOptimistic(
+    tasks,
+    (state, action: TaskOptimisticAction) => {
+      switch (action.type) {
+        case "remove":
+          return state.filter((t) => t.id !== action.id);
+        case "restore":
+          if (state.some((t) => t.id === action.task.id)) return state;
+          return [action.task, ...state];
+        case "status":
+          return state.map((t) =>
+            t.id === action.id ? { ...t, status: action.status } : t,
+          );
+        default:
+          return state;
+      }
+    },
+  );
 
   useEffect(() => {
     setTasks(initialTasks);
@@ -614,57 +643,87 @@ export function ProjectTaskBoard({
 
   const columns = useMemo(() => {
     return TASK_STATUSES.map((status) => {
-      const raw = tasks.filter((task) => task.status === status);
+      const raw = optimisticTasks.filter((task) => task.status === status);
       const prefs = columnPrefs[status];
       const visible = applyColumnPrefs(raw, prefs);
       return { status, rawCount: raw.length, visible };
     });
-  }, [tasks, columnPrefs]);
+  }, [optimisticTasks, columnPrefs]);
 
   const selectedTask = useMemo(
-    () => tasks.find((task) => task.id === selectedTaskId) ?? null,
-    [tasks, selectedTaskId],
+    () => optimisticTasks.find((task) => task.id === selectedTaskId) ?? null,
+    [optimisticTasks, selectedTaskId],
   );
 
   const removeTaskFromBoard = useCallback(
     (taskId: string) => {
-      setTasks((prev) => prev.filter((task) => task.id !== taskId));
+      setTasks((prev) => {
+        const found = prev.find((task) => task.id === taskId);
+        if (found) pendingDeletesRef.current.set(taskId, found);
+        return prev.filter((task) => task.id !== taskId);
+      });
+      startTransition(() => {
+        applyTaskOptimistic({ type: "remove", id: taskId });
+      });
       if (selectedTaskId === taskId) {
         setSelectedTaskId(null);
       }
-      router.refresh();
     },
-    [router, selectedTaskId],
+    [selectedTaskId],
+  );
+
+  const restoreTaskToBoard = useCallback(
+    (task: { id: string; title: string }) => {
+      const restored =
+        pendingDeletesRef.current.get(task.id) ??
+        ({
+          id: task.id,
+          title: task.title,
+          status: "TODO",
+          priority: "MEDIUM",
+          project_id: projectId,
+        } as ProjectTask);
+      pendingDeletesRef.current.delete(task.id);
+
+      setTasks((prev) => {
+        if (prev.some((t) => t.id === restored.id)) return prev;
+        return [restored, ...prev];
+      });
+      startTransition(() => {
+        applyTaskOptimistic({ type: "restore", task: restored });
+      });
+    },
+    [projectId],
   );
 
   const handleStatusChange = useCallback(
-    async (taskId: string, status: TaskStatus) => {
-      let previous: ProjectTask[] = [];
-      setTasks((prev) => {
-        previous = prev;
-        return prev.map((task) =>
-          task.id === taskId ? { ...task, status } : task,
-        );
-      });
+    (taskId: string, status: TaskStatus) => {
       setUpdatingId(taskId);
+      startTransition(() => {
+        applyTaskOptimistic({ type: "status", id: taskId, status });
+        void (async () => {
+          const result = await updateTaskStatus(taskId, status);
+          setUpdatingId(null);
 
-      const result = await updateTaskStatus(taskId, status);
-      setUpdatingId(null);
+          if (!result.success) {
+            console.error(
+              "[ProjectTaskBoard] updateTaskStatus failed:",
+              result.error,
+            );
+            toast.error(result.error);
+            return;
+          }
 
-      if (!result.success) {
-        setTasks(previous);
-        console.error(
-          "[ProjectTaskBoard] updateTaskStatus failed:",
-          result.error,
-        );
-        toast.error(result.error);
-        return;
-      }
-
-      toast.success("Durum güncellendi");
-      router.refresh();
+          setTasks((prev) =>
+            prev.map((task) =>
+              task.id === taskId ? { ...task, status } : task,
+            ),
+          );
+          toast.success("Durum güncellendi");
+        })();
+      });
     },
-    [router],
+    [],
   );
 
   const handleOpenTask = useCallback((taskId: string) => {
@@ -697,7 +756,7 @@ export function ProjectTaskBoard({
     [router],
   );
 
-  if (tasks.length === 0) {
+  if (optimisticTasks.length === 0) {
     return (
       <>
         <Card className="rounded-lg border-dashed border-border bg-card/60">
@@ -759,6 +818,7 @@ export function ProjectTaskBoard({
           }}
           task={taskToDelete}
           onDeleted={removeTaskFromBoard}
+          onDeleteFailed={restoreTaskToBoard}
         />
       ) : null}
     </>

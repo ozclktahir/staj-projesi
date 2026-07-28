@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Lock, NotebookPen } from "lucide-react";
 import {
   getPersonalFiles,
@@ -5,10 +6,11 @@ import {
   getPersonalTodos,
 } from "@/app/actions/personal";
 import { getAssignedTasksByPriority } from "@/app/actions/tasks";
+import { ListSkeleton } from "@/components/loading/page-skeletons";
 import { PersonalWorkspace } from "@/components/personal/personal-workspace";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 
-export default async function PersonalPage() {
+async function PersonalContent() {
   const auth = await getAuthenticatedUser();
 
   if (!auth) {
@@ -35,24 +37,7 @@ export default async function PersonalPage() {
   ].filter(Boolean);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Lock className="size-3.5" />
-            Kişisel alan
-          </p>
-          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground">
-            <NotebookPen className="size-6 text-primary" />
-            Notlar, Planlayıcı ve Atanan Görevler
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Projelerde sana atanan görevler varsayılan listede. Notlar,
-            kişisel yapılacaklar ve dosyalar yalnızca senin hesabına aittir.
-          </p>
-        </div>
-      </div>
-
+    <>
       {errors.length > 0 ? (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
           <p className="font-medium">Veri yüklenirken uyarı</p>
@@ -78,6 +63,33 @@ export default async function PersonalPage() {
         initialTodos={todosResult.todos}
         initialFiles={filesResult.files}
       />
+    </>
+  );
+}
+
+export default function PersonalPage() {
+  return (
+    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Lock className="size-3.5" />
+            Kişisel alan
+          </p>
+          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground">
+            <NotebookPen className="size-6 text-primary" />
+            Notlar, Planlayıcı ve Atanan Görevler
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Projelerde sana atanan görevler varsayılan listede. Notlar,
+            kişisel yapılacaklar ve dosyalar yalnızca senin hesabına aittir.
+          </p>
+        </div>
+      </div>
+
+      <Suspense fallback={<ListSkeleton rows={6} />}>
+        <PersonalContent />
+      </Suspense>
     </div>
   );
 }

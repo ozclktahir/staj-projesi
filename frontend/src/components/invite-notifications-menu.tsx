@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -126,6 +126,32 @@ export function InviteNotificationsMenu({
   );
   const [, startTransition] = useTransition();
   const knownIdsRef = useRef<Set<string>>(new Set());
+
+  type NotifOptimisticAction =
+    | { type: "delete"; id: string }
+    | { type: "clear" }
+    | { type: "markAllRead" }
+    | { type: "markRead"; id: string };
+
+  const [optimisticNotifications, applyNotifOptimistic] = useOptimistic(
+    notifications,
+    (state, action: NotifOptimisticAction) => {
+      switch (action.type) {
+        case "delete":
+          return state.filter((n) => n.id !== action.id);
+        case "clear":
+          return [];
+        case "markAllRead":
+          return state.map((n) => ({ ...n, isRead: true }));
+        case "markRead":
+          return state.map((n) =>
+            n.id === action.id ? { ...n, isRead: true } : n,
+          );
+        default:
+          return state;
+      }
+    },
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -270,7 +296,7 @@ export function InviteNotificationsMenu({
       });
     }
 
-    for (const n of notifications) {
+    for (const n of optimisticNotifications) {
       if (isWorkspaceInviteNotification(n)) {
         const invId = invitationIdFromNotification(n);
         if (invId && inviteIdsShown.has(invId)) continue;
@@ -313,12 +339,12 @@ export function InviteNotificationsMenu({
     }
 
     return items.sort(sortByDateDesc);
-  }, [invitations, notifications]);
+  }, [invitations, optimisticNotifications]);
 
   const unreadCount = useMemo(() => {
-    const unreadNotifs = notifications.filter((n) => !n.isRead).length;
+    const unreadNotifs = optimisticNotifications.filter((n) => !n.isRead).length;
     const covered = new Set(
-      notifications
+      optimisticNotifications
         .filter((n) => isWorkspaceInviteNotification(n))
         .map((n) => invitationIdFromNotification(n))
         .filter(Boolean),
@@ -327,7 +353,7 @@ export function InviteNotificationsMenu({
       (inv) => !covered.has(inv.id),
     ).length;
     return unreadNotifs + orphanInvites;
-  }, [invitations, notifications]);
+  }, [invitations, optimisticNotifications]);
 
   const handleRespond = async (
     invitationId: string,
@@ -435,45 +461,53 @@ export function InviteNotificationsMenu({
     });
   };
 
-  const handleMarkAllRead = async () => {
+  const handleMarkAllRead = () => {
     setMarkingAll(true);
-    try {
-      const result = await markAllNotificationsRead();
-      if (!result.success) {
-        toast.error(result.error ?? "İşlem başarısız");
-        return;
-      }
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      toast.success("Tüm bildirimler okundu");
-    } finally {
-      setMarkingAll(false);
-    }
+    startTransition(() => {
+      applyNotifOptimistic({ type: "markAllRead" });
+      void (async () => {
+        try {
+          const result = await markAllNotificationsRead();
+          if (!result.success) {
+            toast.error(result.error ?? "İşlem başarısız");
+            return;
+          }
+          setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+          toast.success("Tüm bildirimler okundu");
+        } finally {
+          setMarkingAll(false);
+        }
+      })();
+    });
   };
 
-  const handleDeleteNotification = async (notificationId: string) => {
-    const previous = notifications;
-    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+  const handleDeleteNotification = (notificationId: string) => {
     knownIdsRef.current.delete(notificationId);
     setBusyId(notificationId);
-
-    try {
-      const result = await deleteNotification(notificationId);
-      if (!result.success) {
-        setNotifications(previous);
-        toast.error(result.error ?? "Bildirim silinemedi");
-        return;
-      }
-    } catch (error) {
-      setNotifications(previous);
-      toast.error(
-        error instanceof Error ? error.message : "Bildirim silinemedi",
-      );
-    } finally {
-      setBusyId(null);
-    }
+    startTransition(() => {
+      applyNotifOptimistic({ type: "delete", id: notificationId });
+      void (async () => {
+        try {
+          const result = await deleteNotification(notificationId);
+          if (!result.success) {
+            toast.error(result.error ?? "Bildirim silinemedi");
+            return;
+          }
+          setNotifications((prev) =>
+            prev.filter((n) => n.id !== notificationId),
+          );
+        } catch (error) {
+          toast.error(
+            error instanceof Error ? error.message : "Bildirim silinemedi",
+          );
+        } finally {
+          setBusyId(null);
+        }
+      })();
+    });
   };
 
-  const handleClearAllNotifications = async () => {
+  const handleClearAllNotifications = () => {
     if (notifications.length === 0) return;
     const confirmed =
       typeof window !== "undefined"
@@ -483,55 +517,54 @@ export function InviteNotificationsMenu({
         : true;
     if (!confirmed) return;
 
-    const previous = notifications;
     setClearingAll(true);
-    setNotifications([]);
     knownIdsRef.current = new Set();
-
-    try {
-      const result = await clearAllNotifications();
-      if (!result.success) {
-        setNotifications(previous);
-        toast.error(result.error ?? "Bildirimler temizlenemedi");
-        return;
-      }
-      toast.success("Tüm bildirimler temizlendi");
-    } catch (error) {
-      setNotifications(previous);
-      toast.error(
-        error instanceof Error ? error.message : "Bildirimler temizlenemedi",
-      );
-    } finally {
-      setClearingAll(false);
-    }
+    startTransition(() => {
+      applyNotifOptimistic({ type: "clear" });
+      void (async () => {
+        try {
+          const result = await clearAllNotifications();
+          if (!result.success) {
+            toast.error(result.error ?? "Bildirimler temizlenemedi");
+            return;
+          }
+          setNotifications([]);
+          toast.success("Tüm bildirimler temizlendi");
+        } catch (error) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Bildirimler temizlenemedi",
+          );
+        } finally {
+          setClearingAll(false);
+        }
+      })();
+    });
   };
 
-  const handleNotificationClick = async (n: NotificationItem) => {
+  const handleNotificationClick = (n: NotificationItem) => {
     if (!n.isRead) {
-      setNotifications((prev) =>
-        prev.map((item) =>
-          item.id === n.id ? { ...item, isRead: true } : item,
-        ),
-      );
-      try {
-        const result = await markNotificationRead(n.id);
-        if (!result.success) {
-          setNotifications((prev) =>
-            prev.map((item) =>
-              item.id === n.id ? { ...item, isRead: false } : item,
-            ),
-          );
-          toast.error(result.error ?? "Bildirim güncellenemedi");
-        }
-      } catch (error) {
-        console.error("[handleNotificationClick]", error);
-        setNotifications((prev) =>
-          prev.map((item) =>
-            item.id === n.id ? { ...item, isRead: false } : item,
-          ),
-        );
-        toast.error("Bildirim güncellenirken bir hata oluştu");
-      }
+      startTransition(() => {
+        applyNotifOptimistic({ type: "markRead", id: n.id });
+        void (async () => {
+          try {
+            const result = await markNotificationRead(n.id);
+            if (!result.success) {
+              toast.error(result.error ?? "Bildirim güncellenemedi");
+              return;
+            }
+            setNotifications((prev) =>
+              prev.map((item) =>
+                item.id === n.id ? { ...item, isRead: true } : item,
+              ),
+            );
+          } catch (error) {
+            console.error("[handleNotificationClick]", error);
+            toast.error("Bildirim güncellenirken bir hata oluştu");
+          }
+        })();
+      });
     }
 
     const href = taskLinkFromNotification(n);

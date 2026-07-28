@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { deleteTask } from "@/app/actions/delete-task";
 import { getTaskDeletionPreview } from "@/app/actions/task-workflows";
@@ -26,6 +26,8 @@ type DeleteTaskModalProps = {
   /** true ise metinler admin silme onayı diline kayar */
   isAdmin?: boolean;
   onDeleted?: (taskId: string) => void;
+  /** Optimistic silme geri alınırsa */
+  onDeleteFailed?: (task: { id: string; title: string }) => void;
   onApprovalRequested?: (
     taskId: string,
     deletionStatus: TaskDeletionStatus,
@@ -38,11 +40,13 @@ export function DeleteTaskModal({
   task,
   isAdmin = false,
   onDeleted,
+  onDeleteFailed,
   onApprovalRequested,
 }: DeleteTaskModalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [previewMessage, setPreviewMessage] = useState<string | null>(null);
   const [requiresApproval, setRequiresApproval] = useState(false);
+  const [, startTransition] = useTransition();
 
   const pending =
     task?.deletion_status === "pending_admin_approval" ||
@@ -73,50 +77,67 @@ export function DeleteTaskModal({
     };
   }, [open, task?.id, pending]);
 
-  const onConfirm = async () => {
+  const onConfirm = () => {
     if (!task?.id || pending) return;
-    setIsDeleting(true);
 
-    try {
-      if (requiresApproval) {
-        toast.message(
-          isAdmin
-            ? "Bu görevde ilerleme olduğu için silme talebi kullanıcıya iletilecektir."
-            : "Bu görevde ilerleme olduğu için silme talebi yöneticiye iletilecektir.",
-        );
-      }
+    const taskSnapshot = { id: task.id, title: task.title };
+    const optimisticDirectDelete = !requiresApproval;
 
-      const result = await deleteTask(task.id);
-      if (!result.success) {
-        console.error("[DeleteTaskModal]", result.error);
-        toast.error(result.error);
-        return;
-      }
-
-      if (result.mode === "approval_requested") {
-        toast.success(result.message);
-        onApprovalRequested?.(
-          task.id,
-          result.deletionStatus ??
-            (isAdmin ? "pending_user_approval" : "pending_admin_approval"),
-        );
-        onOpenChange(false);
-        return;
-      }
-
-      toast.success(result.message || "Görev başarıyla silindi");
+    if (optimisticDirectDelete) {
+      onDeleted?.(taskSnapshot.id);
       onOpenChange(false);
-      onDeleted?.(task.id);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Görev silinirken bir hata oluştu.";
-      console.error("[DeleteTaskModal] catch:", error);
-      toast.error(message);
-    } finally {
-      setIsDeleting(false);
     }
+
+    setIsDeleting(true);
+    startTransition(() => {
+      void (async () => {
+        try {
+          if (requiresApproval) {
+            toast.message(
+              isAdmin
+                ? "Bu görevde ilerleme olduğu için silme talebi kullanıcıya iletilecektir."
+                : "Bu görevde ilerleme olduğu için silme talebi yöneticiye iletilecektir.",
+            );
+          }
+
+          const result = await deleteTask(taskSnapshot.id);
+          if (!result.success) {
+            console.error("[DeleteTaskModal]", result.error);
+            if (optimisticDirectDelete) onDeleteFailed?.(taskSnapshot);
+            toast.error(result.error);
+            return;
+          }
+
+          if (result.mode === "approval_requested") {
+            if (optimisticDirectDelete) onDeleteFailed?.(taskSnapshot);
+            toast.success(result.message);
+            onApprovalRequested?.(
+              taskSnapshot.id,
+              result.deletionStatus ??
+                (isAdmin ? "pending_user_approval" : "pending_admin_approval"),
+            );
+            if (!optimisticDirectDelete) onOpenChange(false);
+            return;
+          }
+
+          toast.success(result.message || "Görev başarıyla silindi");
+          if (!optimisticDirectDelete) {
+            onOpenChange(false);
+            onDeleted?.(taskSnapshot.id);
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Görev silinirken bir hata oluştu.";
+          console.error("[DeleteTaskModal] catch:", error);
+          if (optimisticDirectDelete) onDeleteFailed?.(taskSnapshot);
+          toast.error(message);
+        } finally {
+          setIsDeleting(false);
+        }
+      })();
+    });
   };
 
   return (
@@ -172,7 +193,7 @@ export function DeleteTaskModal({
           <Button
             type="button"
             disabled={isDeleting || !task?.id || pending}
-            onClick={() => void onConfirm()}
+            onClick={onConfirm}
             className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isDeleting
