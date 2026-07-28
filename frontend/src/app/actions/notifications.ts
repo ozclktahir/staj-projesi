@@ -5,6 +5,7 @@ import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { getWorkspaces } from "@/app/actions/workspaces";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
 import { logActionError } from "@/lib/action-result";
+import { PAGE_SIZE } from "@/lib/query-limits";
 import {
   pickDefaultAdminWorkspace,
   resolveActorDisplayName,
@@ -161,10 +162,14 @@ function mapNotificationRow(row: Record<string, unknown>): NotificationItem {
 }
 
 /** Kullanıcının okunmamış / son bildirimleri (invite uyumlu). */
-export async function getMyNotifications(limit = 20): Promise<{
+export async function getMyNotifications(
+  limit: number = PAGE_SIZE.notifications,
+  offset = 0,
+): Promise<{
   success: boolean;
   notifications: NotificationItem[];
   unreadCount: number;
+  hasMore?: boolean;
   error?: string;
 }> {
   try {
@@ -178,6 +183,10 @@ export async function getMyNotifications(limit = 20): Promise<{
       };
     }
 
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safeOffset = Math.max(offset, 0);
+    const to = safeOffset + safeLimit - 1;
+
     let query = await auth.supabase
       .from("notifications")
       .select(
@@ -185,7 +194,7 @@ export async function getMyNotifications(limit = 20): Promise<{
       )
       .eq("user_id", auth.user.id)
       .order("created_at", { ascending: false })
-      .limit(limit);
+      .range(safeOffset, to);
 
     if (
       query.error?.message?.includes("payload") ||
@@ -198,7 +207,7 @@ export async function getMyNotifications(limit = 20): Promise<{
         )
         .eq("user_id", auth.user.id)
         .order("created_at", { ascending: false })
-        .limit(limit)) as typeof query;
+        .range(safeOffset, to)) as typeof query;
     }
 
     const { data, error } = query;
@@ -209,7 +218,7 @@ export async function getMyNotifications(limit = 20): Promise<{
         error.code === "42P01" ||
         error.code === "PGRST205"
       ) {
-        return { success: true, notifications: [], unreadCount: 0 };
+        return { success: true, notifications: [], unreadCount: 0, hasMore: false };
       }
       return {
         success: false,
@@ -227,6 +236,7 @@ export async function getMyNotifications(limit = 20): Promise<{
       success: true,
       notifications,
       unreadCount: notifications.filter((n) => !n.isRead).length,
+      hasMore: notifications.length >= safeLimit,
     };
   } catch (error) {
     return {

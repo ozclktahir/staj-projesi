@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 
@@ -181,6 +181,8 @@ export async function createProject(
   input: CreateProjectInput,
 ): Promise<CreateProjectResult> {
   let shouldRevalidate = false;
+  let cacheWorkspaceId: string | null = null;
+  let cacheUserId: string | null = null;
 
   try {
     const cookieStore = await cookies();
@@ -471,6 +473,8 @@ export async function createProject(
 
     console.log("[createProject] success", inserted);
     shouldRevalidate = true;
+    cacheWorkspaceId = workspaceId as string;
+    cacheUserId = authUid;
   } catch (error) {
     // redirect()/NEXT_REDIRECT asla yutulmamalı
     if (isNextRedirectError(error)) {
@@ -484,6 +488,13 @@ export async function createProject(
   if (shouldRevalidate) {
     try {
       revalidatePath("/");
+      if (cacheWorkspaceId) {
+        revalidateTag(`workspace-projects-${cacheWorkspaceId}`, "max");
+        revalidateTag(`workspace-members-${cacheWorkspaceId}`, "max");
+      }
+      if (cacheUserId) {
+        revalidateTag(`user-projects-${cacheUserId}`, "max");
+      }
     } catch (error) {
       if (isNextRedirectError(error)) {
         throw error;

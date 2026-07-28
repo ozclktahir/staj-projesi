@@ -21,9 +21,11 @@ import {
   UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
+import { loadMoreProjectTasks } from "@/app/actions/tasks";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { DeleteTaskModal } from "@/components/delete-task-modal";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardDescription,
@@ -38,6 +40,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { PAGE_SIZE } from "@/lib/query-limits";
 import {
   TASK_PRIORITY_LABELS,
   TASK_STATUSES,
@@ -59,6 +64,8 @@ import { isAssignmentClaimOverdue } from "@/lib/utils";
 type ProjectTaskBoardProps = {
   tasks: ProjectTask[];
   projectId: string;
+  workspaceId?: string | null;
+  initialHasMore?: boolean;
 };
 
 type ColumnSort =
@@ -502,11 +509,17 @@ const KanbanColumn = memo(function KanbanColumn({
 export function ProjectTaskBoard({
   tasks: initialTasks,
   projectId,
+  workspaceId = null,
+  initialHasMore = false,
 }: ProjectTaskBoardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
   const [tasks, setTasks] = useState(initialTasks);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 500);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<{
@@ -548,7 +561,8 @@ export function ProjectTaskBoard({
 
   useEffect(() => {
     setTasks(initialTasks);
-  }, [initialTasks]);
+    setHasMore(initialHasMore);
+  }, [initialTasks, initialHasMore]);
 
   useEffect(() => {
     const taskId = searchParams.get("taskId")?.trim() || null;
@@ -642,18 +656,61 @@ export function ProjectTaskBoard({
   }, [projectId]);
 
   const columns = useMemo(() => {
+    const q = debouncedSearch.trim().toLocaleLowerCase("tr-TR");
+    const source = q
+      ? optimisticTasks.filter((task) =>
+          task.title.toLocaleLowerCase("tr-TR").includes(q),
+        )
+      : optimisticTasks;
     return TASK_STATUSES.map((status) => {
-      const raw = optimisticTasks.filter((task) => task.status === status);
+      const raw = source.filter((task) => task.status === status);
       const prefs = columnPrefs[status];
       const visible = applyColumnPrefs(raw, prefs);
       return { status, rawCount: raw.length, visible };
     });
-  }, [optimisticTasks, columnPrefs]);
+  }, [optimisticTasks, columnPrefs, debouncedSearch]);
 
   const selectedTask = useMemo(
     () => optimisticTasks.find((task) => task.id === selectedTaskId) ?? null,
     [optimisticTasks, selectedTaskId],
   );
+
+  const handleLoadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await loadMoreProjectTasks(
+            projectId,
+            workspaceId,
+            tasks.length,
+          );
+          if (!result.success) {
+            toast.error(result.error ?? "Daha fazla görev yüklenemedi");
+            return;
+          }
+          setTasks((prev) => {
+            const seen = new Set(prev.map((t) => t.id));
+            const merged = [...prev];
+            for (const task of result.tasks) {
+              if (!seen.has(task.id)) merged.push(task);
+            }
+            return merged;
+          });
+          setHasMore(result.hasMore);
+        } finally {
+          setLoadingMore(false);
+        }
+      })();
+    });
+  }, [
+    hasMore,
+    loadingMore,
+    projectId,
+    tasks.length,
+    workspaceId,
+  ]);
 
   const removeTaskFromBoard = useCallback(
     (taskId: string) => {
@@ -780,6 +837,30 @@ export function ProjectTaskBoard({
 
   return (
     <>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Görev ara…"
+          className="h-9 max-w-sm"
+          aria-label="Görev ara"
+        />
+        {hasMore ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={loadingMore}
+            onClick={handleLoadMore}
+          >
+            {loadingMore ? "Yükleniyor…" : "Daha fazla yükle"}
+          </Button>
+        ) : null}
+        <span className="text-xs text-muted-foreground">
+          {optimisticTasks.length} görev
+          {PAGE_SIZE.tasks ? ` · sayfa ${PAGE_SIZE.tasks}` : ""}
+        </span>
+      </div>
       <div className="grid min-w-[720px] grid-cols-1 gap-4 md:grid-cols-3">
         {columns.map(({ status, rawCount, visible }) => (
           <KanbanColumn

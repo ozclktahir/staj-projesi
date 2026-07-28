@@ -62,14 +62,14 @@ export async function getUpcomingDeadlinesItems(): Promise<GetUpcomingDeadlinesR
         .not("due_date", "is", null)
         .is("deleted_at", null)
         .order("due_date", { ascending: true })
-        .limit(200),
+        .limit(40),
       supabase
         .from("personal_todos")
         .select("id, task, due_date, is_completed")
         .eq("user_id", user.id)
         .not("due_date", "is", null)
         .order("due_date", { ascending: true })
-        .limit(100),
+        .limit(30),
     ]);
 
     if (tasksRes.error) {

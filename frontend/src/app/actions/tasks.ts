@@ -1,7 +1,11 @@
 "use server";
 
 import { logActionError } from "@/lib/action-result";
-import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { PAGE_SIZE } from "@/lib/query-limits";
+import {
+  getAuthenticatedUser,
+  getProjectTasks,
+} from "@/lib/supabase/server";
 import {
   normalizeTaskStatusInput,
   type ProjectTask,
@@ -210,7 +214,8 @@ export async function getMyTasks(): Promise<GetMyTasksResult> {
       .eq("assignee_id", user.id)
       .is("deleted_at", null)
       .is("parent_task_id", null)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE.tasks);
 
     if (primary.error) {
       console.warn("[getMyTasks] join select failed:", primary.error.message);
@@ -218,14 +223,16 @@ export async function getMyTasks(): Promise<GetMyTasksResult> {
         .from("tasks")
         .select(selectPlain)
         .eq("assignee_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE.tasks);
 
       if (fallback.error) {
         const legacy = await supabase
           .from("tasks")
           .select(selectPlain)
           .eq("assigned_to", user.id)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .limit(PAGE_SIZE.tasks);
         if (legacy.error) {
           console.error("[getMyTasks]", legacy.error.message);
           return {
@@ -410,6 +417,50 @@ export async function getAssignedTasksByPriority(): Promise<GetAssignedTasksResu
         "Atanan görevler getirilirken bir hata oluştu.",
       ),
       tasks: [],
+    };
+  }
+}
+
+/** Proje görevleri için sayfalı yükleme (Daha Fazla). */
+export async function loadMoreProjectTasks(
+  projectId: string,
+  workspaceId: string | null | undefined,
+  offset: number,
+): Promise<{
+  success: boolean;
+  tasks: ProjectTask[];
+  hasMore: boolean;
+  error?: string;
+}> {
+  try {
+    const id = projectId?.trim() ?? "";
+    if (!id) {
+      return {
+        success: false,
+        tasks: [],
+        hasMore: false,
+        error: "Proje gerekli.",
+      };
+    }
+    const tasks = await getProjectTasks(id, workspaceId ?? null, {
+      limit: PAGE_SIZE.tasks,
+      offset: Math.max(offset, 0),
+    });
+    return {
+      success: true,
+      tasks,
+      hasMore: tasks.length >= PAGE_SIZE.tasks,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      tasks: [],
+      hasMore: false,
+      error: logActionError(
+        "loadMoreProjectTasks",
+        error,
+        "Görevler yüklenirken bir hata oluştu.",
+      ),
     };
   }
 }

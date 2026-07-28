@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import type {
@@ -15,6 +16,7 @@ import {
   formatUserCompact,
   loadProfilesByIds,
 } from "@/lib/member-labels";
+import { PAGE_SIZE, resolvePage, type PageQuery } from "@/lib/query-limits";
 import {
   getMemberVisibleProjectIds,
   resolveWorkspaceRole,
@@ -66,11 +68,11 @@ function createAuthedClient(accessToken?: string | null): SupabaseClient | null 
  * Cookie'den access token oku ve kullanıcıyı doğrula.
  * @supabase/ssr cookie chunk'larına dokunmuyoruz (Internal Server Error kaynağı olabiliyor).
  */
-export async function getAuthenticatedUser(): Promise<{
+export const getAuthenticatedUser = cache(async (): Promise<{
   supabase: SupabaseClient;
   user: User;
   accessToken: string;
-} | null> {
+} | null> => {
   try {
     const cookieStore = await cookies();
     const accessToken =
@@ -105,7 +107,7 @@ export async function getAuthenticatedUser(): Promise<{
     console.error("[getAuthenticatedUser] unexpected:", error);
     return null;
   }
-}
+});
 
 /** Geriye dönük uyumluluk — SSR cookie client kullanmadan Bearer client döner. */
 export async function createSupabaseServerClient(): Promise<SupabaseClient | null> {
@@ -253,14 +255,16 @@ export async function getCurrentUserProjects(
       .select(selectCols)
       .eq("workspace_id", activeWorkspaceId)
       .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(60);
 
     if (error?.message?.includes("deleted_at")) {
       ({ data, error } = await supabase
         .from("projects")
         .select(selectCols)
         .eq("workspace_id", activeWorkspaceId)
-        .order("created_at", { ascending: false }));
+        .order("created_at", { ascending: false })
+        .limit(60));
     }
 
     if (error?.message?.includes("updated_at")) {
@@ -270,7 +274,8 @@ export async function getCurrentUserProjects(
           "id, name, description, created_at, workspace_id, user_id, created_by",
         )
         .eq("workspace_id", activeWorkspaceId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(60);
       data = legacy.data as typeof data;
       error = legacy.error;
     }
@@ -624,6 +629,7 @@ function normalizeDeletionStatusField(
 export async function getProjectTasks(
   projectId: string,
   workspaceId?: string | null,
+  page?: PageQuery,
 ): Promise<ProjectTask[]> {
   try {
     if (!projectId?.trim()) {
@@ -635,6 +641,7 @@ export async function getProjectTasks(
       return [];
     }
 
+    const { offset, to } = resolvePage(page, PAGE_SIZE.tasks);
     const { supabase, user } = auth;
     const activeWorkspaceId = workspaceId?.trim() || null;
 
@@ -677,7 +684,8 @@ export async function getProjectTasks(
         .from("tasks")
         .select(opts.columns)
         .eq("project_id", projectId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(offset, to);
 
       if (opts.withWorkspace && activeWorkspaceId) {
         q = q.eq("workspace_id", activeWorkspaceId);
@@ -698,7 +706,8 @@ export async function getProjectTasks(
         .eq("project_id", projectId)
         .is("deleted_at", null)
         .is("parent_task_id", null)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(offset, to);
       rows = (primary.data as Record<string, unknown>[] | null) ?? null;
       error = primary.error;
       if (
@@ -713,7 +722,8 @@ export async function getProjectTasks(
           .from("tasks")
           .select(selectFullNoJoin)
           .eq("project_id", projectId)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+        .range(offset, to);
         rows = (fb.data as Record<string, unknown>[] | null) ?? null;
         error = fb.error;
       }
@@ -726,21 +736,24 @@ export async function getProjectTasks(
             .select(selectFull)
             .eq("project_id", projectId)
             .eq("assignee_id", user.id)
-            .order("created_at", { ascending: false }),
+            .order("created_at", { ascending: false })
+        .range(offset, to),
         () =>
           supabase
             .from("tasks")
             .select(selectFullNoJoin)
             .eq("project_id", projectId)
             .eq("assignee_id", user.id)
-            .order("created_at", { ascending: false }),
+            .order("created_at", { ascending: false })
+        .range(offset, to),
         () =>
           supabase
             .from("tasks")
             .select(selectFullNoJoin)
             .eq("project_id", projectId)
             .eq("assigned_to", user.id)
-            .order("created_at", { ascending: false }),
+            .order("created_at", { ascending: false })
+        .range(offset, to),
       ];
 
       for (const attempt of attempts) {

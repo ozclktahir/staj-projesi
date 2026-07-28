@@ -29,7 +29,14 @@ async function ProjectTaskBoardSection({
   workspaceId: string | null;
 }) {
   const tasks = await getProjectTasks(projectId, workspaceId);
-  return <ProjectTaskBoard projectId={projectId} tasks={tasks} />;
+  return (
+    <ProjectTaskBoard
+      projectId={projectId}
+      workspaceId={workspaceId}
+      tasks={tasks}
+      initialHasMore={tasks.length >= 30}
+    />
+  );
 }
 
 export default async function ProjectDetailPage({

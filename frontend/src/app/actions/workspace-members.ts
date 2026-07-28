@@ -1,10 +1,8 @@
 "use server";
 
+import { revalidateTag } from "next/cache";
+import { getCachedWorkspaceMembers } from "@/lib/data-cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
-import {
-  loadProfilesByIds,
-  resolveMemberDisplayFields,
-} from "@/lib/member-labels";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 import type { WorkspaceMemberOption } from "@/lib/member-labels";
 
@@ -36,7 +34,7 @@ export async function getWorkspaceMembers(
       };
     }
 
-    const { supabase, user } = auth;
+    const { supabase, user, accessToken } = auth;
     const roleCtx = await resolveWorkspaceRole(supabase, wsId, user.id);
 
     if (!roleCtx.isAdmin && !roleCtx.role) {
@@ -48,68 +46,20 @@ export async function getWorkspaceMembers(
       };
     }
 
-    const { data: rows, error } = await supabase
-      .from("workspace_members")
-      .select("user_id, role")
-      .eq("workspace_id", wsId);
-
-    if (error) {
-      console.error("[getWorkspaceMembers]", error);
-      return {
-        success: false,
-        error: error.message,
-        members: [],
-        isAdmin: false,
-      };
-    }
-
-    const memberRows = [...(rows ?? [])];
-    const userIds = memberRows
-      .map((r) => r.user_id as string)
-      .filter(Boolean);
-
-    if (roleCtx.isOwner && !userIds.includes(user.id)) {
-      memberRows.push({ user_id: user.id, role: "OWNER" });
-      userIds.push(user.id);
-    }
-
-    const profileById = await loadProfilesByIds(supabase, userIds);
-
-    const members: WorkspaceMemberOption[] = memberRows.map((row) => {
-      const uid = row.user_id as string;
-      const profile = profileById.get(uid) ?? null;
-      const emailHint = uid === user.id ? (user.email ?? null) : null;
-      const fields = resolveMemberDisplayFields(profile, emailHint);
-
-      return {
-        id: uid,
-        email: fields.email,
-        role: (row.role as string | null) ?? null,
-        fullName: fields.fullName,
-        avatarUrl: fields.avatarUrl,
-        displayName: fields.displayName,
-      };
-    });
-
-    console.info("[getWorkspaceMembers]", {
+    const cached = await getCachedWorkspaceMembers(
       wsId,
-      count: members.length,
-      labels: members.map((m) => ({
-        id: m.id,
-        displayName: m.displayName,
-        email: m.email,
-      })),
-    });
+      user.id,
+      accessToken,
+      roleCtx.isAdmin,
+      roleCtx.isOwner,
+      roleCtx.role,
+    );
 
-    if (!roleCtx.isAdmin) {
-      return {
-        success: true,
-        isAdmin: false,
-        members: members.filter((m) => m.id === user.id),
-      };
-    }
-
-    return { success: true, isAdmin: true, members };
+    return {
+      success: true,
+      isAdmin: cached.isAdmin,
+      members: cached.members,
+    };
   } catch (error) {
     console.error("[getWorkspaceMembers] catch:", error);
     return {
@@ -119,4 +69,11 @@ export async function getWorkspaceMembers(
       isAdmin: false,
     };
   }
+}
+
+/** Üye listesi cache'ini invalid et (davet kabul / rol değişimi sonrası). */
+export async function invalidateWorkspaceMembersCache(workspaceId: string) {
+  const id = workspaceId?.trim();
+  if (!id) return;
+  revalidateTag(`workspace-members-${id}`, "max");
 }

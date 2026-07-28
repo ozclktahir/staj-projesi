@@ -33,11 +33,14 @@ import {
   deletePersonalFile,
   deletePersonalNote,
   deletePersonalTodo,
+  getPersonalNotes,
   toggleNoteCompletion,
   togglePersonalTodo,
   updatePersonalNote,
   uploadPersonalFile,
 } from "@/app/actions/personal";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { PAGE_SIZE } from "@/lib/query-limits";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
 import {
   Accordion,
@@ -236,6 +239,7 @@ export function PersonalWorkspace({
   }, [initialAssignedTasks]);
   useEffect(() => {
     setNotes(initialNotes);
+    setNotesHasMore(initialNotes.length >= PAGE_SIZE.notes);
   }, [initialNotes]);
   useEffect(() => {
     setTodos(initialTodos);
@@ -285,6 +289,15 @@ export function PersonalWorkspace({
   const [dateFilter, setDateFilter] = useState<
     "all" | "hasDue" | "noDue" | "overdue"
   >("all");
+  const [assignedSearch, setAssignedSearch] = useState("");
+  const debouncedAssignedSearch = useDebouncedValue(assignedSearch, 500);
+  const debouncedPriorityFilter = useDebouncedValue(priorityFilter, 500);
+  const debouncedStatusFilter = useDebouncedValue(statusFilter, 500);
+  const debouncedDateFilter = useDebouncedValue(dateFilter, 500);
+  const [notesHasMore, setNotesHasMore] = useState(
+    initialNotes.length >= PAGE_SIZE.notes,
+  );
+  const [notesLoadingMore, setNotesLoadingMore] = useState(false);
 
   const selectedTask = useMemo(
     () =>
@@ -307,23 +320,39 @@ export function PersonalWorkspace({
 
   const filteredAssigned = useMemo(() => {
     const now = Date.now();
+    const q = debouncedAssignedSearch.trim().toLocaleLowerCase("tr-TR");
     return assignedTasks.filter((task) => {
-      if (priorityFilter !== "all" && task.priority !== priorityFilter) {
+      if (
+        debouncedPriorityFilter !== "all" &&
+        task.priority !== debouncedPriorityFilter
+      ) {
         return false;
       }
-      if (statusFilter !== "all" && task.status !== statusFilter) {
+      if (
+        debouncedStatusFilter !== "all" &&
+        task.status !== debouncedStatusFilter
+      ) {
         return false;
       }
-      if (dateFilter === "hasDue" && !task.due_date) return false;
-      if (dateFilter === "noDue" && task.due_date) return false;
-      if (dateFilter === "overdue") {
+      if (debouncedDateFilter === "hasDue" && !task.due_date) return false;
+      if (debouncedDateFilter === "noDue" && task.due_date) return false;
+      if (debouncedDateFilter === "overdue") {
         if (!task.due_date || task.status === "DONE") return false;
         const due = new Date(task.due_date).getTime();
         if (Number.isNaN(due) || due >= now) return false;
       }
+      if (q && !task.title.toLocaleLowerCase("tr-TR").includes(q)) {
+        return false;
+      }
       return true;
     });
-  }, [assignedTasks, priorityFilter, statusFilter, dateFilter]);
+  }, [
+    assignedTasks,
+    debouncedPriorityFilter,
+    debouncedStatusFilter,
+    debouncedDateFilter,
+    debouncedAssignedSearch,
+  ]);
 
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
@@ -563,6 +592,35 @@ export function PersonalWorkspace({
     });
   }
 
+  function handleLoadMoreNotes() {
+    if (notesLoadingMore || !notesHasMore) return;
+    setNotesLoadingMore(true);
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await getPersonalNotes({
+            offset: notes.length,
+            limit: PAGE_SIZE.notes,
+          });
+          if (!result.success) {
+            toast.error(result.error ?? "Notlar yüklenemedi");
+            return;
+          }
+          setNotes((prev) => {
+            const seen = new Set(prev.map((n) => n.id));
+            return [
+              ...prev,
+              ...result.notes.filter((n) => !seen.has(n.id)),
+            ];
+          });
+          setNotesHasMore(Boolean(result.hasMore));
+        } finally {
+          setNotesLoadingMore(false);
+        }
+      })();
+    });
+  }
+
   const uploadFiles = useCallback(
     async (list: FileList | File[] | null) => {
       if (!list || fileBusy) return;
@@ -657,6 +715,13 @@ export function PersonalWorkspace({
               <CardDescription>{t("assigned.description")}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
+              <Input
+                value={assignedSearch}
+                onChange={(e) => setAssignedSearch(e.target.value)}
+                placeholder="Görev ara…"
+                className="h-8 w-full max-w-xs text-sm"
+                aria-label="Atanan görevlerde ara"
+              />
               <Select
                 value={priorityFilter}
                 onValueChange={(v) =>
@@ -1049,6 +1114,19 @@ export function PersonalWorkspace({
                 </Card>
               ))
             )}
+            {notesHasMore ? (
+              <div className="flex justify-center pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={notesLoadingMore}
+                  onClick={handleLoadMoreNotes}
+                >
+                  {notesLoadingMore ? "Yükleniyor…" : "Daha fazla not yükle"}
+                </Button>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

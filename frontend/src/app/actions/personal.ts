@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { logActionError } from "@/lib/action-result";
+import { PAGE_SIZE, resolvePage, type PageQuery } from "@/lib/query-limits";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import type {
   PersonalFile,
@@ -17,9 +18,10 @@ function revalidatePersonal() {
 
 // ─── Notes ───────────────────────────────────────────────────────────────────
 
-export async function getPersonalNotes(): Promise<{
+export async function getPersonalNotes(page?: PageQuery): Promise<{
   success: boolean;
   notes: PersonalNote[];
+  hasMore?: boolean;
   error?: string;
 }> {
   try {
@@ -28,11 +30,14 @@ export async function getPersonalNotes(): Promise<{
       return { success: false, notes: [], error: "Oturum bulunamadı." };
     }
 
+    const { offset, to, limit } = resolvePage(page, PAGE_SIZE.notes);
+
     const primary = await auth.supabase
       .from("personal_notes")
       .select("id, title, content, task_id, is_completed, created_at, updated_at")
       .eq("user_id", auth.user.id)
-      .order("updated_at", { ascending: false });
+      .order("updated_at", { ascending: false })
+      .range(offset, to);
 
     let rows: Array<Record<string, unknown>> =
       (primary.data as Array<Record<string, unknown>> | null) ?? [];
@@ -43,7 +48,8 @@ export async function getPersonalNotes(): Promise<{
         .from("personal_notes")
         .select("id, title, content, task_id, created_at, updated_at")
         .eq("user_id", auth.user.id)
-        .order("updated_at", { ascending: false });
+        .order("updated_at", { ascending: false })
+        .range(offset, to);
       if (!fallback.error) {
         rows = (fallback.data as Array<Record<string, unknown>> | null) ?? [];
         error = null;
@@ -52,7 +58,8 @@ export async function getPersonalNotes(): Promise<{
           .from("personal_notes")
           .select("id, title, content, created_at, updated_at")
           .eq("user_id", auth.user.id)
-          .order("updated_at", { ascending: false });
+          .order("updated_at", { ascending: false })
+          .range(offset, to);
         rows = (legacy.data as Array<Record<string, unknown>> | null) ?? [];
         error = legacy.error;
       } else {
@@ -69,9 +76,11 @@ export async function getPersonalNotes(): Promise<{
       };
     }
 
+    const pageRows = rows;
+
     const taskIds = [
       ...new Set(
-        rows
+        pageRows
           .map((row) =>
             typeof row.task_id === "string" ? row.task_id : null,
           )
@@ -95,7 +104,7 @@ export async function getPersonalNotes(): Promise<{
       }
     }
 
-    const notes: PersonalNote[] = rows.map((row) => {
+    const notes: PersonalNote[] = pageRows.map((row) => {
       const taskId =
         typeof row.task_id === "string" ? row.task_id : null;
       return {
@@ -110,7 +119,7 @@ export async function getPersonalNotes(): Promise<{
       };
     });
 
-    return { success: true, notes };
+    return { success: true, notes, hasMore: notes.length >= limit };
   } catch (error) {
     return {
       success: false,
@@ -327,9 +336,10 @@ export async function deletePersonalNote(id: string): Promise<SimpleResult> {
 
 // ─── Todos ───────────────────────────────────────────────────────────────────
 
-export async function getPersonalTodos(): Promise<{
+export async function getPersonalTodos(page?: PageQuery): Promise<{
   success: boolean;
   todos: PersonalTodo[];
+  hasMore?: boolean;
   error?: string;
 }> {
   try {
@@ -338,13 +348,16 @@ export async function getPersonalTodos(): Promise<{
       return { success: false, todos: [], error: "Oturum bulunamadı." };
     }
 
+    const { offset, to, limit } = resolvePage(page, PAGE_SIZE.todos);
+
     const { data, error } = await auth.supabase
       .from("personal_todos")
       .select("id, task, due_date, is_completed, created_at")
       .eq("user_id", auth.user.id)
       .order("is_completed", { ascending: true })
       .order("due_date", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, to);
 
     if (error) {
       console.error("[getPersonalTodos]", error.message);
@@ -363,7 +376,7 @@ export async function getPersonalTodos(): Promise<{
       createdAt: (row.created_at as string | null) ?? null,
     }));
 
-    return { success: true, todos };
+    return { success: true, todos, hasMore: todos.length >= limit };
   } catch (error) {
     return {
       success: false,
@@ -508,9 +521,10 @@ export async function deletePersonalTodo(id: string): Promise<SimpleResult> {
 
 // ─── Files ───────────────────────────────────────────────────────────────────
 
-export async function getPersonalFiles(): Promise<{
+export async function getPersonalFiles(page?: PageQuery): Promise<{
   success: boolean;
   files: PersonalFile[];
+  hasMore?: boolean;
   error?: string;
 }> {
   try {
@@ -519,11 +533,14 @@ export async function getPersonalFiles(): Promise<{
       return { success: false, files: [], error: "Oturum bulunamadı." };
     }
 
+    const { offset, to, limit } = resolvePage(page, PAGE_SIZE.files);
+
     const { data, error } = await auth.supabase
       .from("personal_files")
       .select("id, file_name, file_url, storage_path, file_size, created_at")
       .eq("user_id", auth.user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, to);
 
     if (error) {
       console.error("[getPersonalFiles]", error.message);
@@ -564,7 +581,7 @@ export async function getPersonalFiles(): Promise<{
       });
     }
 
-    return { success: true, files };
+    return { success: true, files, hasMore: files.length >= limit };
   } catch (error) {
     return {
       success: false,

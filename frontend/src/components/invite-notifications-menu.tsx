@@ -121,6 +121,8 @@ export function InviteNotificationsMenu({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   const [clearingAll, setClearingAll] = useState(false);
+  const [notifHasMore, setNotifHasMore] = useState(false);
+  const [loadingMoreNotifs, setLoadingMoreNotifs] = useState(false);
   const [resolvedActionIds, setResolvedActionIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -158,11 +160,12 @@ export function InviteNotificationsMenu({
     try {
       const [invitesResult, notifResult] = await Promise.all([
         getMyPendingInvitations(),
-        getMyNotifications(40),
+        getMyNotifications(20, 0),
       ]);
       if (invitesResult.success) setInvitations(invitesResult.invitations);
       if (notifResult.success) {
         setNotifications(notifResult.notifications);
+        setNotifHasMore(Boolean(notifResult.hasMore));
         knownIdsRef.current = new Set(
           notifResult.notifications.map((n) => n.id),
         );
@@ -456,6 +459,36 @@ export function InviteNotificationsMenu({
           );
         } finally {
           setBusyId(null);
+        }
+      })();
+    });
+  };
+
+  const handleLoadMoreNotifications = () => {
+    if (loadingMoreNotifs || !notifHasMore) return;
+    setLoadingMoreNotifs(true);
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await getMyNotifications(20, notifications.length);
+          if (!result.success) {
+            toast.error(result.error ?? "Bildirimler yüklenemedi");
+            return;
+          }
+          setNotifications((prev) => {
+            const seen = new Set(prev.map((n) => n.id));
+            const merged = [...prev];
+            for (const n of result.notifications) {
+              if (!seen.has(n.id)) {
+                merged.push(n);
+                knownIdsRef.current.add(n.id);
+              }
+            }
+            return merged;
+          });
+          setNotifHasMore(Boolean(result.hasMore));
+        } finally {
+          setLoadingMoreNotifs(false);
         }
       })();
     });
@@ -887,6 +920,20 @@ export function InviteNotificationsMenu({
               );
             })}
           </ul>
+          {notifHasMore ? (
+            <div className="border-t border-border p-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-full text-xs"
+                disabled={loadingMoreNotifs}
+                onClick={handleLoadMoreNotifications}
+              >
+                {loadingMoreNotifs ? "Yükleniyor…" : "Daha fazla yükle"}
+              </Button>
+            </div>
+          ) : null}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
