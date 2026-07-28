@@ -402,3 +402,4 @@
 
 ### [28 Temmuz 2026] - UI Cleanup, filtreler, not-görev ilişkisi ve i18n
 - Kapsamlı UI revizyonu yapıldı: My Tasks ve Favorites sayfaları kaldırıldı, Header sadeleştirildi. Yaklaşan Tarihler ve Atanan Görevler listelerine açılır-kapanır alt görev (Accordion) desteği, öncelik/tarih bazlı sıralama ve filtreleme eklendi. Kişisel notlar görevlerle ilişkilendirilebilir hale getirildi. Ayarlar sayfasına İngilizce/Türkçe dil seçeneği (i18n altyapısı) eklendi. Tüm Server Action'lar asenkron kurallarına uygun revize edildi.
+- UI/UX İyileştirmeleri: Notlar kartı yeniden tasarlandı (Üstte rozet/tarih, altta onaylı silme ve geri alınabilir tamamlama butonları eklendi). Akıllı Yapılacaklar widget'ı daha kompakt hale getirildi. Yaklaşan Görevler listesindeki öğelere projedeki ilgili göreve doğrudan gitmeyi sağlayan yönlendirme (link) eklendi.
