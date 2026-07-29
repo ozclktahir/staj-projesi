@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../dashboard/presentation/dashboard_screen.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
 import '../../notifications/presentation/notifications_sheet.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../data/project_dto.dart';
@@ -12,16 +14,39 @@ import '../providers/workspace_provider.dart';
 import 'create_project_dialog.dart';
 import 'workspace_switcher.dart';
 
-/// Ana ekran: workspace switcher + proje listesi.
-class HomeScreen extends ConsumerWidget {
+/// Ana ekran: Dashboard + proje listesi sekmeleri.
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final workspaceState = ref.watch(workspaceProvider);
     final projectsAsync = ref.watch(projectsProvider);
     final active = workspaceState.activeWorkspace;
-    final canCreateProject = active != null;
+    final canCreateProject = active != null && _tabController.index == 1;
     final unreadCount = ref.watch(unreadNotificationCountProvider);
 
     return Scaffold(
@@ -62,6 +87,15 @@ class HomeScreen extends ConsumerWidget {
             icon: const Icon(Icons.logout),
           ),
         ],
+        bottom: active == null
+            ? null
+            : TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(icon: Icon(Icons.dashboard_outlined), text: 'Dashboard'),
+                  Tab(icon: Icon(Icons.folder_outlined), text: 'Projeler'),
+                ],
+              ),
       ),
       floatingActionButton: canCreateProject
           ? FloatingActionButton(
@@ -79,17 +113,39 @@ class HomeScreen extends ConsumerWidget {
               child: const Icon(Icons.add),
             )
           : null,
-      body: _HomeBody(
-        workspaceLoading: workspaceState.isLoading,
-        workspaceError: workspaceState.errorMessage,
-        hasWorkspaces: workspaceState.workspaces.isNotEmpty,
-        hasActiveWorkspace: active != null,
-        projectsAsync: projectsAsync,
-        onRefreshWorkspaces: () =>
-            ref.read(workspaceProvider.notifier).refresh(),
-        onRefreshProjects: () => ref.read(projectsProvider.notifier).refresh(),
-        onOpenSwitcher: () => showWorkspaceSwitcher(context, ref),
-      ),
+      body: active == null
+          ? _HomeBody(
+              workspaceLoading: workspaceState.isLoading,
+              workspaceError: workspaceState.errorMessage,
+              hasWorkspaces: workspaceState.workspaces.isNotEmpty,
+              hasActiveWorkspace: false,
+              projectsAsync: projectsAsync,
+              onRefreshWorkspaces: () =>
+                  ref.read(workspaceProvider.notifier).refresh(),
+              onRefreshProjects: () =>
+                  ref.read(projectsProvider.notifier).refresh(),
+              onOpenSwitcher: () => showWorkspaceSwitcher(context, ref),
+            )
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                const DashboardScreen(),
+                _HomeBody(
+                  workspaceLoading: workspaceState.isLoading,
+                  workspaceError: workspaceState.errorMessage,
+                  hasWorkspaces: workspaceState.workspaces.isNotEmpty,
+                  hasActiveWorkspace: true,
+                  projectsAsync: projectsAsync,
+                  onRefreshWorkspaces: () async {
+                    await ref.read(workspaceProvider.notifier).refresh();
+                    ref.invalidate(dashboardProvider);
+                  },
+                  onRefreshProjects: () =>
+                      ref.read(projectsProvider.notifier).refresh(),
+                  onOpenSwitcher: () => showWorkspaceSwitcher(context, ref),
+                ),
+              ],
+            ),
     );
   }
 }

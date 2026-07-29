@@ -97,7 +97,7 @@
   - Görev oluşturma/düzenleme (Assignee, due date, başlık, açıklama, öncelik)
   - Alt görevler (Subtasks) desteği
   - Dosya silme ve önizleme/açma deneyimi
-- [ ] **Adım 2: Dashboard / Analytics Ekranı**
+- [x] **Adım 2: Dashboard / Analytics Ekranı**
   - KPI kartları, istatistik grafikleri ve yaklaşan deadline listesi (`/`)
 - [ ] **Adım 3: Personal Workspace Ekranı**
   - Atanmış görevler, kişisel notlar ve Todo/Dosyalar (`/personal`)
@@ -462,3 +462,6 @@
 
 ### [29 Temmuz 2026] - Faz 8.1 Adım 1: Görev düzenleme, subtask desteği ve dosya yönetimi mobilde tamamlandı
 - Görev düzenleme (başlık/açıklama/öncelik/due date/assignee), Alt Görevler sekmesi (liste + toggle + ekleme), dosya silme ve `url_launcher` ile açma; `flutter analyze` temiz.
+
+### [29 Temmuz 2026] - Faz 8.1 Adım 2: Mobil Dashboard, KPI kartları ve istatistik grafikleri eklendi
+- `fl_chart`, Nest `GET /workspaces/:id/statistics` + görevlerden KPI/pasta grafik/yaklaşan deadline’lar; Home’da Dashboard | Projeler sekmeleri; `flutter analyze` temiz.
