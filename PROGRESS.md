@@ -92,6 +92,28 @@
   - [x] **Adım 4:** Görev (Task) Yönetimi ve Kanban Panosu (Durum Yönetimi, Görev Detayları)
   - [x] **Adım 5:** Gelişmiş Özellikler (Yorumlar, Dosya Ekleri, Bildirimler ve Realtime)
 
+### Faz 8.1: Mobil Eksik Modüller ve Web Eşitlemesi (Ekranlar & İyileştirmeler)
+- [ ] **Adım 1: Görev Detay & İşlevsellik Geliştirmeleri**
+  - Görev oluşturma/düzenleme (Assignee, due date, başlık, açıklama, öncelik)
+  - Alt görevler (Subtasks) desteği
+  - Dosya silme ve önizleme/açma deneyimi
+- [ ] **Adım 2: Dashboard / Analytics Ekranı**
+  - KPI kartları, istatistik grafikleri ve yaklaşan deadline listesi (`/`)
+- [ ] **Adım 3: Personal Workspace Ekranı**
+  - Atanmış görevler, kişisel notlar ve Todo/Dosyalar (`/personal`)
+- [ ] **Adım 4: Davet & Bildirim Aksiyonları**
+  - Üye davet etme, davet kabul/red akışları
+  - Gelişmiş bildirim aksiyonları (silme onayı, görev sahiplenme/claim vb.)
+- [ ] **Adım 5: Kanban & Arayüz Geliştirmeleri**
+  - Kanban ekranına arama, öncelik filtreleri ve sayfalama eklenmesi
+  - Activity Log (Aktivite Akışı) UI bileşeni
+- [ ] **Adım 6: Ayarlar & Onboarding**
+  - Ayarlar ekranı (`/settings` - Tema ve Dil seçenekleri)
+  - Onboarding (İlk workspace oluşturma / karşılama ekranı)
+- [ ] **Adım 7: Yönetimsel Aksiyonlar & Realtime**
+  - Workspace ve Proje silme yetkileri
+  - Canlı güncelleme (Realtime board/bildirim/aktivite senkronizasyonu)
+
 ### 🔮 Gelecek Planları (Zaman Kalırsa eklenecekler)
 - [ ] AI ile görev önerileri, özeti ve deadline tahmini.
 
@@ -434,3 +456,6 @@
 
 ### [29 Temmuz 2026] - Faz 8 Adım 5: Yorumlar, Dosya yükleme (Multipart) ve Bildirim sistemi mobil uygulamaya entegre edildi
 - `file_picker`, Comment/File/Notification repository + provider’lar; Task Detail sekmeleri (Yorumlar/Dosyalar); Home AppBar bildirim zili + rozet; multipart upload; `flutter analyze` temiz.
+
+### [29 Temmuz 2026] - Mobil web eşitleme planı (Faz 8.1) yol haritasına eklendi
+- PROGRESS.md’ye **Faz 8.1: Mobil Eksik Modüller ve Web Eşitlemesi** alt fazı eklendi (görev detay, dashboard, personal, davetler, kanban/activity, ayarlar/onboarding, silme/realtime).
