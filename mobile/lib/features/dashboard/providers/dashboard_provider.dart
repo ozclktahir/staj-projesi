@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client_provider.dart';
 import '../../tasks/data/task_dto.dart';
+import '../../tasks/data/task_repository.dart';
 import '../../tasks/providers/task_provider.dart';
 import '../../workspace/providers/workspace_provider.dart';
 import '../data/dashboard_repository.dart';
@@ -26,11 +28,6 @@ class DashboardNotifier extends AutoDisposeAsyncNotifier<DashboardData> {
     );
     if (workspaceId == null) return DashboardData.empty();
 
-    final tasksFuture = ref.read(taskRepositoryProvider).fetchTasks(
-          workspaceId: workspaceId,
-          limit: 200,
-        );
-
     WorkspaceStatisticsDto? remote;
     try {
       remote = await ref
@@ -40,7 +37,18 @@ class DashboardNotifier extends AutoDisposeAsyncNotifier<DashboardData> {
       remote = null;
     }
 
-    final tasks = await tasksFuture;
+    List<TaskDto> tasks = const [];
+    try {
+      tasks = await ref.read(taskRepositoryProvider).fetchTasks(
+            workspaceId: workspaceId,
+            limit: 200,
+          );
+    } on TaskException catch (error) {
+      // 403 / ağ hatalarında ekranı düşürme
+      debugPrint('[Dashboard] tasks fetch: $error');
+      tasks = const [];
+    }
+
     return DashboardData.fromTasks(
       List<TaskDto>.from(tasks),
       remote: remote,

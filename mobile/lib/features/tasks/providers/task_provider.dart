@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client_provider.dart';
@@ -61,12 +62,18 @@ class TasksNotifier
     if (workspaceId == null) {
       return const ProjectTasksState(items: []);
     }
-    return _fetchPage(
-      workspaceId: workspaceId,
-      projectId: projectId,
-      filter: filter,
-      page: 1,
-    );
+    try {
+      return await _fetchPage(
+        workspaceId: workspaceId,
+        projectId: projectId,
+        filter: filter,
+        page: 1,
+      );
+    } on TaskException catch (error) {
+      debugPrint('[Tasks] fetch: $error');
+      // Yetki/ağ hatalarında ekranı çökertme; boş kolon + refresh mümkün
+      return const ProjectTasksState(items: []);
+    }
   }
 
   Future<ProjectTasksState> _fetchPage({
@@ -138,9 +145,10 @@ class TasksNotifier
         appendTo: current.items,
       );
       state = AsyncData(next);
-    } catch (_) {
+    } catch (error) {
+      // await edilmeyen loadMore çağrılarında unhandled exception önle
       state = AsyncData(current.copyWith(isLoadingMore: false));
-      rethrow;
+      debugPrint('[Tasks] loadMore failed: $error');
     }
   }
 

@@ -22,13 +22,29 @@ Future<void> main() async {
   );
 }
 
-class StajMobileApp extends ConsumerWidget {
+class StajMobileApp extends ConsumerStatefulWidget {
   const StajMobileApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StajMobileApp> createState() => _StajMobileAppState();
+}
+
+class _StajMobileAppState extends ConsumerState<StajMobileApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Socket bağlantısını ilk frame sonrasında başlat (build sırasında invalidate riski azalır).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(realtimeConnectionProvider);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(goRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
+    // Bağımlılıklar değişince provider yeniden çalışır (socket reconnect).
     ref.watch(realtimeConnectionProvider);
 
     return MaterialApp.router(

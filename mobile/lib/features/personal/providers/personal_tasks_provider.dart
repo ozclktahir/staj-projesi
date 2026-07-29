@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_provider.dart';
 import '../../tasks/data/task_dto.dart';
+import '../../tasks/data/task_repository.dart';
 import '../../tasks/providers/task_provider.dart';
 import '../../workspace/providers/workspace_provider.dart';
 
@@ -22,11 +24,16 @@ class PersonalTasksNotifier extends AutoDisposeAsyncNotifier<List<TaskDto>> {
       return const [];
     }
 
-    return ref.read(taskRepositoryProvider).fetchTasks(
-          workspaceId: workspaceId,
-          assigneeId: userId,
-          limit: 100,
-        );
+    try {
+      return await ref.read(taskRepositoryProvider).fetchTasks(
+            workspaceId: workspaceId,
+            assigneeId: userId,
+            limit: 100,
+          );
+    } on TaskException catch (error) {
+      debugPrint('[PersonalTasks] fetch: $error');
+      return const [];
+    }
   }
 
   Future<void> refresh() async {

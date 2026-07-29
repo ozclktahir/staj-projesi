@@ -480,3 +480,6 @@
 
 ### [29 Temmuz 2026] - Faz 8.1 Adım 7: Workspace/Proje silme yetkileri ve Socket.io realtime entegrasyonu tamamlandi. Mobil geliştirme fazı bitti.
 - OWNER workspace silme + proje silme; `socket_io_client` ile `task_updated` / `new_notification` / `activity_logged`; Nest emit’leri; `flutter analyze` temiz. Faz 8.1 mobil tamamlandı.
+
+### [29 Temmuz 2026] - Fix: Faz 8.1 Adım 7 sonrası ortaya çıkan Socket.io bağlantı, CORS ve Riverpod state hataları giderildi.
+- Socket web uyumu (polling+websocket, token auth-only, debounce invalidate); 403/unhandled task fetch ve loadMore rethrow düzeltmeleri; Nest gateway CORS.

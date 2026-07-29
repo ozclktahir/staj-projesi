@@ -19,24 +19,27 @@ class ActivityLogNotifier
     );
     if (workspaceId == null) return const [];
 
-    final all = await ref
-        .read(activityLogRepositoryProvider)
-        .fetchActivityLogs(workspaceId);
+    try {
+      final all = await ref
+          .read(activityLogRepositoryProvider)
+          .fetchActivityLogs(workspaceId);
 
-    if (projectId == null || projectId.isEmpty) {
-      return all;
+      if (projectId == null || projectId.isEmpty) {
+        return all;
+      }
+
+      final filtered = all
+          .where(
+            (log) =>
+                log.projectId == projectId ||
+                (log.entityType == 'project' && log.entityId == projectId),
+          )
+          .toList();
+
+      return filtered.isNotEmpty ? filtered : all;
+    } on ActivityLogException {
+      return const [];
     }
-
-    final filtered = all
-        .where(
-          (log) =>
-              log.projectId == projectId ||
-              (log.entityType == 'project' && log.entityId == projectId),
-        )
-        .toList();
-
-    // Proje filtresi boşsa workspace akışını göster (eski kayıtlarda project_id olmayabilir).
-    return filtered.isNotEmpty ? filtered : all;
   }
 
   Future<void> refresh() async {

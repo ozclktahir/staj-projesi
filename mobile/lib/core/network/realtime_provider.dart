@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/activity/providers/activity_log_provider.dart';
@@ -18,41 +21,80 @@ final socketServiceProvider = Provider<SocketService>((ref) {
 });
 
 /// Auth + aktif workspace değişince socket bağlantısını yönetir;
-/// event gelince ilgili provider'ları yeniler.
+/// event gelince ilgili provider'ları (build dışında) yeniler.
 final realtimeConnectionProvider = Provider<void>((ref) {
-  final auth = ref.watch(authProvider);
+  final authStatus = ref.watch(authProvider.select((s) => s.status));
+  final token = ref.watch(authProvider.select((s) => s.token));
+  final userId = ref.watch(authProvider.select((s) => s.userId));
   final workspaceId = ref.watch(
     workspaceProvider.select((s) => s.activeWorkspace?.id),
   );
   final socket = ref.watch(socketServiceProvider);
 
-  if (auth.status != AuthStatus.authenticated ||
-      auth.token == null ||
-      auth.token!.isEmpty ||
-      auth.userId == null ||
-      auth.userId!.isEmpty) {
+  Timer? debounce;
+
+  void scheduleInvalidate(Object provider) {
+    // Widget build / layout sırasında invalidate → markNeedsBuild hatalarını önle.
+    scheduleMicrotask(() {
+      try {
+        ref.invalidate(provider as ProviderOrFamily);
+      } catch (error, stack) {
+        debugPrint('[Realtime] invalidate failed: $error\n$stack');
+      }
+    });
+  }
+
+  void onRealtimeEvent(void Function() action) {
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 250), () {
+      try {
+        action();
+      } catch (error, stack) {
+        debugPrint('[Realtime] handler failed: $error\n$stack');
+      }
+    });
+  }
+
+  if (authStatus != AuthStatus.authenticated ||
+      token == null ||
+      token.isEmpty ||
+      userId == null ||
+      userId.isEmpty) {
     socket.disconnect();
+    ref.onDispose(() {
+      debounce?.cancel();
+      socket.disconnect();
+    });
     return;
   }
 
   socket.connect(
-    token: auth.token!,
-    userId: auth.userId!,
+    token: token,
+    userId: userId,
     workspaceId: workspaceId,
     onTaskUpdated: (_) {
-      ref.invalidate(tasksProvider);
-      ref.invalidate(dashboardProvider);
-      ref.invalidate(personalTasksProvider);
-      ref.invalidate(projectsProvider);
+      onRealtimeEvent(() {
+        scheduleInvalidate(tasksProvider);
+        scheduleInvalidate(dashboardProvider);
+        scheduleInvalidate(personalTasksProvider);
+        scheduleInvalidate(projectsProvider);
+      });
     },
     onNewNotification: (_) {
-      ref.invalidate(notificationsProvider);
-      ref.invalidate(myInvitationsProvider);
+      onRealtimeEvent(() {
+        scheduleInvalidate(notificationsProvider);
+        scheduleInvalidate(myInvitationsProvider);
+      });
     },
     onActivityLogged: (_) {
-      ref.invalidate(activityLogProvider);
+      onRealtimeEvent(() {
+        scheduleInvalidate(activityLogProvider);
+      });
     },
   );
 
-  ref.onDispose(socket.disconnect);
+  ref.onDispose(() {
+    debounce?.cancel();
+    socket.disconnect();
+  });
 });

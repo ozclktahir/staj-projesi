@@ -5,12 +5,14 @@ import '../constants/api_constants.dart';
 
 typedef SocketPayloadHandler = void Function(dynamic payload);
 
-/// NestJS Socket.IO istemcisi — auth + workspace odası.
+/// NestJS Socket.IO istemcisi — web (Chrome) ve mobil uyumlu.
 class SocketService {
   io.Socket? _socket;
+  String? _signature;
 
   bool get isConnected => _socket?.connected ?? false;
 
+  /// Aynı oturum/workspace için gereksiz reconnect yapılmaz.
   void connect({
     required String token,
     required String userId,
@@ -19,27 +21,41 @@ class SocketService {
     SocketPayloadHandler? onNewNotification,
     SocketPayloadHandler? onActivityLogged,
   }) {
+    final signature = '$userId|${workspaceId ?? ''}|${token.hashCode}';
+    if (_socket != null && _signature == signature && _socket!.connected) {
+      return;
+    }
+
     disconnect();
+    _signature = signature;
+
+    // Token'ı query'ye koyma (URL uzunluğu / özel karakter sorunları).
+    // userId + workspaceId query; token yalnızca auth objesinde.
+    final query = <String, dynamic>{
+      'userId': userId,
+      if (workspaceId != null && workspaceId.isNotEmpty) 'workspaceId': workspaceId,
+    };
 
     final options = io.OptionBuilder()
-        .setTransports(['websocket'])
+        .setTransports(['websocket', 'polling'])
+        .setPath('/socket.io')
         .enableAutoConnect()
         .enableReconnection()
+        .enableForceNew()
+        .setTimeout(12000)
         .setAuth({
           'token': token,
           'userId': userId,
           if (workspaceId != null && workspaceId.isNotEmpty)
             'workspaceId': workspaceId,
         })
-        .setQuery({
-          'token': token,
-          'userId': userId,
-          if (workspaceId != null && workspaceId.isNotEmpty)
-            'workspaceId': workspaceId,
-        })
+        .setQuery(query)
         .build();
 
-    final socket = io.io(ApiConstants.baseUrl, options);
+    final socket = io.io(
+      ApiConstants.baseUrl,
+      options,
+    );
     _socket = socket;
 
     socket.onConnect((_) {
@@ -51,13 +67,15 @@ class SocketService {
     socket.onConnectError((error) {
       debugPrint('[Socket] connect error: $error');
     });
+    socket.onError((error) {
+      debugPrint('[Socket] error: $error');
+    });
 
     if (onTaskUpdated != null) {
       socket.on('task_updated', onTaskUpdated);
     }
     if (onNewNotification != null) {
       socket.on('new_notification', onNewNotification);
-      // Geriye dönük uyumluluk
       socket.on('notification', onNewNotification);
     }
     if (onActivityLogged != null) {
@@ -67,9 +85,15 @@ class SocketService {
 
   void disconnect() {
     final socket = _socket;
-    if (socket == null) return;
-    socket.clearListeners();
-    socket.dispose();
     _socket = null;
+    _signature = null;
+    if (socket == null) return;
+    try {
+      socket.clearListeners();
+      socket.disconnect();
+      socket.dispose();
+    } catch (error) {
+      debugPrint('[Socket] disconnect error: $error');
+    }
   }
 }
