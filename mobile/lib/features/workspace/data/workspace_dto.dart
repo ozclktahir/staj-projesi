@@ -29,6 +29,11 @@ class WorkspaceDto {
   final String? role;
   final String? createdAt;
   final String? updatedAt;
+
+  bool get isOwner {
+    final r = role?.toUpperCase();
+    return r == 'OWNER';
+  }
 }
 
 class CreateWorkspaceDto {

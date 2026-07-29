@@ -1,10 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { NotificationGateway } from '../notification/notification.gateway';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateActivityLogDto } from './dto/create-activity-log.dto';
 
 @Injectable()
 export class ActivityLogService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly notificationGateway: NotificationGateway,
+  ) {}
 
   async logAction(
     workspaceId: string,
@@ -26,6 +30,12 @@ export class ActivityLogService {
     if (error) {
       throw new BadRequestException(error.message);
     }
+
+    this.notificationGateway.emitToWorkspace(
+      workspaceId,
+      'activity_logged',
+      data,
+    );
 
     return data;
   }

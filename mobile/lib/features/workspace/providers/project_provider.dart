@@ -48,6 +48,29 @@ class ProjectsNotifier extends AsyncNotifier<List<ProjectDto>> {
       rethrow;
     }
   }
+
+  Future<void> deleteProject(String projectId) async {
+    final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
+    if (workspaceId == null) {
+      throw ProjectException('Aktif çalışma alanı yok.');
+    }
+
+    final previous = state.valueOrNull ?? const <ProjectDto>[];
+    state = AsyncData([
+      for (final project in previous)
+        if (project.id != projectId) project,
+    ]);
+
+    try {
+      await ref.read(projectRepositoryProvider).deleteProject(
+            workspaceId: workspaceId,
+            projectId: projectId,
+          );
+    } catch (_) {
+      state = AsyncData(previous);
+      rethrow;
+    }
+  }
 }
 
 final projectsProvider =

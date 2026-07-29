@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { NotificationGateway } from '../notification/notification.gateway';
 import { NotificationService } from '../notification/notification.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -17,6 +18,7 @@ export class TaskService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly notificationService: NotificationService,
+    private readonly notificationGateway: NotificationGateway,
   ) {}
 
   async create(workspaceId: string, userId: string, dto: CreateTaskDto) {
@@ -194,6 +196,8 @@ export class TaskService {
         });
       }
     }
+
+    this.notificationGateway.emitToWorkspace(workspaceId, 'task_updated', data);
 
     return data;
   }

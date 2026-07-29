@@ -51,6 +51,14 @@ class WorkspaceRepository {
     }
   }
 
+  Future<void> deleteWorkspace(String workspaceId) async {
+    try {
+      await _dio.delete<void>(ApiConstants.workspaceById(workspaceId));
+    } on DioException catch (error) {
+      throw WorkspaceException(_messageFromDio(error));
+    }
+  }
+
   String _messageFromDio(DioException error) {
     final status = error.response?.statusCode;
     final data = error.response?.data;

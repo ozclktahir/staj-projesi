@@ -71,4 +71,9 @@ abstract final class ApiConstants {
 
   static String workspaceActivityLogs(String workspaceId) =>
       '/workspaces/$workspaceId/activity-logs';
+
+  static String workspaceById(String workspaceId) => '/workspace/$workspaceId';
+
+  static String workspaceProject(String workspaceId, String projectId) =>
+      '/workspaces/$workspaceId/projects/$projectId';
 }

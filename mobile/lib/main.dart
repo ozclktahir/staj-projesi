@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/network/realtime_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/storage/shared_preferences_provider.dart';
 import 'core/theme/app_theme.dart';
@@ -28,6 +29,7 @@ class StajMobileApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(goRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
+    ref.watch(realtimeConnectionProvider);
 
     return MaterialApp.router(
       title: 'Staj Projesi',

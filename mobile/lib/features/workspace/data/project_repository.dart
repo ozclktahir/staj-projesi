@@ -56,6 +56,19 @@ class ProjectRepository {
     }
   }
 
+  Future<void> deleteProject({
+    required String workspaceId,
+    required String projectId,
+  }) async {
+    try {
+      await _dio.delete<void>(
+        ApiConstants.workspaceProject(workspaceId, projectId),
+      );
+    } on DioException catch (error) {
+      throw ProjectException(_messageFromDio(error));
+    }
+  }
+
   String _messageFromDio(DioException error) {
     final status = error.response?.statusCode;
     final data = error.response?.data;

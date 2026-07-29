@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -85,5 +86,18 @@ export class WorkspaceController {
     @Body() dto: InviteMemberDto,
   ) {
     return this.workspaceService.invite(id, user.id, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
+  @ApiOperation({ summary: 'Çalışma alanını siler (yalnızca OWNER)' })
+  @ApiResponse({ status: 200, description: 'Çalışma alanı silindi.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Çalışma alanını yalnızca OWNER silebilir.',
+  })
+  @ApiResponse({ status: 404, description: 'Çalışma alanı bulunamadı.' })
+  remove(@Param('id') id: string, @GetUser() user: { id: string }) {
+    return this.workspaceService.remove(id, user.id);
   }
 }

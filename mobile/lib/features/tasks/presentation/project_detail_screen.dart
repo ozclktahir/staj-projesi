@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../activity/presentation/activity_log_panel.dart';
 import '../../workspace/data/project_dto.dart';
+import '../../workspace/data/project_repository.dart';
+import '../../workspace/providers/project_provider.dart';
 import '../data/task_dto.dart';
 import '../providers/kanban_filter_provider.dart';
 import '../providers/task_provider.dart';
@@ -56,6 +58,55 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     });
   }
 
+  Future<void> _confirmDeleteProject() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Projeyi sil'),
+        content: Text(
+          '"${widget.projectName ?? 'Bu proje'}" arşivlenecek. Devam etmek istiyor musunuz?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('İptal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ref
+          .read(projectsProvider.notifier)
+          .deleteProject(widget.projectId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Proje silindi.')));
+      Navigator.of(context).pop();
+    } on ProjectException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Proje silinemedi.')),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final filter = ref.watch(kanbanFilterProvider(widget.projectId));
@@ -65,6 +116,23 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.projectName ?? 'Proje'),
+          actions: [
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'delete') _confirmDeleteProject();
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.delete_outline),
+                    title: Text('Projeyi Sil'),
+                  ),
+                ),
+              ],
+            ),
+          ],
           bottom: TabBar(
             isScrollable: true,
             tabs: [

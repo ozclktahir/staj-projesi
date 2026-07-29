@@ -20,12 +20,29 @@ export class NotificationGateway
     const userId =
       (client.handshake.query.userId as string | undefined) ||
       (client.handshake.auth?.userId as string | undefined);
+    const workspaceId =
+      (client.handshake.query.workspaceId as string | undefined) ||
+      (client.handshake.auth?.workspaceId as string | undefined);
+    const token =
+      (client.handshake.query.token as string | undefined) ||
+      (client.handshake.auth?.token as string | undefined);
+
+    if (token) {
+      this.logger.debug(`Client ${client.id} connected with auth token`);
+    }
 
     if (userId) {
       void client.join(this.userRoom(userId));
       this.logger.log(`Client ${client.id} joined room for user ${userId}`);
     } else {
       this.logger.warn(`Client ${client.id} connected without userId`);
+    }
+
+    if (workspaceId) {
+      void client.join(this.workspaceRoom(workspaceId));
+      this.logger.log(
+        `Client ${client.id} joined workspace room ${workspaceId}`,
+      );
     }
   }
 
@@ -37,7 +54,15 @@ export class NotificationGateway
     this.server.to(this.userRoom(userId)).emit(event, payload);
   }
 
+  emitToWorkspace(workspaceId: string, event: string, payload: unknown) {
+    this.server.to(this.workspaceRoom(workspaceId)).emit(event, payload);
+  }
+
   private userRoom(userId: string) {
     return `user_${userId}`;
+  }
+
+  private workspaceRoom(workspaceId: string) {
+    return `workspace_${workspaceId}`;
   }
 }

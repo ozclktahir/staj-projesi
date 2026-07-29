@@ -39,6 +39,7 @@ export class NotificationService {
     }
 
     this.notificationGateway.emitToUser(dto.user_id, 'notification', data);
+    this.notificationGateway.emitToUser(dto.user_id, 'new_notification', data);
 
     return data;
   }

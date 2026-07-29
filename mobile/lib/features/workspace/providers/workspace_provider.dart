@@ -140,6 +140,46 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
     state = const WorkspaceState(isLoading: false);
   }
 
+  Future<bool> deleteWorkspace(String workspaceId) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      await repository.deleteWorkspace(workspaceId);
+      final remaining = [
+        for (final workspace in state.workspaces)
+          if (workspace.id != workspaceId) workspace,
+      ];
+      final nextActive = remaining.isEmpty
+          ? null
+          : (state.activeWorkspace?.id == workspaceId
+              ? remaining.first
+              : state.activeWorkspace);
+      if (nextActive != null) {
+        await prefs.setString(StorageKeys.activeWorkspaceId, nextActive.id);
+      } else {
+        await prefs.remove(StorageKeys.activeWorkspaceId);
+      }
+      state = WorkspaceState(
+        workspaces: remaining,
+        activeWorkspace: nextActive,
+        isLoading: false,
+        isSubmitting: false,
+      );
+      return true;
+    } on WorkspaceException catch (error) {
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: error.message,
+      );
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: 'Çalışma alanı silinemedi.',
+      );
+      return false;
+    }
+  }
+
   WorkspaceDto? _resolveActive(List<WorkspaceDto> list, String? savedId) {
     if (list.isEmpty) return null;
     if (savedId != null) {

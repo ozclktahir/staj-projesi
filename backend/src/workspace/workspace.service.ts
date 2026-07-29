@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -188,5 +190,67 @@ export class WorkspaceService {
     }
 
     return invitation;
+  }
+
+  /**
+   * OWNER tarafından workspace silinir (üyelikler + davetler temizlenir).
+   */
+  async remove(workspaceId: string, userId: string) {
+    const client = this.supabaseService.getClient();
+
+    const { data: workspace, error: workspaceError } = await client
+      .from('workspaces')
+      .select('id, owner_id')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
+    if (workspaceError) {
+      throw new BadRequestException(workspaceError.message);
+    }
+    if (!workspace) {
+      throw new NotFoundException('Çalışma alanı bulunamadı.');
+    }
+
+    const isOwner = workspace.owner_id === userId;
+    if (!isOwner) {
+      const { data: membership, error: memberError } = await client
+        .from('workspace_members')
+        .select('role')
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (memberError) {
+        throw new BadRequestException(memberError.message);
+      }
+
+      const role = String(membership?.role ?? '').toUpperCase();
+      if (role !== 'OWNER') {
+        throw new ForbiddenException(
+          'Çalışma alanını yalnızca OWNER silebilir.',
+        );
+      }
+    }
+
+    await client
+      .from('workspace_invitations')
+      .delete()
+      .eq('workspace_id', workspaceId);
+
+    await client
+      .from('workspace_members')
+      .delete()
+      .eq('workspace_id', workspaceId);
+
+    const { error: deleteError } = await client
+      .from('workspaces')
+      .delete()
+      .eq('id', workspaceId);
+
+    if (deleteError) {
+      throw new BadRequestException(deleteError.message);
+    }
+
+    return { message: 'Çalışma alanı silindi.', id: workspaceId };
   }
 }
