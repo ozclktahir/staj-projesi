@@ -1,38 +1,91 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/auth/presentation/login_placeholder_page.dart';
+import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_placeholder_page.dart';
+import '../../features/auth/providers/auth_provider.dart';
 import '../../features/workspace/presentation/home_placeholder_page.dart';
 
 /// Rota path sabitleri.
 abstract final class AppRoutes {
   static const splash = '/splash';
   static const login = '/login';
+  static const register = '/register';
   static const home = '/home';
 }
 
-/// go_router iskeleti — auth redirect Adım 2'de eklenecek.
-final GoRouter appRouter = GoRouter(
-  initialLocation: AppRoutes.splash,
-  routes: [
-    GoRoute(
-      path: AppRoutes.splash,
-      name: 'splash',
-      builder: (context, state) => const SplashPlaceholderPage(),
+class GoRouterRefreshNotifier extends ChangeNotifier {
+  GoRouterRefreshNotifier(Ref ref) {
+    _subscription = ref.listen<AuthState>(
+      authProvider,
+      (_, _) => notifyListeners(),
+    );
+  }
+
+  late final ProviderSubscription<AuthState> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.close();
+    super.dispose();
+  }
+}
+
+final goRouterProvider = Provider<GoRouter>((ref) {
+  final refresh = GoRouterRefreshNotifier(ref);
+  ref.onDispose(refresh.dispose);
+
+  return GoRouter(
+    initialLocation: AppRoutes.splash,
+    refreshListenable: refresh,
+    redirect: (context, state) {
+      final auth = ref.read(authProvider);
+      final location = state.matchedLocation;
+      final isSplash = location == AppRoutes.splash;
+      final isAuthRoute =
+          location == AppRoutes.login || location == AppRoutes.register;
+
+      if (auth.status == AuthStatus.unknown) {
+        return isSplash ? null : AppRoutes.splash;
+      }
+
+      if (auth.status == AuthStatus.unauthenticated) {
+        if (isAuthRoute) return null;
+        return AppRoutes.login;
+      }
+
+      // Authenticated
+      if (isAuthRoute || isSplash) {
+        return AppRoutes.home;
+      }
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: AppRoutes.splash,
+        name: 'splash',
+        builder: (context, state) => const SplashPlaceholderPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.login,
+        name: 'login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.register,
+        name: 'register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.home,
+        name: 'home',
+        builder: (context, state) => const HomePlaceholderPage(),
+      ),
+    ],
+    errorBuilder: (context, state) => Scaffold(
+      body: Center(child: Text('Rota bulunamadı: ${state.uri}')),
     ),
-    GoRoute(
-      path: AppRoutes.login,
-      name: 'login',
-      builder: (context, state) => const LoginPlaceholderPage(),
-    ),
-    GoRoute(
-      path: AppRoutes.home,
-      name: 'home',
-      builder: (context, state) => const HomePlaceholderPage(),
-    ),
-  ],
-  errorBuilder: (context, state) => Scaffold(
-    body: Center(child: Text('Rota bulunamadı: ${state.uri}')),
-  ),
-);
+  );
+});

@@ -9,18 +9,20 @@ Future<void> main() async {
   runApp(const ProviderScope(child: StajMobileApp()));
 }
 
-class StajMobileApp extends StatelessWidget {
+class StajMobileApp extends ConsumerWidget {
   const StajMobileApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(goRouterProvider);
+
     return MaterialApp.router(
       title: 'Staj Projesi',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
-      routerConfig: appRouter,
+      routerConfig: router,
     );
   }
 }
