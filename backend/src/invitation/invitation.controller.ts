@@ -1,4 +1,4 @@
-import { Controller, Param, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -16,6 +16,15 @@ import { InvitationService } from './invitation.service';
 export class InvitationsController {
   constructor(private readonly invitationService: InvitationService) {}
 
+  @Get('me')
+  @ApiOperation({
+    summary: 'Giriş yapmış kullanıcının bekleyen workspace davetlerini listeler',
+  })
+  @ApiResponse({ status: 200, description: 'Bekleyen davetler listelendi.' })
+  findMine(@GetUser() user: { id: string; email?: string }) {
+    return this.invitationService.findPendingForUser(user);
+  }
+
   @Post(':id/accept')
   @ApiOperation({
     summary:
@@ -32,5 +41,20 @@ export class InvitationsController {
     @GetUser() user: { id: string; email?: string },
   ) {
     return this.invitationService.accept(id, user);
+  }
+
+  @Post(':id/reject')
+  @ApiOperation({ summary: 'Workspace davetini reddeder' })
+  @ApiResponse({ status: 200, description: 'Davet reddedildi.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Davet bu kullanıcının e-posta adresine ait değil.',
+  })
+  @ApiResponse({ status: 404, description: 'Davet bulunamadı.' })
+  reject(
+    @Param('id') id: string,
+    @GetUser() user: { id: string; email?: string },
+  ) {
+    return this.invitationService.reject(id, user);
   }
 }

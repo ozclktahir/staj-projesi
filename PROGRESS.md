@@ -101,7 +101,7 @@
   - KPI kartları, istatistik grafikleri ve yaklaşan deadline listesi (`/`)
 - [x] **Adım 3: Personal Workspace Ekranı**
   - Atanmış görevler, kişisel notlar ve Todo/Dosyalar (`/personal`)
-- [ ] **Adım 4: Davet & Bildirim Aksiyonları**
+- [x] **Adım 4: Davet & Bildirim Aksiyonları**
   - Üye davet etme, davet kabul/red akışları
   - Gelişmiş bildirim aksiyonları (silme onayı, görev sahiplenme/claim vb.)
 - [ ] **Adım 5: Kanban & Arayüz Geliştirmeleri**
@@ -468,3 +468,6 @@
 
 ### [29 Temmuz 2026] - Faz 8.1 Adım 3: Mobil Personal Workspace, bana atanan gorevler ve kisisel notlar eklendi
 - Bottom nav’a Kişisel Alan; `assignee_id` ile atanmış görevler + workspace notes CRUD; auth’ta user id saklama; `flutter analyze` temiz.
+
+### [29 Temmuz 2026] - Faz 8.1 Adım 4: Mobil davet gonderme, davet kabul/red akislari ve gelismis bildirim aksiyonlari eklendi
+- Nest `GET /invitations/me` + `POST /invitations/:id/reject`, davette bildirim; mobilde davet repo/provider, Üye Davet Et dialog, bildirimlerde Kabul Et/Reddet; `flutter analyze` temiz.

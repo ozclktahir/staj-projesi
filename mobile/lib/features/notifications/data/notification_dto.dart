@@ -9,9 +9,16 @@ class NotificationDto {
     this.type,
     this.link,
     this.createdAt,
+    this.metadata,
   });
 
   factory NotificationDto.fromJson(Map<String, dynamic> json) {
+    Map<String, dynamic>? metadata;
+    final raw = json['metadata'] ?? json['payload'];
+    if (raw is Map) {
+      metadata = Map<String, dynamic>.from(raw);
+    }
+
     return NotificationDto(
       id: json['id'] as String,
       userId: json['user_id'] as String?,
@@ -22,6 +29,7 @@ class NotificationDto {
       isRead: json['is_read'] as bool? ?? false,
       link: json['link'] as String?,
       createdAt: json['created_at'] as String?,
+      metadata: metadata,
     );
   }
 
@@ -34,6 +42,20 @@ class NotificationDto {
   final bool isRead;
   final String? link;
   final String? createdAt;
+  final Map<String, dynamic>? metadata;
+
+  bool get isInvitation {
+    final t = (type ?? '').toLowerCase();
+    return t.contains('invite') || t.contains('invitation') || t == 'davet';
+  }
+
+  String? get invitationId {
+    final meta = metadata;
+    if (meta == null) return null;
+    final id = meta['invitation_id'] ?? meta['invite_id'] ?? meta['invitationId'];
+    if (id is String && id.isNotEmpty) return id;
+    return null;
+  }
 
   NotificationDto copyWith({bool? isRead}) {
     return NotificationDto(
@@ -46,6 +68,7 @@ class NotificationDto {
       isRead: isRead ?? this.isRead,
       link: link,
       createdAt: createdAt,
+      metadata: metadata,
     );
   }
 }

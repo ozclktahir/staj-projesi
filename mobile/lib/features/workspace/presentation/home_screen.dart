@@ -6,6 +6,8 @@ import '../../../core/router/app_router.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
+import '../../invitations/presentation/invite_member_dialog.dart';
+import '../../invitations/providers/invitation_provider.dart';
 import '../../notifications/presentation/notifications_sheet.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../personal/presentation/personal_screen.dart';
@@ -33,6 +35,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final active = workspaceState.activeWorkspace;
     final canCreateProject = active != null && _index == 1;
     final unreadCount = ref.watch(unreadNotificationCountProvider);
+    final pendingInvites = ref.watch(pendingInvitationCountProvider);
+    final badgeCount = unreadCount + pendingInvites;
 
     return Scaffold(
       appBar: AppBar(
@@ -56,16 +60,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         actions: [
-          if (active != null)
+          if (active != null) ...[
+            IconButton(
+              tooltip: 'Üye Davet Et',
+              onPressed: () async {
+                final sent = await showInviteMemberDialog(
+                  context,
+                  ref,
+                  workspaceId: active.id,
+                );
+                if (sent == true && context.mounted) {
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      const SnackBar(content: Text('Davet gönderildi.')),
+                    );
+                }
+              },
+              icon: const Icon(Icons.person_add_alt_1_outlined),
+            ),
             IconButton(
               tooltip: 'Bildirimler',
               onPressed: () => showNotificationsSheet(context, ref),
               icon: Badge(
-                isLabelVisible: unreadCount > 0,
-                label: Text('$unreadCount'),
+                isLabelVisible: badgeCount > 0,
+                label: Text('$badgeCount'),
                 child: const Icon(Icons.notifications_outlined),
               ),
             ),
+          ],
           IconButton(
             tooltip: 'Çıkış',
             onPressed: () => ref.read(authProvider.notifier).logout(),

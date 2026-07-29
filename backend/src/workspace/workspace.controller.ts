@@ -67,7 +67,7 @@ export class WorkspaceController {
   }
 
   @Post(':id/invite')
-  @Roles('Admin')
+  @Roles('OWNER', 'Admin')
   @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({
     summary: 'Belirtilen çalışma alanına yeni bir üye davet eder',
@@ -75,7 +75,8 @@ export class WorkspaceController {
   @ApiResponse({ status: 201, description: 'Davet başarıyla oluşturuldu.' })
   @ApiResponse({
     status: 403,
-    description: 'Davet gönderebilmek için Admin rolüne sahip olmanız gerekir.',
+    description:
+      'Davet gönderebilmek için OWNER veya Admin rolüne sahip olmanız gerekir.',
   })
   @ApiResponse({ status: 401, description: 'Kimlik doğrulama başarısız.' })
   invite(

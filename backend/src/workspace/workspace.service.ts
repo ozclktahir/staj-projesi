@@ -144,7 +144,7 @@ export class WorkspaceService {
       .from('workspace_invitations')
       .insert({
         workspace_id: workspaceId,
-        email: dto.email,
+        email: dto.email.toLowerCase().trim(),
         role: dto.role,
         invited_by: inviterId,
         status: 'PENDING',
@@ -154,6 +154,37 @@ export class WorkspaceService {
 
     if (invitationError) {
       throw new BadRequestException(invitationError.message);
+    }
+
+    // Davetli kayıtlıysa bildirim oluştur (mobil Kabul/Red için)
+    const { data: profile } = await client
+      .from('profiles')
+      .select('id, email')
+      .ilike('email', dto.email.trim())
+      .maybeSingle();
+
+    if (profile?.id) {
+      const { data: workspace } = await client
+        .from('workspaces')
+        .select('name')
+        .eq('id', workspaceId)
+        .maybeSingle();
+
+      await client.from('notifications').insert({
+        workspace_id: workspaceId,
+        user_id: profile.id,
+        type: 'workspace_invite',
+        title: 'Çalışma alanı daveti',
+        message: `"${workspace?.name ?? 'Bir çalışma alanı'}" sizi ${dto.role} olarak davet etti.`,
+        metadata: {
+          invitation_id: invitation.id,
+          invite_id: invitation.id,
+          workspace_id: workspaceId,
+          workspace_name: workspace?.name ?? null,
+          role: dto.role,
+        },
+        is_read: false,
+      });
     }
 
     return invitation;
