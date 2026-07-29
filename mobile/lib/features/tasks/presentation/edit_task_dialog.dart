@@ -4,23 +4,28 @@ import 'package:intl/intl.dart';
 
 import '../data/task_dto.dart';
 import '../data/task_repository.dart';
+import '../data/update_task_dto.dart';
 import '../providers/task_provider.dart';
 
-Future<bool?> showCreateTaskDialog({
+Future<TaskDto?> showEditTaskDialog({
   required BuildContext context,
   required WidgetRef ref,
   required String projectId,
+  required TaskDto task,
 }) async {
   final formKey = GlobalKey<FormState>();
-  final titleController = TextEditingController();
-  final descriptionController = TextEditingController();
-  final assigneeController = TextEditingController();
-  var priority = TaskPriority.medium;
-  var status = TaskStatus.todo;
-  DateTime? dueDate;
+  final titleController = TextEditingController(text: task.title);
+  final descriptionController =
+      TextEditingController(text: task.description ?? '');
+  final assigneeController =
+      TextEditingController(text: task.effectiveAssigneeId ?? '');
+  var priority = task.priority;
+  DateTime? dueDate = task.dueDate != null
+      ? DateTime.tryParse(task.dueDate!)?.toLocal()
+      : null;
 
   try {
-    return await showDialog<bool>(
+    return await showDialog<TaskDto>(
       context: context,
       builder: (dialogContext) {
         var submitting = false;
@@ -29,11 +34,11 @@ Future<bool?> showCreateTaskDialog({
         return StatefulBuilder(
           builder: (context, setLocal) {
             final dateLabel = dueDate == null
-                ? 'Teslim tarihi (opsiyonel)'
+                ? 'Teslim tarihi seç'
                 : DateFormat('dd.MM.yyyy').format(dueDate!);
 
             return AlertDialog(
-              title: const Text('Yeni görev'),
+              title: const Text('Görevi düzenle'),
               content: SingleChildScrollView(
                 child: Form(
                   key: formKey,
@@ -44,7 +49,6 @@ Future<bool?> showCreateTaskDialog({
                       TextFormField(
                         controller: titleController,
                         enabled: !submitting,
-                        textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
                           labelText: 'Başlık',
                           border: OutlineInputBorder(),
@@ -62,7 +66,7 @@ Future<bool?> showCreateTaskDialog({
                         enabled: !submitting,
                         maxLines: 3,
                         decoration: const InputDecoration(
-                          labelText: 'Açıklama (opsiyonel)',
+                          labelText: 'Açıklama',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -89,28 +93,6 @@ Future<bool?> showCreateTaskDialog({
                               },
                       ),
                       const SizedBox(height: 12),
-                      DropdownButtonFormField<TaskStatus>(
-                        initialValue: status,
-                        decoration: const InputDecoration(
-                          labelText: 'Durum',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: [
-                          for (final value in TaskStatus.values)
-                            DropdownMenuItem(
-                              value: value,
-                              child: Text(value.label),
-                            ),
-                        ],
-                        onChanged: submitting
-                            ? null
-                            : (value) {
-                                if (value != null) {
-                                  setLocal(() => status = value);
-                                }
-                              },
-                      ),
-                      const SizedBox(height: 12),
                       OutlinedButton.icon(
                         onPressed: submitting
                             ? null
@@ -128,13 +110,21 @@ Future<bool?> showCreateTaskDialog({
                         icon: const Icon(Icons.event),
                         label: Text(dateLabel),
                       ),
-                      const SizedBox(height: 12),
+                      if (dueDate != null)
+                        TextButton(
+                          onPressed: submitting
+                              ? null
+                              : () => setLocal(() => dueDate = null),
+                          child: const Text('Teslim tarihini kaldır'),
+                        ),
+                      const SizedBox(height: 8),
                       TextFormField(
                         controller: assigneeController,
                         enabled: !submitting,
                         decoration: const InputDecoration(
-                          labelText: 'Atanan (UUID, opsiyonel)',
+                          labelText: 'Atanan (kullanıcı UUID)',
                           border: OutlineInputBorder(),
+                          helperText: 'Boş bırakılırsa atama kaldırılmaz.',
                         ),
                       ),
                       if (errorText != null) ...[
@@ -154,7 +144,7 @@ Future<bool?> showCreateTaskDialog({
                 TextButton(
                   onPressed: submitting
                       ? null
-                      : () => Navigator.of(dialogContext).pop(false),
+                      : () => Navigator.of(dialogContext).pop(),
                   child: const Text('İptal'),
                 ),
                 FilledButton(
@@ -170,20 +160,23 @@ Future<bool?> showCreateTaskDialog({
                           });
                           try {
                             final assignee = assigneeController.text.trim();
-                            final ok = await ref
+                            final updated = await ref
                                 .read(tasksProvider(projectId).notifier)
-                                .createTask(
-                                  title: titleController.text,
-                                  description: descriptionController.text,
-                                  status: status,
-                                  priority: priority,
-                                  assigneeId:
-                                      assignee.isEmpty ? null : assignee,
-                                  dueDate:
-                                      dueDate?.toUtc().toIso8601String(),
+                                .updateTask(
+                                  taskId: task.id,
+                                  dto: UpdateTaskDto(
+                                    title: titleController.text,
+                                    description: descriptionController.text,
+                                    priority: priority,
+                                    assigneeId:
+                                        assignee.isEmpty ? null : assignee,
+                                    dueDate: dueDate?.toUtc().toIso8601String(),
+                                    clearDueDate: dueDate == null &&
+                                        task.dueDate != null,
+                                  ),
                                 );
                             if (dialogContext.mounted) {
-                              Navigator.of(dialogContext).pop(ok);
+                              Navigator.of(dialogContext).pop(updated);
                             }
                           } on TaskException catch (error) {
                             setLocal(() {
@@ -193,7 +186,7 @@ Future<bool?> showCreateTaskDialog({
                           } catch (_) {
                             setLocal(() {
                               submitting = false;
-                              errorText = 'Görev oluşturulamadı.';
+                              errorText = 'Görev güncellenemedi.';
                             });
                           }
                         },
@@ -203,7 +196,7 @@ Future<bool?> showCreateTaskDialog({
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Oluştur'),
+                      : const Text('Kaydet'),
                 ),
               ],
             );

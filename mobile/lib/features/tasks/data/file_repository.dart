@@ -101,6 +101,20 @@ class FileRepository {
     }
   }
 
+  Future<void> deleteFile({
+    required String workspaceId,
+    required String taskId,
+    required String fileId,
+  }) async {
+    try {
+      await _dio.delete<void>(
+        ApiConstants.taskFile(workspaceId, taskId, fileId),
+      );
+    } on DioException catch (error) {
+      throw FileException(_messageFromDio(error));
+    }
+  }
+
   String _messageFromDio(DioException error) {
     final status = error.response?.statusCode;
     final data = error.response?.data;

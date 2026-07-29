@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../workspace/providers/workspace_provider.dart';
 import '../data/task_dto.dart';
@@ -7,10 +8,13 @@ import '../data/task_repository.dart';
 import '../data/task_scope.dart';
 import '../providers/comment_provider.dart';
 import '../providers/file_provider.dart';
+import '../providers/subtask_provider.dart';
 import '../providers/task_provider.dart';
+import 'edit_task_dialog.dart';
 import 'task_card.dart';
 import 'task_comments_panel.dart';
 import 'task_files_panel.dart';
+import 'task_subtasks_panel.dart';
 
 Future<void> showTaskDetailSheet({
   required BuildContext context,
@@ -47,6 +51,7 @@ class _TaskDetailSheetBody extends ConsumerStatefulWidget {
 
 class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
     with SingleTickerProviderStateMixin {
+  late TaskDto _task;
   late TaskStatus _status;
   late final TabController _tabController;
   var _busy = false;
@@ -54,14 +59,33 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
   @override
   void initState() {
     super.initState();
+    _task = widget.initialTask;
     _status = widget.initialTask.status;
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _edit() async {
+    final updated = await showEditTaskDialog(
+      context: context,
+      ref: ref,
+      projectId: widget.projectId,
+      task: _task,
+    );
+    if (updated != null && mounted) {
+      setState(() {
+        _task = updated;
+        _status = updated.status;
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Görev güncellendi.')));
+    }
   }
 
   Future<void> _changeStatus(TaskStatus status) async {
@@ -72,10 +96,11 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
     });
     try {
       await ref.read(tasksProvider(widget.projectId).notifier).updateStatus(
-            widget.initialTask.id,
+            _task.id,
             status,
           );
       if (mounted) {
+        setState(() => _task = _task.copyWith(status: status));
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
@@ -83,14 +108,14 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
           );
       }
     } on TaskException catch (error) {
-      setState(() => _status = widget.initialTask.status);
+      setState(() => _status = _task.status);
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(SnackBar(content: Text(error.message)));
       }
     } catch (_) {
-      setState(() => _status = widget.initialTask.status);
+      setState(() => _status = _task.status);
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -127,7 +152,7 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
     try {
       await ref
           .read(tasksProvider(widget.projectId).notifier)
-          .deleteTask(widget.initialTask.id);
+          .deleteTask(_task.id);
       if (mounted) Navigator.of(context).pop();
     } on TaskException catch (error) {
       if (mounted) {
@@ -150,7 +175,6 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
 
   @override
   Widget build(BuildContext context) {
-    final task = widget.initialTask;
     final workspaceId = ref.watch(
       workspaceProvider.select((s) => s.activeWorkspace?.id),
     );
@@ -159,12 +183,12 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
 
     final scope = workspaceId == null
         ? null
-        : TaskScope(workspaceId: workspaceId, taskId: task.id);
+        : TaskScope(workspaceId: workspaceId, taskId: _task.id);
 
-    // Yorum ve dosyaları paralel başlat
     if (scope != null) {
       ref.watch(commentsProvider(scope));
       ref.watch(taskFilesProvider(scope));
+      ref.watch(subtasksProvider(scope));
     }
 
     return SizedBox(
@@ -175,16 +199,21 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 12, 0),
+              padding: const EdgeInsets.fromLTRB(20, 0, 4, 0),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
-                      task.title,
+                      _task.title,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
-                  PriorityBadge(priority: task.priority),
+                  PriorityBadge(priority: _task.priority),
+                  IconButton(
+                    tooltip: 'Düzenle',
+                    onPressed: _busy ? null : _edit,
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
                   IconButton(
                     tooltip: 'Kapat',
                     onPressed: () => Navigator.of(context).pop(),
@@ -195,8 +224,10 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
             ),
             TabBar(
               controller: _tabController,
+              isScrollable: true,
               tabs: const [
                 Tab(text: 'Detay'),
+                Tab(text: 'Alt Görevler'),
                 Tab(text: 'Yorumlar'),
                 Tab(text: 'Dosyalar'),
               ],
@@ -206,12 +237,20 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
                 controller: _tabController,
                 children: [
                   _DetailsTab(
-                    task: task,
+                    task: _task,
                     status: _status,
                     busy: _busy,
+                    onEdit: _edit,
                     onStatusSelected: _changeStatus,
                     onDelete: _delete,
                   ),
+                  if (scope != null)
+                    TaskSubtasksPanel(
+                      scope: scope,
+                      projectId: widget.projectId,
+                    )
+                  else
+                    const Center(child: Text('Aktif çalışma alanı yok.')),
                   if (scope != null)
                     TaskCommentsPanel(scope: scope)
                   else
@@ -235,6 +274,7 @@ class _DetailsTab extends StatelessWidget {
     required this.task,
     required this.status,
     required this.busy,
+    required this.onEdit,
     required this.onStatusSelected,
     required this.onDelete,
   });
@@ -242,14 +282,30 @@ class _DetailsTab extends StatelessWidget {
   final TaskDto task;
   final TaskStatus status;
   final bool busy;
+  final VoidCallback onEdit;
   final ValueChanged<TaskStatus> onStatusSelected;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
+    final dueLabel = task.dueDate == null
+        ? 'Belirtilmedi'
+        : DateFormat('dd.MM.yyyy').format(
+            DateTime.tryParse(task.dueDate!)?.toLocal() ?? DateTime.now(),
+          );
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.tonalIcon(
+            onPressed: busy ? null : onEdit,
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Düzenle'),
+          ),
+        ),
+        const SizedBox(height: 12),
         if (task.description != null && task.description!.isNotEmpty) ...[
           Text(
             task.description!,
@@ -262,6 +318,18 @@ class _DetailsTab extends StatelessWidget {
           leading: const Icon(Icons.person_outline),
           title: const Text('Atanan'),
           subtitle: Text(task.assigneeLabel),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.event_outlined),
+          title: const Text('Teslim tarihi'),
+          subtitle: Text(dueLabel),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.flag_outlined),
+          title: const Text('Öncelik'),
+          subtitle: Text(task.priority.label),
         ),
         const SizedBox(height: 8),
         Text('Durum', style: Theme.of(context).textTheme.titleSmall),

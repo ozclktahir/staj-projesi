@@ -93,7 +93,7 @@
   - [x] **Adım 5:** Gelişmiş Özellikler (Yorumlar, Dosya Ekleri, Bildirimler ve Realtime)
 
 ### Faz 8.1: Mobil Eksik Modüller ve Web Eşitlemesi (Ekranlar & İyileştirmeler)
-- [ ] **Adım 1: Görev Detay & İşlevsellik Geliştirmeleri**
+- [x] **Adım 1: Görev Detay & İşlevsellik Geliştirmeleri**
   - Görev oluşturma/düzenleme (Assignee, due date, başlık, açıklama, öncelik)
   - Alt görevler (Subtasks) desteği
   - Dosya silme ve önizleme/açma deneyimi
@@ -459,3 +459,6 @@
 
 ### [29 Temmuz 2026] - Mobil web eşitleme planı (Faz 8.1) yol haritasına eklendi
 - PROGRESS.md’ye **Faz 8.1: Mobil Eksik Modüller ve Web Eşitlemesi** alt fazı eklendi (görev detay, dashboard, personal, davetler, kanban/activity, ayarlar/onboarding, silme/realtime).
+
+### [29 Temmuz 2026] - Faz 8.1 Adım 1: Görev düzenleme, subtask desteği ve dosya yönetimi mobilde tamamlandı
+- Görev düzenleme (başlık/açıklama/öncelik/due date/assignee), Alt Görevler sekmesi (liste + toggle + ekleme), dosya silme ve `url_launcher` ile açma; `flutter analyze` temiz.

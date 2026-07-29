@@ -56,6 +56,7 @@ class PriorityBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (Color bg, Color fg) = switch (priority) {
+      TaskPriority.urgent => (Colors.purple.shade100, Colors.purple.shade900),
       TaskPriority.high => (Colors.red.shade100, Colors.red.shade800),
       TaskPriority.medium => (Colors.orange.shade100, Colors.orange.shade800),
       TaskPriority.low => (Colors.green.shade100, Colors.green.shade800),

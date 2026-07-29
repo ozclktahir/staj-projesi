@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/file_repository.dart';
 import '../data/task_scope.dart';
@@ -58,6 +59,61 @@ class _TaskFilesPanelState extends ConsumerState<TaskFilesPanel> {
       }
     } finally {
       if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _openFile(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Geçersiz dosya URL\'i.')));
+      return;
+    }
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Dosya açılamadı.')));
+    }
+  }
+
+  Future<void> _deleteFile(String fileId, String fileName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Dosyayı sil'),
+        content: Text('"$fileName" silinsin mi?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('İptal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await ref
+          .read(taskFilesProvider(widget.scope).notifier)
+          .deleteFile(fileId);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Dosya silindi.')));
+      }
+    } on FileException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(error.message)));
+      }
     }
   }
 
@@ -137,6 +193,14 @@ class _TaskFilesPanelState extends ConsumerState<TaskFilesPanel> {
                       file.fileUrl,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: file.fileUrl.isEmpty
+                        ? null
+                        : () => _openFile(file.fileUrl),
+                    trailing: IconButton(
+                      tooltip: 'Sil',
+                      onPressed: () => _deleteFile(file.id, file.fileName),
+                      icon: const Icon(Icons.delete_outline),
                     ),
                   );
                 },

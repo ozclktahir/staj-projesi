@@ -43,6 +43,8 @@ class TasksNotifier
     String? description,
     TaskStatus status = TaskStatus.todo,
     TaskPriority priority = TaskPriority.medium,
+    String? assigneeId,
+    String? dueDate,
   }) async {
     final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
     if (workspaceId == null) return false;
@@ -54,12 +56,36 @@ class TasksNotifier
             description: description,
             status: status,
             priority: priority,
+            assigneeId: assigneeId,
+            dueDate: dueDate,
             projectId: arg,
           ),
         );
     final current = state.valueOrNull ?? const <TaskDto>[];
     state = AsyncData([created, ...current]);
     return true;
+  }
+
+  Future<TaskDto> updateTask({
+    required String taskId,
+    required UpdateTaskDto dto,
+  }) async {
+    final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
+    if (workspaceId == null) {
+      throw TaskException('Aktif çalışma alanı yok.');
+    }
+
+    final previous = state.valueOrNull ?? const <TaskDto>[];
+    final updated = await ref.read(taskRepositoryProvider).updateTask(
+          workspaceId: workspaceId,
+          taskId: taskId,
+          dto: dto,
+        );
+    state = AsyncData([
+      for (final task in previous)
+        if (task.id == taskId) updated else task,
+    ]);
+    return updated;
   }
 
   /// Anında UI güncellemesi + hata durumunda geri alma.

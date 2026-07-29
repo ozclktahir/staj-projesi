@@ -9,6 +9,8 @@ class UpdateTaskDto {
     this.assigneeId,
     this.dueDate,
     this.projectId,
+    this.clearAssignee = false,
+    this.clearDueDate = false,
   });
 
   final String? title;
@@ -18,6 +20,8 @@ class UpdateTaskDto {
   final String? assigneeId;
   final String? dueDate;
   final String? projectId;
+  final bool clearAssignee;
+  final bool clearDueDate;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
@@ -33,11 +37,15 @@ class UpdateTaskDto {
     if (priority != null) {
       map['priority'] = priority!.apiValue;
     }
-    if (assigneeId != null) {
-      map['assignee_id'] = assigneeId;
+    if (clearAssignee) {
+      map['assignee_id'] = null;
+    } else if (assigneeId != null) {
+      map['assignee_id'] = assigneeId!.trim().isEmpty ? null : assigneeId!.trim();
     }
-    if (dueDate != null) {
-      map['due_date'] = dueDate;
+    if (clearDueDate) {
+      map['due_date'] = null;
+    } else if (dueDate != null) {
+      map['due_date'] = dueDate!.trim().isEmpty ? null : dueDate!.trim();
     }
     if (projectId != null) {
       map['project_id'] = projectId;

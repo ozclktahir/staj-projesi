@@ -23,18 +23,26 @@ class TaskRepository {
 
   Future<List<TaskDto>> fetchTasks({
     required String workspaceId,
-    required String projectId,
+    String? projectId,
+    String? parentTaskId,
     int page = 1,
     int limit = 100,
   }) async {
     try {
+      final query = <String, dynamic>{
+        'page': page,
+        'limit': limit,
+      };
+      if (projectId != null && projectId.isNotEmpty) {
+        query['projectId'] = projectId;
+      }
+      if (parentTaskId != null && parentTaskId.isNotEmpty) {
+        query['parent_task_id'] = parentTaskId;
+      }
+
       final response = await _dio.get<Map<String, dynamic>>(
         ApiConstants.workspaceTasks(workspaceId),
-        queryParameters: {
-          'projectId': projectId,
-          'page': page,
-          'limit': limit,
-        },
+        queryParameters: query,
       );
       final data = response.data?['data'];
       if (data is! List) {

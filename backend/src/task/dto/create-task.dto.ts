@@ -9,10 +9,15 @@ import {
 } from 'class-validator';
 
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
-export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
 export const TASK_STATUSES: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'DONE'];
-export const TASK_PRIORITIES: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
+export const TASK_PRIORITIES: TaskPriority[] = [
+  'LOW',
+  'MEDIUM',
+  'HIGH',
+  'URGENT',
+];
 
 export class CreateTaskDto {
   @ApiProperty({

@@ -35,7 +35,8 @@ enum TaskStatus {
 enum TaskPriority {
   low('LOW'),
   medium('MEDIUM'),
-  high('HIGH');
+  high('HIGH'),
+  urgent('URGENT');
 
   const TaskPriority(this.apiValue);
   final String apiValue;
@@ -46,6 +47,8 @@ enum TaskPriority {
         return TaskPriority.low;
       case 'HIGH':
         return TaskPriority.high;
+      case 'URGENT':
+        return TaskPriority.urgent;
       case 'MEDIUM':
       default:
         return TaskPriority.medium;
@@ -60,6 +63,8 @@ enum TaskPriority {
         return 'Orta';
       case TaskPriority.high:
         return 'Yüksek';
+      case TaskPriority.urgent:
+        return 'Acil';
     }
   }
 }
@@ -76,6 +81,7 @@ class TaskDto {
     this.dueDate,
     this.projectId,
     this.workspaceId,
+    this.parentTaskId,
     this.createdBy,
     this.createdAt,
     this.updatedAt,
@@ -93,6 +99,7 @@ class TaskDto {
       dueDate: json['due_date'] as String?,
       projectId: json['project_id'] as String?,
       workspaceId: json['workspace_id'] as String?,
+      parentTaskId: json['parent_task_id'] as String?,
       createdBy: json['created_by'] as String?,
       createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
@@ -109,11 +116,14 @@ class TaskDto {
   final String? dueDate;
   final String? projectId;
   final String? workspaceId;
+  final String? parentTaskId;
   final String? createdBy;
   final String? createdAt;
   final String? updatedAt;
 
   String? get effectiveAssigneeId => assigneeId ?? assignedTo;
+
+  bool get isDone => status == TaskStatus.done;
 
   String get assigneeLabel {
     final id = effectiveAssigneeId;
@@ -130,6 +140,7 @@ class TaskDto {
     String? assigneeId,
     String? assignedTo,
     String? dueDate,
+    String? parentTaskId,
     bool clearDescription = false,
     bool clearAssignee = false,
     bool clearDueDate = false,
@@ -146,6 +157,7 @@ class TaskDto {
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       projectId: projectId,
       workspaceId: workspaceId,
+      parentTaskId: parentTaskId ?? this.parentTaskId,
       createdBy: createdBy,
       createdAt: createdAt,
       updatedAt: updatedAt,

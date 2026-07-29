@@ -9,6 +9,7 @@ class CreateTaskDto {
     this.assigneeId,
     this.dueDate,
     this.projectId,
+    this.parentTaskId,
   });
 
   final String title;
@@ -18,6 +19,7 @@ class CreateTaskDto {
   final String? assigneeId;
   final String? dueDate;
   final String? projectId;
+  final String? parentTaskId;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{
@@ -43,6 +45,9 @@ class CreateTaskDto {
     }
     if (projectId != null && projectId!.isNotEmpty) {
       map['project_id'] = projectId;
+    }
+    if (parentTaskId != null && parentTaskId!.isNotEmpty) {
+      map['parent_task_id'] = parentTaskId;
     }
     return map;
   }

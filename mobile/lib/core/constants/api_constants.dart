@@ -32,6 +32,13 @@ abstract final class ApiConstants {
   static String taskFileUpload(String workspaceId, String taskId) =>
       '/workspaces/$workspaceId/tasks/$taskId/files/upload';
 
+  static String taskFile(
+    String workspaceId,
+    String taskId,
+    String fileId,
+  ) =>
+      '/workspaces/$workspaceId/tasks/$taskId/files/$fileId';
+
   static String workspaceNotifications(String workspaceId) =>
       '/workspaces/$workspaceId/notifications';
 

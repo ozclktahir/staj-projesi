@@ -48,6 +48,24 @@ class TaskFilesNotifier
     final current = state.valueOrNull ?? const <TaskFileDto>[];
     state = AsyncData([...current, created]);
   }
+
+  Future<void> deleteFile(String fileId) async {
+    final previous = state.valueOrNull ?? const <TaskFileDto>[];
+    state = AsyncData([
+      for (final file in previous)
+        if (file.id != fileId) file,
+    ]);
+    try {
+      await ref.read(fileRepositoryProvider).deleteFile(
+            workspaceId: arg.workspaceId,
+            taskId: arg.taskId,
+            fileId: fileId,
+          );
+    } catch (_) {
+      state = AsyncData(previous);
+      rethrow;
+    }
+  }
 }
 
 final taskFilesProvider = AsyncNotifierProvider.autoDispose
