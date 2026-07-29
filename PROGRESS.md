@@ -86,7 +86,7 @@
   - [x] Task (Görev) yönetimi ve detay ekranları
     - (20 Temmuz 2026) Task Detail Sheet (Slide-over) bileşeni geliştirildi, Kanban kartlarına tıklandığında sağ taraftan açılan panel entegre edildi.
 - [ ] **Faz 8: Mobil Uygulama Geliştirme (Flutter)**
-  - [ ] **Adım 1:** Flutter Proje Kurulumu ve Feature-first Mimari Yapılandırması (dio, riverpod, go_router, secure_storage)
+  - [x] **Adım 1:** Flutter Proje Kurulumu ve Feature-first Mimari Yapılandırması (dio, riverpod, go_router, secure_storage)
   - [ ] **Adım 2:** Auth Modülü, Login/Register Ekranları ve NestJS API Entegrasyonu (JWT & Auth Guard)
   - [ ] **Adım 3:** Workspace ve Proje Yönetimi Ekranları (Workspace Switcher & Proje Listesi)
   - [ ] **Adım 4:** Görev (Task) Yönetimi ve Kanban Panosu (Durum Yönetimi, Görev Detayları)
@@ -414,3 +414,9 @@
 
 ### [28 Temmuz 2026] - Faz 8 mobil yol haritası
 - Genel Yol Haritası’na **Faz 8: Mobil Uygulama Geliştirme (Flutter)** için Adım 1–5 alt planı eklendi (kurulum/mimari, auth, workspace/proje, görev/kanban, gelişmiş özellikler).
+
+### [29 Temmuz 2026] - Faz 8 Adım 1: Flutter mimari kurulumu
+- `mobile` Flutter projesi `com.stajprojesi` org ile oluşturuldu; Feature-first dizin (`core/`, `features/auth|workspace|tasks`) kuruldu.
+- Paketler eklendi: `dio`, `flutter_riverpod`, `go_router`, `flutter_secure_storage`, `shared_preferences`, `flutter_dotenv`, `intl` (+ `flutter_lints`).
+- Dio `ApiClient` + Secure Storage Bearer interceptor, `go_router` (`/splash`, `/login`, `/home` placeholder), tema ve Riverpod `ProviderScope` iskeleti hazırlandı (Login formu / Nest API çağrısı yok).
+- Android `usesCleartextTraffic=true` ile emülatörden `http://10.0.2.2:3000` erişimine izin verildi; `flutter analyze` temiz.
