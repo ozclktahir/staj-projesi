@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -140,19 +142,55 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
     state = const WorkspaceState(isLoading: false);
   }
 
+  /// 403 / silme sonrası: aktif workspace stale ise temizle.
+  void handleWorkspaceAccessForbidden(String? workspaceId) {
+    final activeId = state.activeWorkspace?.id;
+    if (activeId == null) return;
+    if (workspaceId != null && workspaceId != activeId) return;
+
+    unawaited(prefs.remove(StorageKeys.activeWorkspaceId));
+    final remaining = [
+      for (final workspace in state.workspaces)
+        if (workspace.id != activeId) workspace,
+    ];
+    state = WorkspaceState(
+      workspaces: remaining,
+      activeWorkspace: remaining.isEmpty ? null : remaining.first,
+      isLoading: false,
+      isSubmitting: false,
+    );
+    if (state.activeWorkspace != null) {
+      unawaited(
+        prefs.setString(
+          StorageKeys.activeWorkspaceId,
+          state.activeWorkspace!.id,
+        ),
+      );
+    }
+  }
+
   Future<bool> deleteWorkspace(String workspaceId) async {
     state = state.copyWith(isSubmitting: true, clearError: true);
+
+    final wasActive = state.activeWorkspace?.id == workspaceId;
+
+    // Önce aktif workspace'i düşür — provider'lar eski id ile istek atmasın.
+    if (wasActive) {
+      await prefs.remove(StorageKeys.activeWorkspaceId);
+      state = state.copyWith(
+        clearActive: true,
+        isSubmitting: true,
+        clearError: true,
+      );
+    }
+
     try {
       await repository.deleteWorkspace(workspaceId);
       final remaining = [
         for (final workspace in state.workspaces)
           if (workspace.id != workspaceId) workspace,
       ];
-      final nextActive = remaining.isEmpty
-          ? null
-          : (state.activeWorkspace?.id == workspaceId
-              ? remaining.first
-              : state.activeWorkspace);
+      final nextActive = remaining.isEmpty ? null : remaining.first;
       if (nextActive != null) {
         await prefs.setString(StorageKeys.activeWorkspaceId, nextActive.id);
       } else {
@@ -166,16 +204,19 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
       );
       return true;
     } on WorkspaceException catch (error) {
+      // Silme başarısızsa ve aktif'i temizlediysek listeyi yenilemeyi dene.
       state = state.copyWith(
         isSubmitting: false,
         errorMessage: error.message,
       );
+      await refresh();
       return false;
     } catch (_) {
       state = state.copyWith(
         isSubmitting: false,
         errorMessage: 'Çalışma alanı silinemedi.',
       );
+      await refresh();
       return false;
     }
   }

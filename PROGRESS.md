@@ -483,3 +483,6 @@
 
 ### [29 Temmuz 2026] - Fix: Faz 8.1 Adım 7 sonrası ortaya çıkan Socket.io bağlantı, CORS ve Riverpod state hataları giderildi.
 - Socket web uyumu (polling+websocket, token auth-only, debounce invalidate); 403/unhandled task fetch ve loadMore rethrow düzeltmeleri; Nest gateway CORS.
+
+### [29 Temmuz 2026] - Fix: Workspace silme sonrasi state'in temizlenmemesinden kaynaklanan 403 Forbidden hatalari giderildi.
+- Silmede aktif workspace önce null; bildirim/görev/proje/istatistik provider invalidate; Dio 403 interceptor + socket leave_workspace.

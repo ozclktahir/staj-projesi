@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client_provider.dart';
@@ -17,7 +18,12 @@ class ProjectsNotifier extends AsyncNotifier<List<ProjectDto>> {
       workspaceProvider.select((s) => s.activeWorkspace?.id),
     );
     if (workspaceId == null) return const [];
-    return ref.read(projectRepositoryProvider).fetchProjects(workspaceId);
+    try {
+      return await ref.read(projectRepositoryProvider).fetchProjects(workspaceId);
+    } on ProjectException catch (error) {
+      debugPrint('[Projects] fetch: $error');
+      return const [];
+    }
   }
 
   Future<void> refresh() async {
@@ -25,7 +31,13 @@ class ProjectsNotifier extends AsyncNotifier<List<ProjectDto>> {
     state = await AsyncValue.guard(() async {
       final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
       if (workspaceId == null) return const <ProjectDto>[];
-      return ref.read(projectRepositoryProvider).fetchProjects(workspaceId);
+      try {
+        return await ref
+            .read(projectRepositoryProvider)
+            .fetchProjects(workspaceId);
+      } on ProjectException {
+        return const <ProjectDto>[];
+      }
     });
   }
 

@@ -21,7 +21,11 @@ class PersonalNotesNotifier extends AutoDisposeAsyncNotifier<List<NoteDto>> {
       workspaceProvider.select((s) => s.activeWorkspace?.id),
     );
     if (workspaceId == null) return const [];
-    return ref.read(noteRepositoryProvider).fetchNotes(workspaceId);
+    try {
+      return await ref.read(noteRepositoryProvider).fetchNotes(workspaceId);
+    } catch (error) {
+      return const [];
+    }
   }
 
   Future<void> refresh() async {

@@ -9,6 +9,7 @@ typedef SocketPayloadHandler = void Function(dynamic payload);
 class SocketService {
   io.Socket? _socket;
   String? _signature;
+  String? _joinedWorkspaceId;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -26,11 +27,11 @@ class SocketService {
       return;
     }
 
+    // Eski workspace odasını bırak / bağlantıyı kapat.
+    leaveWorkspaceRoom();
     disconnect();
     _signature = signature;
 
-    // Token'ı query'ye koyma (URL uzunluğu / özel karakter sorunları).
-    // userId + workspaceId query; token yalnızca auth objesinde.
     final query = <String, dynamic>{
       'userId': userId,
       if (workspaceId != null && workspaceId.isNotEmpty) 'workspaceId': workspaceId,
@@ -60,9 +61,14 @@ class SocketService {
 
     socket.onConnect((_) {
       debugPrint('[Socket] connected ${socket.id}');
+      if (workspaceId != null && workspaceId.isNotEmpty) {
+        _joinedWorkspaceId = workspaceId;
+        // Sunucu handshake.query ile join eder; ekstra leave için id tutuyoruz.
+      }
     });
     socket.onDisconnect((_) {
       debugPrint('[Socket] disconnected');
+      _joinedWorkspaceId = null;
     });
     socket.onConnectError((error) {
       debugPrint('[Socket] connect error: $error');
@@ -83,7 +89,22 @@ class SocketService {
     }
   }
 
+  /// Aktif workspace silindiğinde / değiştiğinde eski odayı bırak.
+  void leaveWorkspaceRoom() {
+    final socket = _socket;
+    final oldId = _joinedWorkspaceId;
+    _joinedWorkspaceId = null;
+    if (socket == null || oldId == null) return;
+    try {
+      socket.emit('leave_workspace', {'workspaceId': oldId});
+      debugPrint('[Socket] left workspace room $oldId');
+    } catch (error) {
+      debugPrint('[Socket] leave room error: $error');
+    }
+  }
+
   void disconnect() {
+    leaveWorkspaceRoom();
     final socket = _socket;
     _socket = null;
     _signature = null;

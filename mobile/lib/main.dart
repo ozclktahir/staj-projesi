@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/network/api_client_provider.dart';
 import 'core/network/realtime_provider.dart';
+import 'core/network/workspace_scope_sync.dart';
 import 'core/router/app_router.dart';
 import 'core/storage/shared_preferences_provider.dart';
 import 'core/theme/app_theme.dart';
@@ -46,6 +48,8 @@ class _StajMobileAppState extends ConsumerState<StajMobileApp> {
     final themeMode = ref.watch(themeModeProvider);
     // Bağımlılıklar değişince provider yeniden çalışır (socket reconnect).
     ref.watch(realtimeConnectionProvider);
+    ref.watch(workspaceScopeSyncProvider);
+    ref.watch(workspaceForbiddenListenerProvider);
 
     return MaterialApp.router(
       title: 'Staj Projesi',

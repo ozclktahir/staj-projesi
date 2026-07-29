@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/locale/locale_provider.dart';
+import '../../../core/network/workspace_session_cleanup.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -44,9 +45,15 @@ class SettingsScreen extends ConsumerWidget {
 
     if (confirmed != true || !context.mounted) return;
 
+    // Silmeden önce eski workspace bağımlı state'i temizle.
+    invalidateWorkspaceScopedProvidersWithWidgetRef(ref);
+
     final ok =
         await ref.read(workspaceProvider.notifier).deleteWorkspace(active.id);
     if (!context.mounted) return;
+
+    // Silme sonrası (aktif null / yeni workspace) tekrar temizle + yenile.
+    invalidateWorkspaceScopedProvidersWithWidgetRef(ref);
 
     if (ok) {
       final remaining = ref.read(workspaceProvider).workspaces;

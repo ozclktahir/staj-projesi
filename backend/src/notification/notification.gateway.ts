@@ -1,6 +1,7 @@
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
@@ -54,6 +55,18 @@ export class NotificationGateway
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  @SubscribeMessage('leave_workspace')
+  handleLeaveWorkspace(
+    client: Socket,
+    payload: { workspaceId?: string } | string,
+  ) {
+    const workspaceId =
+      typeof payload === 'string' ? payload : payload?.workspaceId;
+    if (!workspaceId) return;
+    void client.leave(this.workspaceRoom(workspaceId));
+    this.logger.log(`Client ${client.id} left workspace room ${workspaceId}`);
   }
 
   emitToUser(userId: string, event: string, payload: unknown) {
