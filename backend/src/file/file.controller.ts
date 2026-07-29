@@ -34,7 +34,7 @@ export class FileController {
   constructor(private readonly fileService: FileService) {}
 
   @Post('upload')
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -70,7 +70,7 @@ export class FileController {
   }
 
   @Post()
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @ApiOperation({ summary: 'Bir göreve dosya kaydı ekler' })
   @ApiResponse({ status: 201, description: 'Dosya kaydı başarıyla oluşturuldu.' })
   create(
@@ -89,7 +89,7 @@ export class FileController {
   }
 
   @Delete(':fileId')
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @ApiOperation({ summary: 'Belirtilen dosya kaydını siler' })
   @ApiResponse({ status: 200, description: 'Dosya başarıyla silindi.' })
   @ApiResponse({ status: 404, description: 'Dosya bulunamadı.' })

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../notifications/presentation/notifications_sheet.dart';
+import '../../notifications/providers/notification_provider.dart';
 import '../data/project_dto.dart';
 import '../providers/project_provider.dart';
 import '../providers/workspace_provider.dart';
@@ -20,6 +22,7 @@ class HomeScreen extends ConsumerWidget {
     final projectsAsync = ref.watch(projectsProvider);
     final active = workspaceState.activeWorkspace;
     final canCreateProject = active != null;
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -43,6 +46,16 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
         actions: [
+          if (active != null)
+            IconButton(
+              tooltip: 'Bildirimler',
+              onPressed: () => showNotificationsSheet(context, ref),
+              icon: Badge(
+                isLabelVisible: unreadCount > 0,
+                label: Text('$unreadCount'),
+                child: const Icon(Icons.notifications_outlined),
+              ),
+            ),
           IconButton(
             tooltip: 'Çıkış',
             onPressed: () => ref.read(authProvider.notifier).logout(),

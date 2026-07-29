@@ -20,12 +20,13 @@ export class CommentController {
   constructor(private readonly commentService: CommentService) {}
 
   @Post()
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @ApiOperation({ summary: 'Bir göreve yeni bir yorum ekler' })
   @ApiResponse({ status: 201, description: 'Yorum başarıyla oluşturuldu.' })
   @ApiResponse({
     status: 403,
-    description: 'Yorum yazmak için Admin veya Member rolüne sahip olmanız gerekir.',
+    description:
+      'Yorum yazmak için OWNER, Admin veya Member rolüne sahip olmanız gerekir.',
   })
   create(
     @Param('taskId') taskId: string,

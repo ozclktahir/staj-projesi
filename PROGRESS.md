@@ -90,7 +90,7 @@
   - [x] **Adım 2:** Auth Modülü, Login/Register Ekranları ve NestJS API Entegrasyonu (JWT & Auth Guard)
   - [x] **Adım 3:** Workspace ve Proje Yönetimi Ekranları (Workspace Switcher & Proje Listesi)
   - [x] **Adım 4:** Görev (Task) Yönetimi ve Kanban Panosu (Durum Yönetimi, Görev Detayları)
-  - [ ] **Adım 5:** Gelişmiş Özellikler (Yorumlar, Dosya Ekleri, Bildirimler ve Realtime)
+  - [x] **Adım 5:** Gelişmiş Özellikler (Yorumlar, Dosya Ekleri, Bildirimler ve Realtime)
 
 ### 🔮 Gelecek Planları (Zaman Kalırsa eklenecekler)
 - [ ] AI ile görev önerileri, özeti ve deadline tahmini.
@@ -431,3 +431,6 @@
 
 ### [29 Temmuz 2026] - Faz 8 Adım 4: Kanban panosu, Görev CRUD işlemleri, durum güncellemeleri ve proje detay rotası tamamlandı
 - Task DTO/Repository (GET/POST/PATCH/DELETE), `tasksProvider` (optimistic status), `/project/:id` Kanban (TabBar), Task Detail BottomSheet, FAB ile yeni görev; OWNER rolü task mutasyonlarına eklendi; `flutter analyze` temiz.
+
+### [29 Temmuz 2026] - Faz 8 Adım 5: Yorumlar, Dosya yükleme (Multipart) ve Bildirim sistemi mobil uygulamaya entegre edildi
+- `file_picker`, Comment/File/Notification repository + provider’lar; Task Detail sekmeleri (Yorumlar/Dosyalar); Home AppBar bildirim zili + rozet; multipart upload; `flutter analyze` temiz.
