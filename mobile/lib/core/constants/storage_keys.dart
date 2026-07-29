@@ -5,4 +5,5 @@ abstract final class StorageKeys {
   static const String userId = 'user_id';
   static const String activeWorkspaceId = 'active_workspace_id';
   static const String themeMode = 'theme_mode';
+  static const String localeCode = 'locale_code';
 }

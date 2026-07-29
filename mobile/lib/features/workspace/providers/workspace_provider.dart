@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/storage_keys.dart';
 import '../../../core/network/api_client_provider.dart';
 import '../../../core/storage/shared_preferences_provider.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../data/workspace_dto.dart';
 import '../data/workspace_repository.dart';
 
@@ -135,6 +136,10 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
     }
   }
 
+  void resetLocal() {
+    state = const WorkspaceState(isLoading: false);
+  }
+
   WorkspaceDto? _resolveActive(List<WorkspaceDto> list, String? savedId) {
     if (list.isEmpty) return null;
     if (savedId != null) {
@@ -152,8 +157,19 @@ final workspaceRepositoryProvider = Provider<WorkspaceRepository>((ref) {
 
 final workspaceProvider =
     StateNotifierProvider<WorkspaceNotifier, WorkspaceState>((ref) {
-  return WorkspaceNotifier(
+  final notifier = WorkspaceNotifier(
     repository: ref.watch(workspaceRepositoryProvider),
     prefs: ref.watch(sharedPreferencesProvider),
   );
+
+  // Auth oturumu açılınca / kapanınca workspace listesini senkronla.
+  ref.listen<AuthState>(authProvider, (previous, next) {
+    if (next.status == AuthStatus.authenticated) {
+      notifier.refresh();
+    } else if (next.status == AuthStatus.unauthenticated) {
+      notifier.resetLocal();
+    }
+  });
+
+  return notifier;
 });

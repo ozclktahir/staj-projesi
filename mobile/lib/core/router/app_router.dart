@@ -6,8 +6,11 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_placeholder_page.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/onboarding/presentation/onboarding_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/tasks/presentation/project_detail_screen.dart';
 import '../../features/workspace/presentation/home_screen.dart';
+import '../../features/workspace/providers/workspace_provider.dart';
 
 /// Rota path sabitleri.
 abstract final class AppRoutes {
@@ -15,6 +18,8 @@ abstract final class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const home = '/home';
+  static const onboarding = '/onboarding';
+  static const settings = '/settings';
   static const project = '/project/:id';
 
   static String projectDetail(String projectId) => '/project/$projectId';
@@ -22,17 +27,23 @@ abstract final class AppRoutes {
 
 class GoRouterRefreshNotifier extends ChangeNotifier {
   GoRouterRefreshNotifier(Ref ref) {
-    _subscription = ref.listen<AuthState>(
+    _authSubscription = ref.listen<AuthState>(
       authProvider,
+      (_, _) => notifyListeners(),
+    );
+    _workspaceSubscription = ref.listen(
+      workspaceProvider,
       (_, _) => notifyListeners(),
     );
   }
 
-  late final ProviderSubscription<AuthState> _subscription;
+  late final ProviderSubscription<AuthState> _authSubscription;
+  late final ProviderSubscription<WorkspaceState> _workspaceSubscription;
 
   @override
   void dispose() {
-    _subscription.close();
+    _authSubscription.close();
+    _workspaceSubscription.close();
     super.dispose();
   }
 }
@@ -46,10 +57,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: refresh,
     redirect: (context, state) {
       final auth = ref.read(authProvider);
+      final workspace = ref.read(workspaceProvider);
       final location = state.matchedLocation;
       final isSplash = location == AppRoutes.splash;
       final isAuthRoute =
           location == AppRoutes.login || location == AppRoutes.register;
+      final isOnboarding = location == AppRoutes.onboarding;
 
       if (auth.status == AuthStatus.unknown) {
         return isSplash ? null : AppRoutes.splash;
@@ -60,10 +73,28 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return AppRoutes.login;
       }
 
-      // Authenticated
+      // Authenticated — workspace bootstrap bitmeden karar verme.
+      if (workspace.isLoading) {
+        if (isSplash || isOnboarding || location == AppRoutes.home) {
+          return isSplash ? null : AppRoutes.splash;
+        }
+        return null;
+      }
+
+      final needsOnboarding = workspace.workspaces.isEmpty;
+
       if (isAuthRoute || isSplash) {
+        return needsOnboarding ? AppRoutes.onboarding : AppRoutes.home;
+      }
+
+      if (needsOnboarding && !isOnboarding && location != AppRoutes.settings) {
+        return AppRoutes.onboarding;
+      }
+
+      if (!needsOnboarding && isOnboarding) {
         return AppRoutes.home;
       }
+
       return null;
     },
     routes: [
@@ -83,9 +114,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterScreen(),
       ),
       GoRoute(
+        path: AppRoutes.onboarding,
+        name: 'onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.home,
         name: 'home',
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.settings,
+        name: 'settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: AppRoutes.project,

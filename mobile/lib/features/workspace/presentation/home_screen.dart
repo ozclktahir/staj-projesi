@@ -39,6 +39,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final badgeCount = unreadCount + pendingInvites;
 
     return Scaffold(
+      drawer: Drawer(
+        child: SafeArea(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              DrawerHeader(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                ),
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Text(
+                    workspaceTitle(active),
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.settings_outlined),
+                title: const Text('Ayarlar'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.push(AppRoutes.settings);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.logout),
+                title: const Text('Çıkış yap'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  ref.read(authProvider.notifier).logout();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
       appBar: AppBar(
         title: InkWell(
           onTap: () => showWorkspaceSwitcher(context, ref),
@@ -89,6 +126,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ],
+          IconButton(
+            tooltip: 'Ayarlar',
+            onPressed: () => context.push(AppRoutes.settings),
+            icon: const Icon(Icons.settings_outlined),
+          ),
           IconButton(
             tooltip: 'Çıkış',
             onPressed: () => ref.read(authProvider.notifier).logout(),

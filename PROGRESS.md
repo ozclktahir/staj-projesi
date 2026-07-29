@@ -107,7 +107,7 @@
 - [x] **Adım 5: Kanban & Arayüz Geliştirmeleri**
   - Kanban ekranına arama, öncelik filtreleri ve sayfalama eklenmesi
   - Activity Log (Aktivite Akışı) UI bileşeni
-- [ ] **Adım 6: Ayarlar & Onboarding**
+- [x] **Adım 6: Ayarlar & Onboarding**
   - Ayarlar ekranı (`/settings` - Tema ve Dil seçenekleri)
   - Onboarding (İlk workspace oluşturma / karşılama ekranı)
 - [ ] **Adım 7: Yönetimsel Aksiyonlar & Realtime**
@@ -474,3 +474,6 @@
 
 ### [29 Temmuz 2026] - Faz 8.1 Adım 5: Kanban filtresi/aramasi ve Activity Log UI mobilde tamamlandi
 - Kanban arama + öncelik chip’leri + sayfalama/infinite scroll; `activity_log_provider` + Timeline UI (proje Aktivite sekmesi); `flutter analyze` temiz.
+
+### [29 Temmuz 2026] - Faz 8.1 Adım 6: Onboarding ilk workspace akisi ve Ayarlar (Tema/Dil) ekrani eklendi
+- Workspace yoksa onboarding formu; Settings’te Light/Dark/System tema + TR/EN dil tercihi; Drawer/AppBar girişi; `flutter analyze` temiz.
