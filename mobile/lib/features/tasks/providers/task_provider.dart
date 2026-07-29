@@ -6,36 +6,142 @@ import '../data/create_task_dto.dart';
 import '../data/task_dto.dart';
 import '../data/task_repository.dart';
 import '../data/update_task_dto.dart';
+import 'kanban_filter_provider.dart';
 
 final taskRepositoryProvider = Provider<TaskRepository>((ref) {
   return TaskRepository(apiClient: ref.watch(apiClientProvider));
 });
 
+/// Proje görev listesi + sayfalama meta bilgisi.
+class ProjectTasksState {
+  const ProjectTasksState({
+    required this.items,
+    this.page = 1,
+    this.totalPages = 1,
+    this.total = 0,
+    this.isLoadingMore = false,
+  });
+
+  final List<TaskDto> items;
+  final int page;
+  final int totalPages;
+  final int total;
+  final bool isLoadingMore;
+
+  bool get hasMore => page < totalPages;
+
+  ProjectTasksState copyWith({
+    List<TaskDto>? items,
+    int? page,
+    int? totalPages,
+    int? total,
+    bool? isLoadingMore,
+  }) {
+    return ProjectTasksState(
+      items: items ?? this.items,
+      page: page ?? this.page,
+      totalPages: totalPages ?? this.totalPages,
+      total: total ?? this.total,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    );
+  }
+}
+
 /// Seçili projeye ait görevler — [projectId] family argümanı.
 class TasksNotifier
-    extends AutoDisposeFamilyAsyncNotifier<List<TaskDto>, String> {
+    extends AutoDisposeFamilyAsyncNotifier<ProjectTasksState, String> {
+  static const _pageSize = TaskRepository.defaultPageSize;
+
   @override
-  Future<List<TaskDto>> build(String projectId) async {
+  Future<ProjectTasksState> build(String projectId) async {
     final workspaceId = ref.watch(
       workspaceProvider.select((s) => s.activeWorkspace?.id),
     );
-    if (workspaceId == null) return const [];
-    return ref.read(taskRepositoryProvider).fetchTasks(
+    final filter = ref.watch(kanbanFilterProvider(projectId));
+    if (workspaceId == null) {
+      return const ProjectTasksState(items: []);
+    }
+    return _fetchPage(
+      workspaceId: workspaceId,
+      projectId: projectId,
+      filter: filter,
+      page: 1,
+    );
+  }
+
+  Future<ProjectTasksState> _fetchPage({
+    required String workspaceId,
+    required String projectId,
+    required KanbanFilter filter,
+    required int page,
+    List<TaskDto> appendTo = const [],
+  }) async {
+    final result = await ref.read(taskRepositoryProvider).fetchTasksPage(
           workspaceId: workspaceId,
           projectId: projectId,
+          search: filter.search.isEmpty ? null : filter.search,
+          priority: filter.priority,
+          page: page,
+          limit: _pageSize,
         );
+    final merged = page <= 1
+        ? result.items
+        : [...appendTo, ...result.items];
+    // Aynı id'leri tekilleştir (optimistic create sonrası sayfa yüklemesi)
+    final seen = <String>{};
+    final unique = <TaskDto>[];
+    for (final task in merged) {
+      if (seen.add(task.id)) unique.add(task);
+    }
+    return ProjectTasksState(
+      items: unique,
+      page: result.meta.page,
+      totalPages: result.meta.totalPages,
+      total: result.meta.total,
+    );
   }
 
   Future<void> refresh() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
-      if (workspaceId == null) return const <TaskDto>[];
-      return ref.read(taskRepositoryProvider).fetchTasks(
-            workspaceId: workspaceId,
-            projectId: arg,
-          );
+      if (workspaceId == null) {
+        return const ProjectTasksState(items: []);
+      }
+      final filter = ref.read(kanbanFilterProvider(arg));
+      return _fetchPage(
+        workspaceId: workspaceId,
+        projectId: arg,
+        filter: filter,
+        page: 1,
+      );
     });
+  }
+
+  Future<void> loadMore() async {
+    final current = state.valueOrNull;
+    if (current == null || !current.hasMore || current.isLoadingMore) {
+      return;
+    }
+
+    final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
+    if (workspaceId == null) return;
+
+    state = AsyncData(current.copyWith(isLoadingMore: true));
+    try {
+      final filter = ref.read(kanbanFilterProvider(arg));
+      final next = await _fetchPage(
+        workspaceId: workspaceId,
+        projectId: arg,
+        filter: filter,
+        page: current.page + 1,
+        appendTo: current.items,
+      );
+      state = AsyncData(next);
+    } catch (_) {
+      state = AsyncData(current.copyWith(isLoadingMore: false));
+      rethrow;
+    }
   }
 
   Future<bool> createTask({
@@ -61,8 +167,13 @@ class TasksNotifier
             projectId: arg,
           ),
         );
-    final current = state.valueOrNull ?? const <TaskDto>[];
-    state = AsyncData([created, ...current]);
+    final current = state.valueOrNull ?? const ProjectTasksState(items: []);
+    state = AsyncData(
+      current.copyWith(
+        items: [created, ...current.items],
+        total: current.total + 1,
+      ),
+    );
     return true;
   }
 
@@ -75,16 +186,20 @@ class TasksNotifier
       throw TaskException('Aktif çalışma alanı yok.');
     }
 
-    final previous = state.valueOrNull ?? const <TaskDto>[];
+    final previous = state.valueOrNull ?? const ProjectTasksState(items: []);
     final updated = await ref.read(taskRepositoryProvider).updateTask(
           workspaceId: workspaceId,
           taskId: taskId,
           dto: dto,
         );
-    state = AsyncData([
-      for (final task in previous)
-        if (task.id == taskId) updated else task,
-    ]);
+    state = AsyncData(
+      previous.copyWith(
+        items: [
+          for (final task in previous.items)
+            if (task.id == taskId) updated else task,
+        ],
+      ),
+    );
     return updated;
   }
 
@@ -93,11 +208,15 @@ class TasksNotifier
     final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
     if (workspaceId == null) return;
 
-    final previous = state.valueOrNull ?? const <TaskDto>[];
-    state = AsyncData([
-      for (final task in previous)
-        if (task.id == taskId) task.copyWith(status: status) else task,
-    ]);
+    final previous = state.valueOrNull ?? const ProjectTasksState(items: []);
+    state = AsyncData(
+      previous.copyWith(
+        items: [
+          for (final task in previous.items)
+            if (task.id == taskId) task.copyWith(status: status) else task,
+        ],
+      ),
+    );
 
     try {
       final updated = await ref.read(taskRepositoryProvider).updateTask(
@@ -106,10 +225,14 @@ class TasksNotifier
             dto: UpdateTaskDto(status: status),
           );
       final latest = state.valueOrNull ?? previous;
-      state = AsyncData([
-        for (final task in latest)
-          if (task.id == taskId) updated else task,
-      ]);
+      state = AsyncData(
+        latest.copyWith(
+          items: [
+            for (final task in latest.items)
+              if (task.id == taskId) updated else task,
+          ],
+        ),
+      );
     } catch (_) {
       state = AsyncData(previous);
       rethrow;
@@ -120,11 +243,16 @@ class TasksNotifier
     final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
     if (workspaceId == null) return;
 
-    final previous = state.valueOrNull ?? const <TaskDto>[];
-    state = AsyncData([
-      for (final task in previous)
-        if (task.id != taskId) task,
-    ]);
+    final previous = state.valueOrNull ?? const ProjectTasksState(items: []);
+    state = AsyncData(
+      previous.copyWith(
+        items: [
+          for (final task in previous.items)
+            if (task.id != taskId) task,
+        ],
+        total: previous.total > 0 ? previous.total - 1 : 0,
+      ),
+    );
 
     try {
       await ref.read(taskRepositoryProvider).deleteTask(
@@ -138,7 +266,7 @@ class TasksNotifier
   }
 }
 
-final tasksProvider =
-    AsyncNotifierProvider.autoDispose.family<TasksNotifier, List<TaskDto>, String>(
+final tasksProvider = AsyncNotifierProvider.autoDispose
+    .family<TasksNotifier, ProjectTasksState, String>(
   TasksNotifier.new,
 );

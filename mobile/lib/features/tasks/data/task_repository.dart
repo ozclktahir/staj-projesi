@@ -15,19 +15,67 @@ class TaskException implements Exception {
   String toString() => message;
 }
 
+class TaskListMeta {
+  const TaskListMeta({
+    required this.total,
+    required this.page,
+    required this.limit,
+    required this.totalPages,
+  });
+
+  factory TaskListMeta.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return const TaskListMeta(
+        total: 0,
+        page: 1,
+        limit: 40,
+        totalPages: 1,
+      );
+    }
+    return TaskListMeta(
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      page: (json['page'] as num?)?.toInt() ?? 1,
+      limit: (json['limit'] as num?)?.toInt() ?? 40,
+      totalPages: (json['totalPages'] as num?)?.toInt() ?? 1,
+    );
+  }
+
+  final int total;
+  final int page;
+  final int limit;
+  final int totalPages;
+
+  bool get hasMore => page < totalPages;
+}
+
+class TaskListPage {
+  const TaskListPage({
+    required this.items,
+    required this.meta,
+  });
+
+  final List<TaskDto> items;
+  final TaskListMeta meta;
+}
+
 /// NestJS `/workspaces/:workspaceId/tasks` uçları.
 class TaskRepository {
   TaskRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
 
   final Dio _dio;
 
-  Future<List<TaskDto>> fetchTasks({
+  static const int defaultPageSize = 40;
+
+  Future<TaskListPage> fetchTasksPage({
     required String workspaceId,
     String? projectId,
     String? parentTaskId,
     String? assigneeId,
+    String? search,
+    TaskPriority? priority,
+    TaskStatus? status,
     int page = 1,
-    int limit = 100,
+    int limit = defaultPageSize,
   }) async {
     try {
       final query = <String, dynamic>{
@@ -43,22 +91,61 @@ class TaskRepository {
       if (assigneeId != null && assigneeId.isNotEmpty) {
         query['assignee_id'] = assigneeId;
       }
+      if (search != null && search.trim().isNotEmpty) {
+        query['search'] = search.trim();
+      }
+      if (priority != null) {
+        query['priority'] = priority.apiValue;
+      }
+      if (status != null) {
+        query['status'] = status.apiValue;
+      }
 
       final response = await _dio.get<Map<String, dynamic>>(
         ApiConstants.workspaceTasks(workspaceId),
         queryParameters: query,
       );
-      final data = response.data?['data'];
+      final body = response.data;
+      final data = body?['data'];
       if (data is! List) {
         throw TaskException('Görev listesi beklenmeyen formatta.');
       }
-      return data
+      final items = data
           .whereType<Map>()
           .map((item) => TaskDto.fromJson(Map<String, dynamic>.from(item)))
           .toList();
+      final metaRaw = body?['meta'];
+      final meta = TaskListMeta.fromJson(
+        metaRaw is Map ? Map<String, dynamic>.from(metaRaw) : null,
+      );
+      return TaskListPage(items: items, meta: meta);
     } on DioException catch (error) {
       throw TaskException(_messageFromDio(error));
     }
+  }
+
+  /// Geriye dönük kolaylık: yalnızca görev listesi.
+  Future<List<TaskDto>> fetchTasks({
+    required String workspaceId,
+    String? projectId,
+    String? parentTaskId,
+    String? assigneeId,
+    String? search,
+    TaskPriority? priority,
+    int page = 1,
+    int limit = 100,
+  }) async {
+    final result = await fetchTasksPage(
+      workspaceId: workspaceId,
+      projectId: projectId,
+      parentTaskId: parentTaskId,
+      assigneeId: assigneeId,
+      search: search,
+      priority: priority,
+      page: page,
+      limit: limit,
+    );
+    return result.items;
   }
 
   Future<TaskDto> createTask({

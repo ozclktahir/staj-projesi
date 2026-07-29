@@ -68,4 +68,7 @@ abstract final class ApiConstants {
 
   static String invitationReject(String invitationId) =>
       '/invitations/$invitationId/reject';
+
+  static String workspaceActivityLogs(String workspaceId) =>
+      '/workspaces/$workspaceId/activity-logs';
 }
