@@ -50,6 +50,7 @@ class _StajMobileAppState extends ConsumerState<StajMobileApp> {
     ref.watch(realtimeConnectionProvider);
     ref.watch(workspaceScopeSyncProvider);
     ref.watch(workspaceForbiddenListenerProvider);
+    ref.watch(unauthorizedSessionListenerProvider);
 
     return MaterialApp.router(
       title: 'Staj Projesi',

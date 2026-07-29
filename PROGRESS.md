@@ -486,3 +486,6 @@
 
 ### [29 Temmuz 2026] - Fix: Workspace silme sonrasi state'in temizlenmemesinden kaynaklanan 403 Forbidden hatalari giderildi.
 - Silmede aktif workspace önce null; bildirim/görev/proje/istatistik provider invalidate; Dio 403 interceptor + socket leave_workspace.
+
+### [29 Temmuz 2026] - Fix: task_card.dart arayüz taşma (RenderFlex overflow) ve 401 Unauthorized oturum yönlendirme hataları giderildi.
+- TaskCard Expanded/ellipsis layout; Dio 401 → oturum temizliği + `/login` yönlendirmesi.

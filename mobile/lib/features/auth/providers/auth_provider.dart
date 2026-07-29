@@ -189,6 +189,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// 401 sonrası: API çağrısı yapmadan yerel oturumu temizler → router /login.
+  Future<void> clearSessionLocally() async {
+    await secureStorage.delete(key: StorageKeys.accessToken);
+    await secureStorage.delete(key: StorageKeys.refreshToken);
+    await secureStorage.delete(key: StorageKeys.userId);
+    state = const AuthState.unauthenticated(
+      errorMessage: 'Oturum süreniz doldu. Lütfen tekrar giriş yapın.',
+    );
+  }
+
   void clearError() {
     if (state.errorMessage != null) {
       state = state.copyWith(clearError: true);

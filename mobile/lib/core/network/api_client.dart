@@ -4,9 +4,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../constants/api_constants.dart';
 import '../constants/storage_keys.dart';
+import 'auth_session_bus.dart';
 import 'workspace_access_bus.dart';
 
-/// Merkezi Dio istemcisi — JWT + workspace 403 yakalama.
+/// Merkezi Dio istemcisi — JWT + 401/403 yakalama.
 class ApiClient {
   ApiClient({
     required this._secureStorage,
@@ -34,6 +35,7 @@ class ApiClient {
           handler.next(options);
         },
         onError: (error, handler) {
+          _maybeHandleUnauthorized(error);
           _maybeHandleWorkspaceForbidden(error);
           handler.next(error);
         },
@@ -45,6 +47,17 @@ class ApiClient {
   final FlutterSecureStorage _secureStorage;
 
   Dio get dio => _dio;
+
+  void _maybeHandleUnauthorized(DioException error) {
+    if (error.response?.statusCode != 401) return;
+    final path = error.requestOptions.path;
+    // Login/register 401'leri oturum düşürmesin.
+    if (path.contains('/auth/login') || path.contains('/auth/register')) {
+      return;
+    }
+    debugPrint('[ApiClient] 401 Unauthorized → session bus');
+    AuthSessionBus.instance.notifyUnauthorized();
+  }
 
   void _maybeHandleWorkspaceForbidden(DioException error) {
     final status = error.response?.statusCode;
