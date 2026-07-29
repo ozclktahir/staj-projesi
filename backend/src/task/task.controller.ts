@@ -32,13 +32,14 @@ export class TaskController {
   constructor(private readonly taskService: TaskService) {}
 
   @Post()
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Çalışma alanı içinde yeni bir görev oluşturur' })
   @ApiResponse({ status: 201, description: 'Görev başarıyla oluşturuldu.' })
   @ApiResponse({
     status: 403,
-    description: 'Görev oluşturmak için Admin veya Member rolüne sahip olmanız gerekir.',
+    description:
+      'Görev oluşturmak için OWNER, Admin veya Member rolüne sahip olmanız gerekir.',
   })
   create(
     @Param('workspaceId') workspaceId: string,
@@ -73,7 +74,7 @@ export class TaskController {
   }
 
   @Patch(':id/restore')
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({
     summary: 'Soft-delete edilmiş görevi çöp kutusundan geri getirir',
@@ -81,7 +82,8 @@ export class TaskController {
   @ApiResponse({ status: 200, description: 'Görev başarıyla geri getirildi.' })
   @ApiResponse({
     status: 403,
-    description: 'Görev geri getirmek için Admin veya Member rolüne sahip olmanız gerekir.',
+    description:
+      'Görev geri getirmek için OWNER, Admin veya Member rolüne sahip olmanız gerekir.',
   })
   @ApiResponse({
     status: 404,
@@ -95,13 +97,14 @@ export class TaskController {
   }
 
   @Patch(':id')
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Belirtilen görevi günceller' })
   @ApiResponse({ status: 200, description: 'Görev başarıyla güncellendi.' })
   @ApiResponse({
     status: 403,
-    description: 'Görev güncellemek için Admin veya Member rolüne sahip olmanız gerekir.',
+    description:
+      'Görev güncellemek için OWNER, Admin veya Member rolüne sahip olmanız gerekir.',
   })
   @ApiResponse({ status: 404, description: 'Görev bulunamadı.' })
   update(
@@ -113,13 +116,14 @@ export class TaskController {
   }
 
   @Delete(':id')
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Belirtilen görevi siler' })
   @ApiResponse({ status: 200, description: 'Görev başarıyla silindi.' })
   @ApiResponse({
     status: 403,
-    description: 'Görev silmek için Admin veya Member rolüne sahip olmanız gerekir.',
+    description:
+      'Görev silmek için OWNER, Admin veya Member rolüne sahip olmanız gerekir.',
   })
   @ApiResponse({ status: 404, description: 'Görev bulunamadı.' })
   remove(

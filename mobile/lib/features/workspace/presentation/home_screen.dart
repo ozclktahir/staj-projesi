@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../data/project_dto.dart';
 import '../providers/project_provider.dart';
@@ -224,6 +226,11 @@ class _HomeBody extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         )
                       : null,
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push(
+                    AppRoutes.projectDetail(project.id),
+                    extra: project,
+                  ),
                 ),
               );
             },

@@ -17,4 +17,10 @@ abstract final class ApiConstants {
 
   static String workspaceProjects(String workspaceId) =>
       '/workspaces/$workspaceId/projects';
+
+  static String workspaceTasks(String workspaceId) =>
+      '/workspaces/$workspaceId/tasks';
+
+  static String workspaceTask(String workspaceId, String taskId) =>
+      '/workspaces/$workspaceId/tasks/$taskId';
 }

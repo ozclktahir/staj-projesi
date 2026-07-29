@@ -6,6 +6,7 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_placeholder_page.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/tasks/presentation/project_detail_screen.dart';
 import '../../features/workspace/presentation/home_screen.dart';
 
 /// Rota path sabitleri.
@@ -14,6 +15,9 @@ abstract final class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const home = '/home';
+  static const project = '/project/:id';
+
+  static String projectDetail(String projectId) => '/project/$projectId';
 }
 
 class GoRouterRefreshNotifier extends ChangeNotifier {
@@ -82,6 +86,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.home,
         name: 'home',
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.project,
+        name: 'project',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          final project = projectFromExtra(state.extra);
+          return ProjectDetailScreen(
+            projectId: id,
+            projectName: project?.name ??
+                state.uri.queryParameters['name'],
+          );
+        },
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

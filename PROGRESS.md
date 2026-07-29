@@ -89,7 +89,7 @@
   - [x] **Adım 1:** Flutter Proje Kurulumu ve Feature-first Mimari Yapılandırması (dio, riverpod, go_router, secure_storage)
   - [x] **Adım 2:** Auth Modülü, Login/Register Ekranları ve NestJS API Entegrasyonu (JWT & Auth Guard)
   - [x] **Adım 3:** Workspace ve Proje Yönetimi Ekranları (Workspace Switcher & Proje Listesi)
-  - [ ] **Adım 4:** Görev (Task) Yönetimi ve Kanban Panosu (Durum Yönetimi, Görev Detayları)
+  - [x] **Adım 4:** Görev (Task) Yönetimi ve Kanban Panosu (Durum Yönetimi, Görev Detayları)
   - [ ] **Adım 5:** Gelişmiş Özellikler (Yorumlar, Dosya Ekleri, Bildirimler ve Realtime)
 
 ### 🔮 Gelecek Planları (Zaman Kalırsa eklenecekler)
@@ -428,3 +428,6 @@
 ### [29 Temmuz 2026] - Faz 8 Adım 3: Workspace Switcher, Proje Listesi, SharedPreferences aktif workspace takibi ve NestJS entegrasyonu tamamlandı
 - `WorkspaceRepository` / `ProjectRepository`, aktif workspace SharedPreferences, `projectsProvider` (workspace değişince otomatik yenileme).
 - Home: Workspace Switcher (bottom sheet), proje kartları, pull-to-refresh, FAB ile yeni proje; OWNER rolü proje create/delete için backend’de eklendi; `flutter analyze` temiz.
+
+### [29 Temmuz 2026] - Faz 8 Adım 4: Kanban panosu, Görev CRUD işlemleri, durum güncellemeleri ve proje detay rotası tamamlandı
+- Task DTO/Repository (GET/POST/PATCH/DELETE), `tasksProvider` (optimistic status), `/project/:id` Kanban (TabBar), Task Detail BottomSheet, FAB ile yeni görev; OWNER rolü task mutasyonlarına eklendi; `flutter analyze` temiz.
