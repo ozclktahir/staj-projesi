@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
+import 'jwt_utils.dart';
 import 'login_dto.dart';
 import 'register_dto.dart';
 
@@ -14,26 +15,38 @@ class AuthException implements Exception {
   String toString() => message;
 }
 
-/// NestJS `/auth/*` uçları — JWT access_token döner.
+class AuthSession {
+  const AuthSession({
+    required this.accessToken,
+    this.refreshToken,
+    this.userId,
+  });
+
+  final String accessToken;
+  final String? refreshToken;
+  final String? userId;
+}
+
+/// NestJS `/auth/*` uçları — JWT access_token + user id.
 class AuthRepository {
   AuthRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
 
   final Dio _dio;
 
-  Future<String> login(LoginDto dto) async {
+  Future<AuthSession> login(LoginDto dto) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         ApiConstants.authLogin,
         data: dto.toJson(),
       );
-      return _extractAccessToken(response.data);
+      return _sessionFromResponse(response.data);
     } on DioException catch (error) {
       throw AuthException(_messageFromDio(error));
     }
   }
 
   /// Kayıt sonrası session dönmeyebilir; token için login yapılır.
-  Future<String> register(RegisterDto dto) async {
+  Future<AuthSession> register(RegisterDto dto) async {
     try {
       final response = await _dio.post<dynamic>(
         ApiConstants.authRegister,
@@ -41,7 +54,13 @@ class AuthRepository {
       );
 
       final token = _tryReadAccessToken(response.data);
-      if (token != null) return token;
+      if (token != null) {
+        return AuthSession(
+          accessToken: token,
+          userId: _tryReadUserId(response.data) ?? userIdFromJwt(token),
+          refreshToken: _tryReadRefreshToken(response.data),
+        );
+      }
 
       return login(
         LoginDto(email: dto.email, password: dto.password),
@@ -61,12 +80,16 @@ class AuthRepository {
     }
   }
 
-  String _extractAccessToken(Map<String, dynamic>? data) {
+  AuthSession _sessionFromResponse(Map<String, dynamic>? data) {
     final token = _tryReadAccessToken(data);
     if (token == null) {
       throw AuthException('Sunucu access_token döndürmedi.');
     }
-    return token;
+    return AuthSession(
+      accessToken: token,
+      refreshToken: _tryReadRefreshToken(data),
+      userId: _tryReadUserId(data) ?? userIdFromJwt(token),
+    );
   }
 
   String? _tryReadAccessToken(dynamic data) {
@@ -74,6 +97,25 @@ class AuthRepository {
     final map = Map<String, dynamic>.from(data);
     final token = map['access_token'] ?? map['accessToken'];
     if (token is String && token.isNotEmpty) return token;
+    return null;
+  }
+
+  String? _tryReadRefreshToken(dynamic data) {
+    if (data is! Map) return null;
+    final map = Map<String, dynamic>.from(data);
+    final token = map['refresh_token'] ?? map['refreshToken'];
+    if (token is String && token.isNotEmpty) return token;
+    return null;
+  }
+
+  String? _tryReadUserId(dynamic data) {
+    if (data is! Map) return null;
+    final map = Map<String, dynamic>.from(data);
+    final user = map['user'];
+    if (user is Map) {
+      final id = user['id'];
+      if (id is String && id.isNotEmpty) return id;
+    }
     return null;
   }
 

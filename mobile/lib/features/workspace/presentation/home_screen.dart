@@ -8,13 +8,14 @@ import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 import '../../notifications/presentation/notifications_sheet.dart';
 import '../../notifications/providers/notification_provider.dart';
+import '../../personal/presentation/personal_screen.dart';
 import '../data/project_dto.dart';
 import '../providers/project_provider.dart';
 import '../providers/workspace_provider.dart';
 import 'create_project_dialog.dart';
 import 'workspace_switcher.dart';
 
-/// Ana ekran: Dashboard + proje listesi sekmeleri.
+/// Ana ekran: Dashboard / Projeler / Kişisel Alan.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -22,31 +23,15 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  var _index = 0;
 
   @override
   Widget build(BuildContext context) {
     final workspaceState = ref.watch(workspaceProvider);
     final projectsAsync = ref.watch(projectsProvider);
     final active = workspaceState.activeWorkspace;
-    final canCreateProject = active != null && _tabController.index == 1;
+    final canCreateProject = active != null && _index == 1;
     final unreadCount = ref.watch(unreadNotificationCountProvider);
 
     return Scaffold(
@@ -87,15 +72,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             icon: const Icon(Icons.logout),
           ),
         ],
-        bottom: active == null
-            ? null
-            : TabBar(
-                controller: _tabController,
-                tabs: const [
-                  Tab(icon: Icon(Icons.dashboard_outlined), text: 'Dashboard'),
-                  Tab(icon: Icon(Icons.folder_outlined), text: 'Projeler'),
-                ],
-              ),
       ),
       floatingActionButton: canCreateProject
           ? FloatingActionButton(
@@ -113,8 +89,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               child: const Icon(Icons.add),
             )
           : null,
+      bottomNavigationBar: active == null
+          ? null
+          : NavigationBar(
+              selectedIndex: _index,
+              onDestinationSelected: (value) => setState(() => _index = value),
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.dashboard_outlined),
+                  selectedIcon: Icon(Icons.dashboard),
+                  label: 'Dashboard',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.folder_outlined),
+                  selectedIcon: Icon(Icons.folder),
+                  label: 'Projeler',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: 'Kişisel',
+                ),
+              ],
+            ),
       body: active == null
-          ? _HomeBody(
+          ? _ProjectsBody(
               workspaceLoading: workspaceState.isLoading,
               workspaceError: workspaceState.errorMessage,
               hasWorkspaces: workspaceState.workspaces.isNotEmpty,
@@ -126,11 +125,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ref.read(projectsProvider.notifier).refresh(),
               onOpenSwitcher: () => showWorkspaceSwitcher(context, ref),
             )
-          : TabBarView(
-              controller: _tabController,
+          : IndexedStack(
+              index: _index,
               children: [
                 const DashboardScreen(),
-                _HomeBody(
+                _ProjectsBody(
                   workspaceLoading: workspaceState.isLoading,
                   workspaceError: workspaceState.errorMessage,
                   hasWorkspaces: workspaceState.workspaces.isNotEmpty,
@@ -144,14 +143,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ref.read(projectsProvider.notifier).refresh(),
                   onOpenSwitcher: () => showWorkspaceSwitcher(context, ref),
                 ),
+                const PersonalScreen(),
               ],
             ),
     );
   }
 }
 
-class _HomeBody extends StatelessWidget {
-  const _HomeBody({
+class _ProjectsBody extends StatelessWidget {
+  const _ProjectsBody({
     required this.workspaceLoading,
     required this.workspaceError,
     required this.hasWorkspaces,

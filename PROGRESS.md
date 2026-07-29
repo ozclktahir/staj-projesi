@@ -99,7 +99,7 @@
   - Dosya silme ve önizleme/açma deneyimi
 - [x] **Adım 2: Dashboard / Analytics Ekranı**
   - KPI kartları, istatistik grafikleri ve yaklaşan deadline listesi (`/`)
-- [ ] **Adım 3: Personal Workspace Ekranı**
+- [x] **Adım 3: Personal Workspace Ekranı**
   - Atanmış görevler, kişisel notlar ve Todo/Dosyalar (`/personal`)
 - [ ] **Adım 4: Davet & Bildirim Aksiyonları**
   - Üye davet etme, davet kabul/red akışları
@@ -465,3 +465,6 @@
 
 ### [29 Temmuz 2026] - Faz 8.1 Adım 2: Mobil Dashboard, KPI kartları ve istatistik grafikleri eklendi
 - `fl_chart`, Nest `GET /workspaces/:id/statistics` + görevlerden KPI/pasta grafik/yaklaşan deadline’lar; Home’da Dashboard | Projeler sekmeleri; `flutter analyze` temiz.
+
+### [29 Temmuz 2026] - Faz 8.1 Adım 3: Mobil Personal Workspace, bana atanan gorevler ve kisisel notlar eklendi
+- Bottom nav’a Kişisel Alan; `assignee_id` ile atanmış görevler + workspace notes CRUD; auth’ta user id saklama; `flutter analyze` temiz.

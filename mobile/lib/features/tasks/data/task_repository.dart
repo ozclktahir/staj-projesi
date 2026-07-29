@@ -25,6 +25,7 @@ class TaskRepository {
     required String workspaceId,
     String? projectId,
     String? parentTaskId,
+    String? assigneeId,
     int page = 1,
     int limit = 100,
   }) async {
@@ -38,6 +39,9 @@ class TaskRepository {
       }
       if (parentTaskId != null && parentTaskId.isNotEmpty) {
         query['parent_task_id'] = parentTaskId;
+      }
+      if (assigneeId != null && assigneeId.isNotEmpty) {
+        query['assignee_id'] = assigneeId;
       }
 
       final response = await _dio.get<Map<String, dynamic>>(

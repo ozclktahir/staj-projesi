@@ -6,6 +6,7 @@ import '../../../core/constants/storage_keys.dart';
 import '../../../core/network/api_client_provider.dart';
 import '../../../core/storage/secure_storage_provider.dart';
 import '../data/auth_repository.dart';
+import '../data/jwt_utils.dart';
 import '../data/login_dto.dart';
 import '../data/register_dto.dart';
 
@@ -20,6 +21,7 @@ class AuthState {
   const AuthState({
     required this.status,
     this.token,
+    this.userId,
     this.isSubmitting = false,
     this.errorMessage,
   });
@@ -27,21 +29,26 @@ class AuthState {
   const AuthState.unknown()
       : status = AuthStatus.unknown,
         token = null,
+        userId = null,
         isSubmitting = false,
         errorMessage = null;
 
-  const AuthState.authenticated(String this.token)
-      : status = AuthStatus.authenticated,
+  const AuthState.authenticated({
+    required String this.token,
+    this.userId,
+  })  : status = AuthStatus.authenticated,
         isSubmitting = false,
         errorMessage = null;
 
   const AuthState.unauthenticated({this.errorMessage})
       : status = AuthStatus.unauthenticated,
         token = null,
+        userId = null,
         isSubmitting = false;
 
   final AuthStatus status;
   final String? token;
+  final String? userId;
   final bool isSubmitting;
   final String? errorMessage;
 
@@ -50,14 +57,17 @@ class AuthState {
   AuthState copyWith({
     AuthStatus? status,
     String? token,
+    String? userId,
     bool? isSubmitting,
     String? errorMessage,
     bool clearError = false,
     bool clearToken = false,
+    bool clearUserId = false,
   }) {
     return AuthState(
       status: status ?? this.status,
       token: clearToken ? null : (token ?? this.token),
+      userId: clearUserId ? null : (userId ?? this.userId),
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
@@ -78,9 +88,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _bootstrap() async {
     final token = await secureStorage.read(key: StorageKeys.accessToken);
     if (token != null && token.isNotEmpty) {
-      state = AuthState.authenticated(token);
+      var userId = await secureStorage.read(key: StorageKeys.userId);
+      userId ??= userIdFromJwt(token);
+      if (userId != null) {
+        await secureStorage.write(key: StorageKeys.userId, value: userId);
+      }
+      state = AuthState.authenticated(token: token, userId: userId);
     } else {
       state = const AuthState.unauthenticated();
+    }
+  }
+
+  Future<void> _persistSession(AuthSession session) async {
+    await secureStorage.write(
+      key: StorageKeys.accessToken,
+      value: session.accessToken,
+    );
+    if (session.refreshToken != null) {
+      await secureStorage.write(
+        key: StorageKeys.refreshToken,
+        value: session.refreshToken,
+      );
+    }
+    if (session.userId != null) {
+      await secureStorage.write(
+        key: StorageKeys.userId,
+        value: session.userId,
+      );
     }
   }
 
@@ -90,14 +124,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
-      final token = await repository.login(
+      final session = await repository.login(
         LoginDto(email: email, password: password),
       );
-      await secureStorage.write(
-        key: StorageKeys.accessToken,
-        value: token,
+      await _persistSession(session);
+      state = AuthState.authenticated(
+        token: session.accessToken,
+        userId: session.userId,
       );
-      state = AuthState.authenticated(token);
       return true;
     } on AuthException catch (error) {
       state = AuthState.unauthenticated(errorMessage: error.message);
@@ -118,7 +152,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
-      final token = await repository.register(
+      final session = await repository.register(
         RegisterDto(
           email: email,
           password: password,
@@ -126,11 +160,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
           lastName: lastName,
         ),
       );
-      await secureStorage.write(
-        key: StorageKeys.accessToken,
-        value: token,
+      await _persistSession(session);
+      state = AuthState.authenticated(
+        token: session.accessToken,
+        userId: session.userId,
       );
-      state = AuthState.authenticated(token);
       return true;
     } on AuthException catch (error) {
       state = AuthState.unauthenticated(errorMessage: error.message);
@@ -150,6 +184,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } finally {
       await secureStorage.delete(key: StorageKeys.accessToken);
       await secureStorage.delete(key: StorageKeys.refreshToken);
+      await secureStorage.delete(key: StorageKeys.userId);
       state = const AuthState.unauthenticated();
     }
   }
