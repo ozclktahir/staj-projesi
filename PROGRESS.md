@@ -104,7 +104,7 @@
 - [x] **Adım 4: Davet & Bildirim Aksiyonları**
   - Üye davet etme, davet kabul/red akışları
   - Gelişmiş bildirim aksiyonları (silme onayı, görev sahiplenme/claim vb.)
-- [ ] **Adım 5: Kanban & Arayüz Geliştirmeleri**
+- [x] **Adım 5: Kanban & Arayüz Geliştirmeleri**
   - Kanban ekranına arama, öncelik filtreleri ve sayfalama eklenmesi
   - Activity Log (Aktivite Akışı) UI bileşeni
 - [ ] **Adım 6: Ayarlar & Onboarding**
@@ -471,3 +471,6 @@
 
 ### [29 Temmuz 2026] - Faz 8.1 Adım 4: Mobil davet gonderme, davet kabul/red akislari ve gelismis bildirim aksiyonlari eklendi
 - Nest `GET /invitations/me` + `POST /invitations/:id/reject`, davette bildirim; mobilde davet repo/provider, Üye Davet Et dialog, bildirimlerde Kabul Et/Reddet; `flutter analyze` temiz.
+
+### [29 Temmuz 2026] - Faz 8.1 Adım 5: Kanban filtresi/aramasi ve Activity Log UI mobilde tamamlandi
+- Kanban arama + öncelik chip’leri + sayfalama/infinite scroll; `activity_log_provider` + Timeline UI (proje Aktivite sekmesi); `flutter analyze` temiz.

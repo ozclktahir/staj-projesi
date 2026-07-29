@@ -20,12 +20,13 @@ export class ActivityLogController {
   constructor(private readonly activityLogService: ActivityLogService) {}
 
   @Post()
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @ApiOperation({ summary: 'Çalışma alanına manuel bir aktivite kaydı ekler' })
   @ApiResponse({ status: 201, description: 'Aktivite kaydı başarıyla oluşturuldu.' })
   @ApiResponse({
     status: 403,
-    description: 'Aktivite kaydı eklemek için Admin veya Member rolüne sahip olmanız gerekir.',
+    description:
+      'Aktivite kaydı eklemek için OWNER, Admin veya Member rolüne sahip olmanız gerekir.',
   })
   create(
     @Param('workspaceId') workspaceId: string,
@@ -36,12 +37,13 @@ export class ActivityLogController {
   }
 
   @Get()
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @ApiOperation({ summary: 'Çalışma alanına ait tüm aktivite kayıtlarını listeler' })
   @ApiResponse({ status: 200, description: 'Aktivite kayıtları listelendi.' })
   @ApiResponse({
     status: 403,
-    description: 'Aktivite kayıtlarını görmek için Admin veya Member rolüne sahip olmanız gerekir.',
+    description:
+      'Aktivite kayıtlarını görmek için OWNER, Admin veya Member rolüne sahip olmanız gerekir.',
   })
   findAll(@Param('workspaceId') workspaceId: string) {
     return this.activityLogService.findAllByWorkspace(workspaceId);
