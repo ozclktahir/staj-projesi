@@ -14,4 +14,7 @@ abstract final class ApiConstants {
   static const String authRegister = '/auth/register';
   static const String authLogout = '/auth/logout';
   static const String workspaces = '/workspace';
+
+  static String workspaceProjects(String workspaceId) =>
+      '/workspaces/$workspaceId/projects';
 }

@@ -2,10 +2,10 @@ import 'package:dio/dio.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
-import 'workspace_dto.dart';
+import 'project_dto.dart';
 
-class WorkspaceException implements Exception {
-  WorkspaceException(this.message);
+class ProjectException implements Exception {
+  ProjectException(this.message);
 
   final String message;
 
@@ -13,41 +13,46 @@ class WorkspaceException implements Exception {
   String toString() => message;
 }
 
-/// NestJS `/workspace` uçları.
-class WorkspaceRepository {
-  WorkspaceRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
+/// NestJS `/workspaces/:workspaceId/projects` uçları.
+class ProjectRepository {
+  ProjectRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
 
   final Dio _dio;
 
-  Future<List<WorkspaceDto>> fetchWorkspaces() async {
+  Future<List<ProjectDto>> fetchProjects(String workspaceId) async {
     try {
-      final response = await _dio.get<dynamic>(ApiConstants.workspaces);
+      final response = await _dio.get<dynamic>(
+        ApiConstants.workspaceProjects(workspaceId),
+      );
       final data = response.data;
       if (data is! List) {
-        throw WorkspaceException('Çalışma alanları listesi beklenmeyen formatta.');
+        throw ProjectException('Proje listesi beklenmeyen formatta.');
       }
       return data
           .whereType<Map>()
-          .map((item) => WorkspaceDto.fromJson(Map<String, dynamic>.from(item)))
+          .map((item) => ProjectDto.fromJson(Map<String, dynamic>.from(item)))
           .toList();
     } on DioException catch (error) {
-      throw WorkspaceException(_messageFromDio(error));
+      throw ProjectException(_messageFromDio(error));
     }
   }
 
-  Future<WorkspaceDto> createWorkspace(CreateWorkspaceDto dto) async {
+  Future<ProjectDto> createProject({
+    required String workspaceId,
+    required CreateProjectDto dto,
+  }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
-        ApiConstants.workspaces,
+        ApiConstants.workspaceProjects(workspaceId),
         data: dto.toJson(),
       );
       final data = response.data;
       if (data == null) {
-        throw WorkspaceException('Sunucu çalışma alanı döndürmedi.');
+        throw ProjectException('Sunucu proje döndürmedi.');
       }
-      return WorkspaceDto.fromJson(data);
+      return ProjectDto.fromJson(data);
     } on DioException catch (error) {
-      throw WorkspaceException(_messageFromDio(error));
+      throw ProjectException(_messageFromDio(error));
     }
   }
 
@@ -65,11 +70,12 @@ class WorkspaceRepository {
 
     if (status == 401) return 'Oturum süresi dolmuş olabilir. Tekrar giriş yapın.';
     if (status == 403) return 'Bu işlem için yetkiniz yok.';
+    if (status == 404) return 'Çalışma alanı veya proje bulunamadı.';
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout ||
         error.type == DioExceptionType.connectionError) {
       return 'Sunucuya bağlanılamadı. NestJS çalışıyor mu?';
     }
-    return 'Çalışma alanı işlemi başarısız oldu.';
+    return 'Proje işlemi başarısız oldu.';
   }
 }

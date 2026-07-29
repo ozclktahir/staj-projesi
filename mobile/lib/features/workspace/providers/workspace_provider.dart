@@ -1,0 +1,159 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../core/constants/storage_keys.dart';
+import '../../../core/network/api_client_provider.dart';
+import '../../../core/storage/shared_preferences_provider.dart';
+import '../data/workspace_dto.dart';
+import '../data/workspace_repository.dart';
+
+@immutable
+class WorkspaceState {
+  const WorkspaceState({
+    this.workspaces = const [],
+    this.activeWorkspace,
+    this.isLoading = false,
+    this.isSubmitting = false,
+    this.errorMessage,
+  });
+
+  final List<WorkspaceDto> workspaces;
+  final WorkspaceDto? activeWorkspace;
+  final bool isLoading;
+  final bool isSubmitting;
+  final String? errorMessage;
+
+  WorkspaceState copyWith({
+    List<WorkspaceDto>? workspaces,
+    WorkspaceDto? activeWorkspace,
+    bool? isLoading,
+    bool? isSubmitting,
+    String? errorMessage,
+    bool clearActive = false,
+    bool clearError = false,
+  }) {
+    return WorkspaceState(
+      workspaces: workspaces ?? this.workspaces,
+      activeWorkspace:
+          clearActive ? null : (activeWorkspace ?? this.activeWorkspace),
+      isLoading: isLoading ?? this.isLoading,
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+    );
+  }
+}
+
+class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
+  WorkspaceNotifier({
+    required this.repository,
+    required this.prefs,
+  }) : super(const WorkspaceState(isLoading: true)) {
+    _bootstrap();
+  }
+
+  final WorkspaceRepository repository;
+  final SharedPreferences prefs;
+
+  Future<void> _bootstrap() async {
+    await refresh();
+  }
+
+  Future<void> refresh() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final list = await repository.fetchWorkspaces();
+      final savedId = prefs.getString(StorageKeys.activeWorkspaceId);
+      final active = _resolveActive(list, savedId);
+      if (active != null) {
+        await prefs.setString(StorageKeys.activeWorkspaceId, active.id);
+      } else {
+        await prefs.remove(StorageKeys.activeWorkspaceId);
+      }
+      state = WorkspaceState(
+        workspaces: list,
+        activeWorkspace: active,
+        isLoading: false,
+      );
+    } on WorkspaceException catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: error.message,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Çalışma alanları yüklenemedi.',
+      );
+    }
+  }
+
+  Future<void> selectWorkspace(String workspaceId) async {
+    WorkspaceDto? match;
+    for (final workspace in state.workspaces) {
+      if (workspace.id == workspaceId) {
+        match = workspace;
+        break;
+      }
+    }
+    if (match == null) return;
+
+    await prefs.setString(StorageKeys.activeWorkspaceId, match.id);
+    state = state.copyWith(activeWorkspace: match, clearError: true);
+  }
+
+  Future<bool> createWorkspace({
+    required String name,
+    String? description,
+  }) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      final created = await repository.createWorkspace(
+        CreateWorkspaceDto(name: name, description: description),
+      );
+      final list = [...state.workspaces, created];
+      await prefs.setString(StorageKeys.activeWorkspaceId, created.id);
+      state = WorkspaceState(
+        workspaces: list,
+        activeWorkspace: created,
+        isLoading: false,
+        isSubmitting: false,
+      );
+      return true;
+    } on WorkspaceException catch (error) {
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: error.message,
+      );
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: 'Çalışma alanı oluşturulamadı.',
+      );
+      return false;
+    }
+  }
+
+  WorkspaceDto? _resolveActive(List<WorkspaceDto> list, String? savedId) {
+    if (list.isEmpty) return null;
+    if (savedId != null) {
+      for (final workspace in list) {
+        if (workspace.id == savedId) return workspace;
+      }
+    }
+    return list.first;
+  }
+}
+
+final workspaceRepositoryProvider = Provider<WorkspaceRepository>((ref) {
+  return WorkspaceRepository(apiClient: ref.watch(apiClientProvider));
+});
+
+final workspaceProvider =
+    StateNotifierProvider<WorkspaceNotifier, WorkspaceState>((ref) {
+  return WorkspaceNotifier(
+    repository: ref.watch(workspaceRepositoryProvider),
+    prefs: ref.watch(sharedPreferencesProvider),
+  );
+});

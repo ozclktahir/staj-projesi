@@ -30,13 +30,14 @@ export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
   @Post()
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Çalışma alanı içinde yeni bir proje oluşturur' })
   @ApiResponse({ status: 201, description: 'Proje başarıyla oluşturuldu.' })
   @ApiResponse({
     status: 403,
-    description: 'Proje oluşturmak için Admin veya Member rolüne sahip olmanız gerekir.',
+    description:
+      'Proje oluşturmak için OWNER, Admin veya Member rolüne sahip olmanız gerekir.',
   })
   create(
     @Param('workspaceId') workspaceId: string,
@@ -56,13 +57,14 @@ export class ProjectController {
   }
 
   @Delete(':id')
-  @Roles('Admin', 'Member')
+  @Roles('OWNER', 'Admin', 'Member')
   @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Belirtilen projeyi siler' })
   @ApiResponse({ status: 200, description: 'Proje başarıyla silindi.' })
   @ApiResponse({
     status: 403,
-    description: 'Proje silmek için Admin veya Member rolüne sahip olmanız gerekir.',
+    description:
+      'Proje silmek için OWNER, Admin veya Member rolüne sahip olmanız gerekir.',
   })
   @ApiResponse({ status: 404, description: 'Proje bulunamadı.' })
   remove(

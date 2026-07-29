@@ -6,7 +6,7 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_placeholder_page.dart';
 import '../../features/auth/providers/auth_provider.dart';
-import '../../features/workspace/presentation/home_placeholder_page.dart';
+import '../../features/workspace/presentation/home_screen.dart';
 
 /// Rota path sabitleri.
 abstract final class AppRoutes {
@@ -81,7 +81,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.home,
         name: 'home',
-        builder: (context, state) => const HomePlaceholderPage(),
+        builder: (context, state) => const HomeScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
