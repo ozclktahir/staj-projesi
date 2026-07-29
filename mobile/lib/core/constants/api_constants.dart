@@ -3,7 +3,7 @@ abstract final class ApiConstants {
   /// Android emülatör → host makinedeki NestJS (port 3000).
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:3000',
+    defaultValue: 'http://localhost:3000',
   );
 
   static const Duration connectTimeout = Duration(seconds: 15);
