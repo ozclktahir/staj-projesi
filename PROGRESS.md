@@ -125,7 +125,7 @@
 - Personal: Web ile aynı 4 sekme (Atanan / Notlar / Todos / Dosyalar) + not düzenleme / todo / dosya.
 - Üyeler: Web assignee dropdown + üye görünürlük kuralları; mobilde UUID elle giriş, üye listesi/yönetim yok.
 - RBAC UI: Web Admin/OWNER kapıları; mobilde çoğu aksiyon herkese açık (API 403’e bırakılmış).
-- Dashboard: Web workload / priority grafikleri + activity feed; mobil KPI + basit pasta.
+- Dashboard: Web ile yakın KPI (oran/üyeler) + öncelik/workload bar + aktivite feed.
 - i18n: Web TR/EN kısmen uygulanmış; mobil tercih kaydı var, UI hard-coded TR.
 - Kanban: Web sıralama + claim pending görselleri; mobil tab kolonları, claim yok.
 - Bildirimler: Web claim/silme-onay aksiyonları; mobil yalnızca davet + okundu.
@@ -158,7 +158,7 @@
   - Sekmeler: Atanan | Notlar | Todos | Dosyalar (web ile aynı)
   - Not düzenleme (PATCH); todo CRUD + due; kişisel dosya upload/liste/sil
   - Filtreler (öncelik/durum/tarih) atanmış görevlerde
-- [ ] **Adım 8: Dashboard / Analytics parity**
+- [x] **Adım 8: Dashboard / Analytics parity**
   - Öncelik bar / üye iş yükü (workload) grafikleri
   - Dashboard’da son aktiviteler feed’i (web QuickActivityFeed)
   - KPI kartları ve boş durumları web layout’una yakınlaştır
@@ -573,3 +573,7 @@
 ### [30 Temmuz 2026] - Faz 8.2 Adım 7: Personal Workspace tam parity
 - Nest `PersonalModule` (`/personal/notes|todos|files`) + mobil 4 sekme (Atanan/Notlar/Todos/Dosyalar).
 - Not PATCH, todo CRUD+due, dosya upload/liste/sil; atanmış görevlerde öncelik/durum/tarih/arama filtreleri. `flutter analyze` + backend `tsc` temiz.
+
+### [30 Temmuz 2026] - Faz 8.2 Adım 8: Dashboard / Analytics parity
+- KPI: Toplam / Tamamlanma % / Geciken / Aktif Üyeler; Durum donut + Öncelik bar + Üye iş yükü bar (`fl_chart`).
+- Dashboard’da Son Aktiviteler feed (`activityLogProvider`); boş grafik/deadline durumları web’e yakın. `flutter analyze` temiz.

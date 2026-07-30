@@ -5,6 +5,7 @@ import '../../../core/network/api_client_provider.dart';
 import '../../tasks/data/task_dto.dart';
 import '../../tasks/data/task_repository.dart';
 import '../../tasks/providers/task_provider.dart';
+import '../../workspace/providers/workspace_members_provider.dart';
 import '../../workspace/providers/workspace_provider.dart';
 import '../data/dashboard_repository.dart';
 import '../data/workspace_statistics_dto.dart';
@@ -27,6 +28,13 @@ class DashboardNotifier extends AutoDisposeAsyncNotifier<DashboardData> {
       workspaceProvider.select((s) => s.activeWorkspace?.id),
     );
     if (workspaceId == null) return DashboardData.empty();
+
+    // Üye etiketleri / sayısı (workload + Aktif Üyeler KPI).
+    final membersAsync = ref.watch(workspaceMembersProvider);
+    final members = membersAsync.valueOrNull ?? const [];
+    final memberLabels = {
+      for (final m in members) m.id: m.label,
+    };
 
     WorkspaceStatisticsDto? remote;
     try {
@@ -52,6 +60,8 @@ class DashboardNotifier extends AutoDisposeAsyncNotifier<DashboardData> {
     return DashboardData.fromTasks(
       List<TaskDto>.from(tasks),
       remote: remote,
+      memberLabels: memberLabels,
+      memberCount: members.length,
     );
   }
 

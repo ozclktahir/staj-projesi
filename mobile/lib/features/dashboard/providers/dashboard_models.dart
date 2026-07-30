@@ -4,6 +4,34 @@ import '../../tasks/data/task_dto.dart';
 import '../data/workspace_statistics_dto.dart';
 
 @immutable
+class DashboardChartSlice {
+  const DashboardChartSlice({
+    required this.key,
+    required this.label,
+    required this.count,
+  });
+
+  final String key;
+  final String label;
+  final int count;
+}
+
+@immutable
+class DashboardWorkloadItem {
+  const DashboardWorkloadItem({
+    required this.userId,
+    required this.name,
+    required this.total,
+    required this.completed,
+  });
+
+  final String userId;
+  final String name;
+  final int total;
+  final int completed;
+}
+
+@immutable
 class DashboardData {
   const DashboardData({
     required this.totalTasks,
@@ -11,6 +39,10 @@ class DashboardData {
     required this.inProgressTasks,
     required this.todoTasks,
     required this.overdueTasks,
+    required this.completionRate,
+    required this.activeMembers,
+    required this.byPriority,
+    required this.workload,
     required this.upcomingDeadlines,
   });
 
@@ -20,21 +52,40 @@ class DashboardData {
         inProgressTasks: 0,
         todoTasks: 0,
         overdueTasks: 0,
+        completionRate: 0,
+        activeMembers: 0,
+        byPriority: [
+          DashboardChartSlice(key: 'HIGH', label: 'Yüksek', count: 0),
+          DashboardChartSlice(key: 'MEDIUM', label: 'Orta', count: 0),
+          DashboardChartSlice(key: 'LOW', label: 'Düşük', count: 0),
+        ],
+        workload: [],
         upcomingDeadlines: [],
       );
 
   factory DashboardData.fromTasks(
     List<TaskDto> tasks, {
     WorkspaceStatisticsDto? remote,
+    Map<String, String> memberLabels = const {},
+    int? memberCount,
   }) {
+    final topLevel = [
+      for (final task in tasks)
+        if (task.parentTaskId == null || task.parentTaskId!.isEmpty) task,
+    ];
+
     final now = DateTime.now();
     var completed = 0;
     var inProgress = 0;
     var todo = 0;
     var overdue = 0;
+    var high = 0;
+    var medium = 0;
+    var low = 0;
     final withDue = <TaskDto>[];
+    final workloadMap = <String, ({int total, int completed})>{};
 
-    for (final task in tasks) {
+    for (final task in topLevel) {
       switch (task.status) {
         case TaskStatus.done:
           completed++;
@@ -42,6 +93,26 @@ class DashboardData {
           inProgress++;
         case TaskStatus.todo:
           todo++;
+      }
+
+      // Web normalizePriority: HIGH / LOW özel; URGENT dahil diğerleri MEDIUM.
+      switch (task.priority) {
+        case TaskPriority.high:
+          high++;
+        case TaskPriority.low:
+          low++;
+        case TaskPriority.medium:
+        case TaskPriority.urgent:
+          medium++;
+      }
+
+      final assignee = task.effectiveAssigneeId;
+      if (assignee != null && assignee.isNotEmpty) {
+        final prev = workloadMap[assignee] ?? (total: 0, completed: 0);
+        workloadMap[assignee] = (
+          total: prev.total + 1,
+          completed: prev.completed + (task.isDone ? 1 : 0),
+        );
       }
 
       final dueRaw = task.dueDate;
@@ -63,12 +134,45 @@ class DashboardData {
       return aDue.compareTo(bDue);
     });
 
+    final workload = workloadMap.entries
+        .map((e) {
+          final label = memberLabels[e.key];
+          final name = (label != null && label.isNotEmpty)
+              ? label
+              : (e.key.length > 8 ? '${e.key.substring(0, 8)}…' : e.key);
+          return DashboardWorkloadItem(
+            userId: e.key,
+            name: name,
+            total: e.value.total,
+            completed: e.value.completed,
+          );
+        })
+        .toList()
+      ..sort((a, b) => b.total.compareTo(a.total));
+
+    final total = remote?.totalTasks ?? topLevel.length;
+    final completedFinal = remote?.completedTasks ?? completed;
+    final completionRate =
+        total == 0 ? 0.0 : ((completedFinal / total) * 1000).round() / 10;
+
+    final members = memberCount ?? memberLabels.length;
+    final activeMembers =
+        workload.isNotEmpty ? workload.length : members;
+
     return DashboardData(
-      totalTasks: remote?.totalTasks ?? tasks.length,
-      completedTasks: remote?.completedTasks ?? completed,
+      totalTasks: total,
+      completedTasks: completedFinal,
       inProgressTasks: remote?.inProgressTasks ?? inProgress,
       todoTasks: remote?.todoTasks ?? todo,
       overdueTasks: remote?.overdueTasks ?? overdue,
+      completionRate: completionRate,
+      activeMembers: activeMembers,
+      byPriority: [
+        DashboardChartSlice(key: 'HIGH', label: 'Yüksek', count: high),
+        DashboardChartSlice(key: 'MEDIUM', label: 'Orta', count: medium),
+        DashboardChartSlice(key: 'LOW', label: 'Düşük', count: low),
+      ],
+      workload: workload,
       upcomingDeadlines: withDue.take(8).toList(),
     );
   }
@@ -78,5 +182,9 @@ class DashboardData {
   final int inProgressTasks;
   final int todoTasks;
   final int overdueTasks;
+  final double completionRate;
+  final int activeMembers;
+  final List<DashboardChartSlice> byPriority;
+  final List<DashboardWorkloadItem> workload;
   final List<TaskDto> upcomingDeadlines;
 }
