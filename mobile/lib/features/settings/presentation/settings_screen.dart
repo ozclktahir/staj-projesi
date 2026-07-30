@@ -100,7 +100,9 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           Text(
             'Görünüm',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -152,7 +154,6 @@ class SettingsScreen extends ConsumerWidget {
             decoration: const InputDecoration(
               labelText: 'Uygulama dili',
               prefixIcon: Icon(Icons.language),
-              border: OutlineInputBorder(),
             ),
             items: [
               for (final option in AppLocaleOption.values)

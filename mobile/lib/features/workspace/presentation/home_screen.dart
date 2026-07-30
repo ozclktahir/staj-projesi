@@ -46,13 +46,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             children: [
               DrawerHeader(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
+                  color: Theme.of(context).colorScheme.primary.withValues(
+                        alpha: 0.15,
+                      ),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+                  ),
                 ),
                 child: Align(
                   alignment: Alignment.bottomLeft,
                   child: Text(
                     workspaceTitle(active),
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                   ),
                 ),
               ),

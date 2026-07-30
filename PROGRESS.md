@@ -114,6 +114,63 @@
   - Workspace ve Proje silme yetkileri
   - Canlı güncelleme (Realtime board/bildirim/aktivite senkronizasyonu)
 
+### Faz 8.2: Mobil Uygulamayı Web ile Birebir Eşitleme ve UI/UX Uyumlaştırması
+> Amaç: Flutter mobilin, Next.js web’deki özellikler, iş kuralları, yetkiler ve görsel dil ile **%100 parity** sağlaması.
+> Kaynak referans: `frontend/` (globals.css / shadcn), `DESIGN.md`, web RBAC (`lib/rbac.ts`).
+
+**Analiz özeti (Web’de var → Mobilde eksik / uyumsuz):**
+- Tema: Web primary turuncu (`#ea580c` / `#ff6a00`) + koyu yüzeyler; mobil Material mavi seed (`#2563EB`) — marka uyumsuz.
+- Shell: Web Sidebar + Header; mobil AppBar/Drawer/BottomNav — hiyerarşi ve spacing farklı.
+- İş akışları: Task Claim, dual silme onayı, reddedilen görevi yeniden atama — mobilde yok (yalnızca davet accept/reject).
+- Personal: Web’de 4 sekme (Atanan / Notlar / Todos / Dosyalar); mobilde yalnızca Atanan + Notlar (not düzenleme yok).
+- Üyeler: Web assignee dropdown + üye görünürlük kuralları; mobilde UUID elle giriş, üye listesi/yönetim yok.
+- RBAC UI: Web Admin/OWNER kapıları; mobilde çoğu aksiyon herkese açık (API 403’e bırakılmış).
+- Dashboard: Web workload / priority grafikleri + activity feed; mobil KPI + basit pasta.
+- i18n: Web TR/EN kısmen uygulanmış; mobil tercih kaydı var, UI hard-coded TR.
+- Kanban: Web sıralama + claim pending görselleri; mobil tab kolonları, claim yok.
+- Bildirimler: Web claim/silme-onay aksiyonları; mobil yalnızca davet + okundu.
+
+- [x] **Adım 1: Tasarım sistemi & tema parity (Web token → Flutter)**
+  - Web `globals.css` / shadcn ile uyumlu ColorScheme (primary turuncu, background/card/border, dark/light)
+  - Tipografi, radius (`0.5rem`), kart/buton/chip stilleri; `AppTheme` iskeletini ürün temasına çevir
+  - Auth + Home + Settings ekranlarında görsel smoke kontrol
+- [ ] **Adım 2: Uygulama kabuğu (Shell) & navigasyon UX**
+  - Web Sidebar/Header hiyerarşisine yakın Drawer/NavigationRail + AppBar düzeni
+  - Spacing, bölüm başlıkları, boş durum (empty state) kartları web ile hizalı
+  - Auth split-screen / onboarding görsel dilini web’e yaklaştır
+- [ ] **Adım 3: RBAC & yetki kapıları (UI)**
+  - `isOwner` / `isAdminRole` helper’ları (OWNER|Admin)
+  - Invite, proje oluştur/sil, workspace sil, yeniden atama vb. butonları role göre göster/gizle
+  - Member’ın yalnızca kendi görünür projelerini görmesi (web `getMemberVisibleProjectIds` mantığı)
+- [ ] **Adım 4: Workspace üyeleri & assignee seçici**
+  - Üye listesi API + basit Üyeler UI (listeleme)
+  - Görev oluştur/düzenle’de UUID yerine üye dropdown (web gibi)
+  - Member için assignee = yalnızca kendisi kuralı
+- [ ] **Adım 5: Task Claim (sahiplenme) akışı**
+  - `assignment_status` / pending claim alanları DTO + Kanban kart stilleri (soluk / SLA)
+  - Bildirimde claim accept/reject aksiyonları (web `respondToTaskClaim`)
+  - Pending iken durum değişimini kilitleme
+- [ ] **Adım 6: Dual silme onayı & gelişmiş bildirim aksiyonları**
+  - İlerlemeli görev silmede onay isteği (admin↔assignee)
+  - Bildirim türleri: `task_deletion_request` approve/reject
+  - Reddedilen görevleri admin’in Create Task’tan yeniden ataması
+- [ ] **Adım 7: Personal Workspace tam parity (`/personal`)**
+  - Sekmeler: Atanan | Notlar | Todos | Dosyalar (web ile aynı)
+  - Not düzenleme (PATCH); todo CRUD + due; kişisel dosya upload/liste/sil
+  - Filtreler (öncelik/durum/tarih) atanmış görevlerde
+- [ ] **Adım 8: Dashboard / Analytics parity**
+  - Öncelik bar / üye iş yükü (workload) grafikleri
+  - Dashboard’da son aktiviteler feed’i (web QuickActivityFeed)
+  - KPI kartları ve boş durumları web layout’una yakınlaştır
+- [ ] **Adım 9: Kanban & görev detay UI cilası**
+  - Kolon sıralama (öncelik), claim pending görselleri, kart badge’leri web ile uyumlu
+  - Task detail sheet bölüm düzeni (Detay / Alt görev / Yorum / Dosya) spacing & tipografi
+  - Create/Edit dialog form stilleri (outline input, primary CTA)
+- [ ] **Adım 10: i18n gerçek uygulama + kalan uyum**
+  - TR/EN string katmanı (nav, settings, ortak butonlar, hatalar) — Settings dil tercihine bağla
+  - Bildirim/Activity metinlerinde dil desteği
+  - Son regressiyon: `flutter analyze` + kritik akış smoke listesi
+
 ### 🔮 Gelecek Planları (Zaman Kalırsa eklenecekler)
 - [ ] AI ile görev önerileri, özeti ve deadline tahmini.
 
@@ -489,3 +546,7 @@
 
 ### [29 Temmuz 2026] - Fix: task_card.dart arayüz taşma (RenderFlex overflow) ve 401 Unauthorized oturum yönlendirme hataları giderildi.
 - TaskCard Expanded/ellipsis layout; Dio 401 → oturum temizliği + `/login` yönlendirmesi.
+
+### [30 Temmuz 2026] - Faz 8.2 Adım 1: Tasarım sistemi & tema parity (Web token → Flutter)
+- `AppTheme`: primary light `#ea580c` / dark `#ff6a00`, border `#cbd5e1`/`#1e293b`, radius 8; Card/Input/Button/NavBar/Chip temaları web `globals.css` ile hizalandı.
+- Login/Register/Settings/Home drawer primary vurgusu; InputDecoration Outline override’ları kaldırıldı. `flutter analyze` temiz.
