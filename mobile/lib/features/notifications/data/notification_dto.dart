@@ -56,6 +56,13 @@ class NotificationDto {
         t == 'assignment_claim';
   }
 
+  bool get isDeletionRequest {
+    final t = (type ?? '').toLowerCase();
+    return t == 'task_deletion_request' ||
+        t == 'task_delete_request' ||
+        t == 'deletion_approval';
+  }
+
   String? get invitationId {
     final meta = metadata;
     if (meta == null) return null;

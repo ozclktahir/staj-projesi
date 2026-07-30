@@ -186,6 +186,11 @@ class TaskDto {
 
   bool get canChangeStatus => !isClaimPending;
 
+  bool get isDeletionPending {
+    final s = (deletionStatus ?? '').toLowerCase();
+    return s == 'pending_admin_approval' || s == 'pending_user_approval';
+  }
+
   String get assigneeLabel {
     final id = effectiveAssigneeId;
     if (id == null || id.isEmpty) return 'Atanmadı';

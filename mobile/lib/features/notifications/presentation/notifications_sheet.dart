@@ -221,6 +221,7 @@ class _NotificationTile extends ConsumerWidget {
     final invitationId = item.invitationId;
     final showInviteActions = item.isInvitation && invitationId != null;
     final showClaimActions = item.isClaimRequest && item.taskId != null;
+    final showDeletionActions = item.isDeletionRequest && item.taskId != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -231,9 +232,11 @@ class _NotificationTile extends ConsumerWidget {
                 ? Icons.mail_outline
                 : item.isClaimRequest
                     ? Icons.handshake_outlined
-                    : item.isRead
-                        ? Icons.notifications_none
-                        : Icons.notifications_active,
+                    : item.isDeletionRequest
+                        ? Icons.delete_outline
+                        : item.isRead
+                            ? Icons.notifications_none
+                            : Icons.notifications_active,
             color: item.isRead
                 ? null
                 : Theme.of(context).colorScheme.primary,
@@ -282,6 +285,11 @@ class _NotificationTile extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: _ClaimActionButtons(notificationId: item.id),
+          ),
+        if (showDeletionActions)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: _DeletionActionButtons(notificationId: item.id),
           ),
       ],
     );
@@ -419,6 +427,79 @@ class _InviteActionButtonsState extends ConsumerState<_InviteActionButtons> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Text('Kabul Et'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DeletionActionButtons extends ConsumerStatefulWidget {
+  const _DeletionActionButtons({required this.notificationId});
+
+  final String notificationId;
+
+  @override
+  ConsumerState<_DeletionActionButtons> createState() =>
+      _DeletionActionButtonsState();
+}
+
+class _DeletionActionButtonsState
+    extends ConsumerState<_DeletionActionButtons> {
+  var _busy = false;
+
+  Future<void> _respond(String decision) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final message =
+          await ref.read(notificationsProvider.notifier).respondToDeletion(
+                notificationId: widget.notificationId,
+                decision: decision,
+              );
+      ref.invalidate(tasksProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    } on NotificationException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Silme onayı yanıtı başarısız oldu.')),
+        );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: _busy ? null : () => _respond('decline'),
+            child: const Text('Reddet'),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: FilledButton(
+            onPressed: _busy ? null : () => _respond('accept'),
+            child: _busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Onayla ve sil'),
           ),
         ),
       ],

@@ -187,14 +187,60 @@ class TaskRepository {
     }
   }
 
-  Future<void> deleteTask({
+  Future<Map<String, dynamic>> deleteTask({
     required String workspaceId,
     required String taskId,
   }) async {
     try {
-      await _dio.delete<void>(
+      final response = await _dio.delete<Map<String, dynamic>>(
         ApiConstants.workspaceTask(workspaceId, taskId),
       );
+      return response.data ??
+          const <String, dynamic>{'mode': 'deleted', 'message': 'Görev silindi.'};
+    } on DioException catch (error) {
+      throw TaskException(_messageFromDio(error));
+    }
+  }
+
+  Future<List<TaskDto>> fetchRejectedTasks({
+    required String workspaceId,
+    required String projectId,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        ApiConstants.workspaceRejectedTasks(workspaceId),
+        queryParameters: {'projectId': projectId},
+      );
+      final raw = response.data?['tasks'];
+      if (raw is! List) return const [];
+      return raw
+          .whereType<Map>()
+          .map((item) => TaskDto.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } on DioException catch (error) {
+      throw TaskException(_messageFromDio(error));
+    }
+  }
+
+  Future<TaskDto> reassignRejectedTask({
+    required String workspaceId,
+    required String taskId,
+    required String assigneeId,
+    String? dueDate,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiConstants.workspaceTaskReassign(workspaceId, taskId),
+        data: {
+          'assignee_id': assigneeId,
+          'due_date': ?dueDate,
+        },
+      );
+      final task = response.data?['task'];
+      if (task is Map) {
+        return TaskDto.fromJson(Map<String, dynamic>.from(task));
+      }
+      throw TaskException('Yeniden atama yanıtı beklenmeyen formatta.');
     } on DioException catch (error) {
       throw TaskException(_messageFromDio(error));
     }

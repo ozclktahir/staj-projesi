@@ -112,6 +112,36 @@ class NotificationsNotifier
             ? 'Görev kabul edildi.'
             : 'Görev reddedildi.');
   }
+
+  Future<String> respondToDeletion({
+    required String notificationId,
+    required String decision,
+  }) async {
+    final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
+    if (workspaceId == null) {
+      throw NotificationException('Aktif çalışma alanı yok.');
+    }
+
+    final result =
+        await ref.read(notificationRepositoryProvider).respondToDeletion(
+              workspaceId: workspaceId,
+              notificationId: notificationId,
+              decision: decision,
+            );
+
+    final previous = state.valueOrNull ?? const <NotificationDto>[];
+    state = AsyncData([
+      for (final item in previous)
+        if (item.id == notificationId) item.copyWith(isRead: true) else item,
+    ]);
+
+    final message = result['message'];
+    return message is String && message.isNotEmpty
+        ? message
+        : (decision == 'accept'
+            ? 'Görev silindi.'
+            : 'Silme isteği reddedildi.');
+  }
 }
 
 final notificationsProvider =

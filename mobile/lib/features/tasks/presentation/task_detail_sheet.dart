@@ -142,11 +142,24 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
   }
 
   Future<void> _delete() async {
+    if (_task.isDeletionPending) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Bu görev için zaten silme onayı bekleniyor.'),
+          ),
+        );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Görevi sil'),
-        content: const Text('Bu görev arşivlenecek. Devam edilsin mi?'),
+        content: const Text(
+          'İlerleme yoksa görev silinir. İlerleme varsa karşı tarafa silme onayı gönderilir.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -154,7 +167,7 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Sil'),
+            child: const Text('Sil / Onay iste'),
           ),
         ],
       ),
@@ -163,10 +176,36 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
 
     setState(() => _busy = true);
     try {
-      await ref
+      final message = await ref
           .read(tasksProvider(widget.projectId).notifier)
           .deleteTask(_task.id);
-      if (mounted) Navigator.of(context).pop();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+
+      final stillOpen = (ref
+                  .read(tasksProvider(widget.projectId))
+                  .valueOrNull
+                  ?.items ??
+              const <TaskDto>[])
+          .any((t) => t.id == _task.id);
+
+      if (stillOpen) {
+        await ref.read(tasksProvider(widget.projectId).notifier).refresh();
+        if (!mounted) return;
+        final items =
+            ref.read(tasksProvider(widget.projectId)).valueOrNull?.items ??
+                const <TaskDto>[];
+        for (final task in items) {
+          if (task.id == _task.id) {
+            setState(() => _task = task);
+            break;
+          }
+        }
+      } else {
+        Navigator.of(context).pop();
+      }
     } on TaskException catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -373,6 +412,19 @@ class _DetailsTab extends StatelessWidget {
             ),
           ),
         ],
+        if (task.isDeletionPending) ...[
+          const SizedBox(height: 4),
+          Card(
+            color: Colors.orange.shade50,
+            child: const ListTile(
+              leading: Icon(Icons.delete_forever_outlined),
+              title: Text('Silme onayı bekleniyor'),
+              subtitle: Text(
+                'Karşı taraf onaylayana kadar görev silinmez.',
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         Text('Durum', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
@@ -403,8 +455,10 @@ class _DetailsTab extends StatelessWidget {
               ),
             const Spacer(),
             TextButton(
-              onPressed: busy ? null : onDelete,
-              child: const Text('Sil'),
+              onPressed: (busy || task.isDeletionPending) ? null : onDelete,
+              child: Text(
+                task.isDeletionPending ? 'Onay bekleniyor' : 'Sil',
+              ),
             ),
           ],
         ),

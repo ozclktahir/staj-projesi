@@ -150,7 +150,7 @@
   - `assignment_status` / pending claim alanları DTO + Kanban kart stilleri (soluk / SLA)
   - Bildirimde claim accept/reject aksiyonları (web `respondToTaskClaim`)
   - Pending iken durum değişimini kilitleme
-- [ ] **Adım 6: Dual silme onayı & gelişmiş bildirim aksiyonları**
+- [x] **Adım 6: Dual silme onayı & gelişmiş bildirim aksiyonları**
   - İlerlemeli görev silmede onay isteği (admin↔assignee)
   - Bildirim türleri: `task_deletion_request` approve/reject
   - Reddedilen görevleri admin’in Create Task’tan yeniden ataması
@@ -566,3 +566,6 @@
 ### [30 Temmuz 2026] - Faz 8.2 Adım 5: Task Claim (sahiplenme) akışı
 - Nest create/update `assignment_status` + `POST .../notifications/:id/respond-claim`; claim bildirimi (`task_claim_request`).
 - Mobil DTO/kart (soluk + SLA), detayda durum kilidi, bildirim Kabul/Reddet. `flutter analyze` temiz.
+
+### [30 Temmuz 2026] - Faz 8.2 Adım 6: Dual silme onayı & bildirim aksiyonları
+- Nest `requestOrDelete` (ilerleme→onay), `respond-deletion`, rejected list + reassign; mobil silme/onay UI + Create Task yeniden atama. `flutter analyze` temiz.

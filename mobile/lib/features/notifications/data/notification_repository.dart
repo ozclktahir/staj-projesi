@@ -83,6 +83,22 @@ class NotificationRepository {
     }
   }
 
+  Future<Map<String, dynamic>> respondToDeletion({
+    required String workspaceId,
+    required String notificationId,
+    required String decision,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiConstants.notificationRespondDeletion(workspaceId, notificationId),
+        data: {'decision': decision},
+      );
+      return response.data ?? const <String, dynamic>{};
+    } on DioException catch (error) {
+      throw NotificationException(_messageFromDio(error));
+    }
+  }
+
   String _messageFromDio(DioException error) {
     final status = error.response?.statusCode;
     final data = error.response?.data;

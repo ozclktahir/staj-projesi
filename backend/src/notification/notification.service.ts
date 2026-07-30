@@ -271,6 +271,159 @@ export class NotificationService {
     };
   }
 
+  /**
+   * Silme onay bildirimine kabul/red (web respondToTaskDeletion parity).
+   */
+  async respondToDeletion(
+    workspaceId: string,
+    notificationId: string,
+    userId: string,
+    decision: 'accept' | 'decline',
+  ) {
+    const client = this.supabaseService.getClient();
+
+    const { data: notif, error: notifError } = await client
+      .from('notifications')
+      .select('id, user_id, type, metadata, payload, workspace_id')
+      .eq('id', notificationId)
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (notifError) throw new BadRequestException(notifError.message);
+    if (!notif) throw new NotFoundException('Bildirim bulunamadı.');
+
+    const meta =
+      (notif.payload && typeof notif.payload === 'object'
+        ? (notif.payload as Record<string, unknown>)
+        : null) ||
+      (notif.metadata && typeof notif.metadata === 'object'
+        ? (notif.metadata as Record<string, unknown>)
+        : null) ||
+      {};
+
+    const taskId =
+      typeof meta.task_id === 'string' ? meta.task_id.trim() : '';
+    if (!taskId) {
+      throw new BadRequestException('Bildirimde görev bilgisi yok.');
+    }
+
+    const { data: task, error: taskError } = await client
+      .from('tasks')
+      .select(
+        'id, title, project_id, workspace_id, assignee_id, assigned_to, deletion_status, deletion_requested_by',
+      )
+      .eq('id', taskId)
+      .maybeSingle();
+
+    if (taskError) throw new BadRequestException(taskError.message);
+    if (!task) throw new NotFoundException('Görev bulunamadı veya silinmiş.');
+
+    const taskWorkspaceId =
+      typeof task.workspace_id === 'string' ? task.workspace_id : workspaceId;
+    const projectId =
+      typeof task.project_id === 'string' ? task.project_id : null;
+    const title = typeof task.title === 'string' ? task.title : 'görev';
+    const deletionStatus = String(task.deletion_status ?? 'none').toLowerCase();
+
+    if (
+      deletionStatus !== 'pending_admin_approval' &&
+      deletionStatus !== 'pending_user_approval'
+    ) {
+      throw new BadRequestException(
+        'Bu görev için bekleyen bir silme onayı yok.',
+      );
+    }
+
+    const assignee =
+      (typeof task.assignee_id === 'string' && task.assignee_id) ||
+      (typeof task.assigned_to === 'string' && task.assigned_to) ||
+      null;
+
+    const isAdmin = (await this.getWorkspaceAdminIds(taskWorkspaceId)).includes(
+      userId,
+    );
+
+    if (deletionStatus === 'pending_admin_approval' && !isAdmin) {
+      throw new ForbiddenException('Bu onay yalnızca yöneticilere açık.');
+    }
+    if (deletionStatus === 'pending_user_approval' && assignee !== userId) {
+      throw new ForbiddenException(
+        'Bu onay yalnızca atanan kullanıcıya açık.',
+      );
+    }
+
+    if (decision === 'decline') {
+      const { error: resetError } = await client
+        .from('tasks')
+        .update({
+          deletion_status: 'none',
+          deletion_requested_by: null,
+          deletion_requested_at: null,
+        })
+        .eq('id', taskId);
+
+      if (resetError) throw new BadRequestException(resetError.message);
+
+      await client
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId)
+        .eq('user_id', userId);
+
+      const requester =
+        typeof task.deletion_requested_by === 'string'
+          ? task.deletion_requested_by
+          : null;
+      if (requester && requester !== userId) {
+        await this.create(taskWorkspaceId, {
+          user_id: requester,
+          type: 'task_deletion_rejected',
+          title: 'Silme isteği reddedildi',
+          message: `'${title}' görevi için silme onayı reddedildi.`,
+          metadata: { task_id: taskId, project_id: projectId },
+        });
+      }
+
+      this.notificationGateway.emitToWorkspace(
+        taskWorkspaceId,
+        'task_updated',
+        { id: taskId, deletion_status: 'none' },
+      );
+
+      return {
+        success: true,
+        message: 'Silme isteği reddedildi. Görev duruyor.',
+        deleted: false,
+      };
+    }
+
+    const { error: deleteError } = await client
+      .from('tasks')
+      .update({ deleted_at: new Date().toISOString(), deletion_status: 'none' })
+      .eq('id', taskId);
+
+    if (deleteError) throw new BadRequestException(deleteError.message);
+
+    await client
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId)
+      .eq('user_id', userId);
+
+    this.notificationGateway.emitToWorkspace(taskWorkspaceId, 'task_deleted', {
+      id: taskId,
+      project_id: projectId,
+    });
+
+    return {
+      success: true,
+      message: 'Görev onaylandıktan sonra silindi.',
+      deleted: true,
+      deletedTaskId: taskId,
+    };
+  }
+
   private async getWorkspaceAdminIds(workspaceId: string): Promise<string[]> {
     const client = this.supabaseService.getClient();
     const ids = new Set<string>();

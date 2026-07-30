@@ -62,6 +62,22 @@ export class TaskController {
     return this.taskService.findAll(workspaceId, filterDto);
   }
 
+  @Get('rejected')
+  @Roles('OWNER', 'Admin')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
+  @ApiOperation({ summary: 'Reddedilmiş (claim rejected) görevleri listeler' })
+  listRejected(
+    @Param('workspaceId') workspaceId: string,
+    @Query('projectId') projectId: string,
+    @GetUser() user: { id: string },
+  ) {
+    return this.taskService.listRejectedTasks(
+      workspaceId,
+      projectId,
+      user.id,
+    );
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Belirtilen görevin detayını getirir' })
   @ApiResponse({ status: 200, description: 'Görev bulundu.' })
@@ -71,6 +87,27 @@ export class TaskController {
     @Param('id') id: string,
   ) {
     return this.taskService.findOne(workspaceId, id);
+  }
+
+  @Post(':id/reassign')
+  @Roles('OWNER', 'Admin')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
+  @ApiOperation({
+    summary: 'Reddedilmiş görevi yeni bir üyeye yeniden atar',
+  })
+  reassign(
+    @Param('workspaceId') workspaceId: string,
+    @Param('id') id: string,
+    @GetUser() user: { id: string },
+    @Body() body: { assignee_id: string; due_date?: string | null },
+  ) {
+    return this.taskService.reassignRejectedTask(
+      workspaceId,
+      id,
+      user.id,
+      body.assignee_id,
+      body.due_date,
+    );
   }
 
   @Patch(':id/restore')
@@ -119,8 +156,11 @@ export class TaskController {
   @Delete(':id')
   @Roles('OWNER', 'Admin', 'Member')
   @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
-  @ApiOperation({ summary: 'Belirtilen görevi siler' })
-  @ApiResponse({ status: 200, description: 'Görev başarıyla silindi.' })
+  @ApiOperation({
+    summary:
+      'Görevi siler veya ilerleme varsa dual silme onayı başlatır (web requestOrDeleteTask)',
+  })
+  @ApiResponse({ status: 200, description: 'Silindi veya onay istendi.' })
   @ApiResponse({
     status: 403,
     description:
@@ -130,7 +170,8 @@ export class TaskController {
   remove(
     @Param('workspaceId') workspaceId: string,
     @Param('id') id: string,
+    @GetUser() user: { id: string },
   ) {
-    return this.taskService.remove(workspaceId, id);
+    return this.taskService.requestOrDelete(workspaceId, id, user.id);
   }
 }

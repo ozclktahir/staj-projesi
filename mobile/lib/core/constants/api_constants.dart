@@ -63,6 +63,12 @@ abstract final class ApiConstants {
   ) =>
       '/workspaces/$workspaceId/notifications/$notificationId/respond-claim';
 
+  static String notificationRespondDeletion(
+    String workspaceId,
+    String notificationId,
+  ) =>
+      '/workspaces/$workspaceId/notifications/$notificationId/respond-deletion';
+
   /// Nest: `POST /workspace/:id/invite` (tekil `workspace`).
   static String workspaceInvite(String workspaceId) =>
       '/workspace/$workspaceId/invite';
@@ -85,4 +91,10 @@ abstract final class ApiConstants {
 
   static String workspaceMembers(String workspaceId) =>
       '/workspaces/$workspaceId/members';
+
+  static String workspaceRejectedTasks(String workspaceId) =>
+      '/workspaces/$workspaceId/tasks/rejected';
+
+  static String workspaceTaskReassign(String workspaceId, String taskId) =>
+      '/workspaces/$workspaceId/tasks/$taskId/reassign';
 }

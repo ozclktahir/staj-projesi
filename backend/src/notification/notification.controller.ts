@@ -79,6 +79,24 @@ export class NotificationsController {
     );
   }
 
+  @Post(':id/respond-deletion')
+  @ApiOperation({
+    summary: 'Görev silme onay bildirimini kabul veya reddeder',
+  })
+  respondDeletion(
+    @Param('workspaceId') workspaceId: string,
+    @Param('id') id: string,
+    @GetUser() user: { id: string },
+    @Body() dto: RespondClaimDto,
+  ) {
+    return this.notificationService.respondToDeletion(
+      workspaceId,
+      id,
+      user.id,
+      dto.decision,
+    );
+  }
+
   @Patch(':id/read')
   @ApiOperation({ summary: 'Belirli bir bildirimi okundu olarak işaretler' })
   @ApiResponse({ status: 200, description: 'Bildirim okundu olarak işaretlendi.' })

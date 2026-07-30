@@ -247,26 +247,47 @@ class TasksNotifier
     }
   }
 
-  Future<void> deleteTask(String taskId) async {
+  Future<String> deleteTask(String taskId) async {
     final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
-    if (workspaceId == null) return;
+    if (workspaceId == null) {
+      throw TaskException('Aktif çalışma alanı yok.');
+    }
 
     final previous = state.valueOrNull ?? const ProjectTasksState(items: []);
-    state = AsyncData(
-      previous.copyWith(
-        items: [
-          for (final task in previous.items)
-            if (task.id != taskId) task,
-        ],
-        total: previous.total > 0 ? previous.total - 1 : 0,
-      ),
-    );
 
     try {
-      await ref.read(taskRepositoryProvider).deleteTask(
+      final result = await ref.read(taskRepositoryProvider).deleteTask(
             workspaceId: workspaceId,
             taskId: taskId,
           );
+      final mode = result['mode'] as String? ?? 'deleted';
+      final message = result['message'] as String? ?? 'Görev silindi.';
+      final deletionStatus = result['deletionStatus'] as String?;
+
+      if (mode == 'approval_requested') {
+        state = AsyncData(
+          previous.copyWith(
+            items: [
+              for (final task in previous.items)
+                if (task.id == taskId)
+                  task.copyWith(deletionStatus: deletionStatus)
+                else
+                  task,
+            ],
+          ),
+        );
+      } else {
+        state = AsyncData(
+          previous.copyWith(
+            items: [
+              for (final task in previous.items)
+                if (task.id != taskId) task,
+            ],
+            total: previous.total > 0 ? previous.total - 1 : 0,
+          ),
+        );
+      }
+      return message;
     } catch (_) {
       state = AsyncData(previous);
       rethrow;
