@@ -69,6 +69,45 @@ enum TaskPriority {
   }
 }
 
+/// Görev sahiplenme durumu (web assignment_status).
+enum TaskAssignmentStatus {
+  pending,
+  accepted,
+  rejected,
+  unknown;
+
+  static TaskAssignmentStatus fromApi(String? value) {
+    switch ((value ?? '').trim().toLowerCase()) {
+      case 'pending':
+        return TaskAssignmentStatus.pending;
+      case 'accepted':
+        return TaskAssignmentStatus.accepted;
+      case 'rejected':
+        return TaskAssignmentStatus.rejected;
+      default:
+        return TaskAssignmentStatus.unknown;
+    }
+  }
+
+  bool get isPending => this == TaskAssignmentStatus.pending;
+  bool get isRejected => this == TaskAssignmentStatus.rejected;
+}
+
+/// Sahiplenme SLA (saat) — web CLAIM_SLA_HOURS.
+const claimSlaHours = 24;
+
+bool isAssignmentClaimOverdue({
+  String? pendingAt,
+  String? createdAt,
+  int hours = claimSlaHours,
+}) {
+  final raw = pendingAt ?? createdAt;
+  if (raw == null || raw.isEmpty) return false;
+  final ms = DateTime.tryParse(raw)?.millisecondsSinceEpoch;
+  if (ms == null) return false;
+  return DateTime.now().millisecondsSinceEpoch - ms > hours * 60 * 60 * 1000;
+}
+
 class TaskDto {
   const TaskDto({
     required this.id,
@@ -85,6 +124,9 @@ class TaskDto {
     this.createdBy,
     this.createdAt,
     this.updatedAt,
+    this.assignmentStatus = TaskAssignmentStatus.unknown,
+    this.assignmentPendingAt,
+    this.deletionStatus,
   });
 
   factory TaskDto.fromJson(Map<String, dynamic> json) {
@@ -103,6 +145,11 @@ class TaskDto {
       createdBy: json['created_by'] as String?,
       createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
+      assignmentStatus: TaskAssignmentStatus.fromApi(
+        json['assignment_status'] as String?,
+      ),
+      assignmentPendingAt: json['assignment_pending_at'] as String?,
+      deletionStatus: json['deletion_status'] as String?,
     );
   }
 
@@ -120,10 +167,24 @@ class TaskDto {
   final String? createdBy;
   final String? createdAt;
   final String? updatedAt;
+  final TaskAssignmentStatus assignmentStatus;
+  final String? assignmentPendingAt;
+  final String? deletionStatus;
 
   String? get effectiveAssigneeId => assigneeId ?? assignedTo;
 
   bool get isDone => status == TaskStatus.done;
+
+  bool get isClaimPending => assignmentStatus.isPending;
+
+  bool get isClaimOverdue =>
+      isClaimPending &&
+      isAssignmentClaimOverdue(
+        pendingAt: assignmentPendingAt,
+        createdAt: createdAt,
+      );
+
+  bool get canChangeStatus => !isClaimPending;
 
   String get assigneeLabel {
     final id = effectiveAssigneeId;
@@ -149,9 +210,13 @@ class TaskDto {
     String? assignedTo,
     String? dueDate,
     String? parentTaskId,
+    TaskAssignmentStatus? assignmentStatus,
+    String? assignmentPendingAt,
+    String? deletionStatus,
     bool clearDescription = false,
     bool clearAssignee = false,
     bool clearDueDate = false,
+    bool clearAssignmentPendingAt = false,
   }) {
     return TaskDto(
       id: id,
@@ -169,6 +234,11 @@ class TaskDto {
       createdBy: createdBy,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      assignmentStatus: assignmentStatus ?? this.assignmentStatus,
+      assignmentPendingAt: clearAssignmentPendingAt
+          ? null
+          : (assignmentPendingAt ?? this.assignmentPendingAt),
+      deletionStatus: deletionStatus ?? this.deletionStatus,
     );
   }
 }

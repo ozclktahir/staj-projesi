@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -23,38 +24,54 @@ export class TaskService {
 
   async create(workspaceId: string, userId: string, dto: CreateTaskDto) {
     const client = this.supabaseService.getClient();
+    const assigneeId = this.resolveAssigneeId(dto.assignee_id, dto.assigned_to);
+    const needsClaim = Boolean(assigneeId && assigneeId !== userId);
 
-    const { data, error } = await client
+    const payload: Record<string, unknown> = {
+      title: dto.title,
+      description: dto.description,
+      status: dto.status,
+      priority: dto.priority,
+      assigned_to: dto.assigned_to ?? dto.assignee_id,
+      assignee_id: dto.assignee_id ?? dto.assigned_to,
+      due_date: dto.due_date,
+      parent_task_id: dto.parent_task_id,
+      project_id: dto.project_id,
+      file_url: dto.file_url,
+      workspace_id: workspaceId,
+      created_by: userId,
+      assignment_status: needsClaim ? 'pending' : 'accepted',
+      assignment_pending_at: needsClaim ? new Date().toISOString() : null,
+    };
+
+    let { data, error } = await client
       .from('tasks')
-      .insert({
-        title: dto.title,
-        description: dto.description,
-        status: dto.status,
-        priority: dto.priority,
-        assigned_to: dto.assigned_to,
-        assignee_id: dto.assignee_id,
-        due_date: dto.due_date,
-        parent_task_id: dto.parent_task_id,
-        project_id: dto.project_id,
-        file_url: dto.file_url,
-        workspace_id: workspaceId,
-        created_by: userId,
-      })
+      .insert(payload)
       .select()
       .single();
+
+    if (
+      error &&
+      (error.message.includes('assignment_status') ||
+        error.message.includes('assignment_pending_at'))
+    ) {
+      const retry = { ...payload };
+      delete retry.assignment_status;
+      delete retry.assignment_pending_at;
+      ({ data, error } = await client.from('tasks').insert(retry).select().single());
+    }
 
     if (error) {
       throw new BadRequestException(error.message);
     }
 
-    const assigneeId = this.resolveAssigneeId(dto.assignee_id, dto.assigned_to);
-    if (assigneeId && assigneeId !== userId) {
-      await this.notifyAssignee({
+    if (needsClaim && assigneeId) {
+      await this.notifyClaimRequest({
         workspaceId,
         assigneeId,
         taskId: data.id,
         taskTitle: data.title,
-        isCreate: true,
+        projectId: data.project_id ?? dto.project_id ?? null,
       });
     }
 
@@ -141,18 +158,88 @@ export class TaskService {
     return data;
   }
 
-  async update(workspaceId: string, taskId: string, dto: UpdateTaskDto) {
+  async update(
+    workspaceId: string,
+    taskId: string,
+    actorUserId: string,
+    dto: UpdateTaskDto,
+  ) {
     const client = this.supabaseService.getClient();
 
     const existing = await this.findOne(workspaceId, taskId);
+    const existingAssignment = String(
+      existing.assignment_status ?? '',
+    ).toLowerCase();
 
-    const { data, error } = await client
+    if (
+      dto.status !== undefined &&
+      dto.status !== existing.status &&
+      existingAssignment === 'pending'
+    ) {
+      throw new ForbiddenException(
+        'Sahiplenme onayı bekleyen görevin durumu değiştirilemez.',
+      );
+    }
+
+    const previousAssignee = this.resolveAssigneeId(
+      existing.assignee_id,
+      existing.assigned_to,
+    );
+
+    const patch: Record<string, unknown> = {
+      ...dto,
+      updated_at: new Date().toISOString(),
+    };
+
+    const assigneeTouched =
+      dto.assignee_id !== undefined || dto.assigned_to !== undefined;
+
+    if (assigneeTouched) {
+      const nextAssignee = this.resolveAssigneeId(
+        dto.assignee_id !== undefined ? dto.assignee_id : existing.assignee_id,
+        dto.assigned_to !== undefined ? dto.assigned_to : existing.assigned_to,
+      );
+
+      if (dto.assignee_id !== undefined && dto.assigned_to === undefined) {
+        patch.assigned_to = dto.assignee_id;
+      }
+      if (dto.assigned_to !== undefined && dto.assignee_id === undefined) {
+        patch.assignee_id = dto.assigned_to;
+      }
+
+      if (nextAssignee && nextAssignee !== actorUserId) {
+        patch.assignment_status = 'pending';
+        patch.assignment_pending_at = new Date().toISOString();
+      } else {
+        patch.assignment_status = 'accepted';
+        patch.assignment_pending_at = null;
+      }
+    }
+
+    let { data, error } = await client
       .from('tasks')
-      .update({ ...dto, updated_at: new Date().toISOString() })
+      .update(patch)
       .eq('workspace_id', workspaceId)
       .eq('id', taskId)
       .select()
       .maybeSingle();
+
+    if (
+      error &&
+      (error.message.includes('assignment_status') ||
+        error.message.includes('assignment_pending_at'))
+    ) {
+      const retry = { ...patch };
+      delete retry.assignment_status;
+      delete retry.assignment_pending_at;
+      ({ data, error } = await client
+        .from('tasks')
+        .update(retry)
+        .eq('workspace_id', workspaceId)
+        .eq('id', taskId)
+        .select()
+        .maybeSingle());
+    }
 
     if (error) {
       throw new BadRequestException(error.message);
@@ -162,27 +249,21 @@ export class TaskService {
       throw new NotFoundException('Görev bulunamadı.');
     }
 
-    const previousAssignee = this.resolveAssigneeId(
-      existing.assignee_id,
-      existing.assigned_to,
-    );
     const nextAssignee = this.resolveAssigneeId(
-      dto.assignee_id !== undefined ? dto.assignee_id : data.assignee_id,
-      dto.assigned_to !== undefined ? dto.assigned_to : data.assigned_to,
+      data.assignee_id,
+      data.assigned_to,
     );
 
-    // Yeni atama veya atanan kişi değiştiyse ilgili kullanıcıya bildirim gönder.
     if (nextAssignee && nextAssignee !== previousAssignee) {
-      await this.notifyAssignee({
+      await this.notifyClaimRequest({
         workspaceId,
         assigneeId: nextAssignee,
         taskId: data.id,
         taskTitle: data.title,
-        isCreate: false,
+        projectId: data.project_id ?? null,
       });
     }
 
-    // Durum değiştiyse görevi oluşturan kişiye bildirim gönder.
     if (dto.status !== undefined && dto.status !== existing.status) {
       const creatorId = data.created_by ?? existing.created_by;
       if (creatorId) {
@@ -263,27 +344,31 @@ export class TaskService {
     return assigneeId || assignedTo || undefined;
   }
 
-  private async notifyAssignee(params: {
+  private async notifyClaimRequest(params: {
     workspaceId: string;
     assigneeId: string;
     taskId: string;
     taskTitle: string;
-    isCreate: boolean;
+    projectId: string | null;
   }) {
     try {
       await this.notificationService.create(params.workspaceId, {
         user_id: params.assigneeId,
-        type: params.isCreate ? 'TASK_ASSIGNED' : 'TASK_UPDATED',
-        title: params.isCreate ? 'Yeni Görev Atandı' : 'Görev Güncellendi',
-        message: `"${params.taskTitle}" görevi size atandı.`,
+        type: 'task_claim_request',
+        title: 'Görev ataması — onayınız gerekli',
+        message: `"${params.taskTitle}" görevi size atandı. Kabul ediyor musunuz?`,
         metadata: {
           task_id: params.taskId,
-          event: params.isCreate ? 'task_assigned' : 'task_reassigned',
+          project_id: params.projectId,
+          task_title: params.taskTitle,
+          workspace_id: params.workspaceId,
+          action: 'task_claim',
+          event: 'task_claim_request',
         },
       });
     } catch (error) {
       this.logger.warn(
-        `Assignee bildirimi gönderilemedi (task=${params.taskId}): ${
+        `Claim bildirimi gönderilemedi (task=${params.taskId}): ${
           error instanceof Error ? error.message : String(error)
         }`,
       );

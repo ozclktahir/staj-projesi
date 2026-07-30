@@ -57,6 +57,12 @@ abstract final class ApiConstants {
   static String notificationsReadAll(String workspaceId) =>
       '/workspaces/$workspaceId/notifications/read-all';
 
+  static String notificationRespondClaim(
+    String workspaceId,
+    String notificationId,
+  ) =>
+      '/workspaces/$workspaceId/notifications/$notificationId/respond-claim';
+
   /// Nest: `POST /workspace/:id/invite` (tekil `workspace`).
   static String workspaceInvite(String workspaceId) =>
       '/workspace/$workspaceId/invite';

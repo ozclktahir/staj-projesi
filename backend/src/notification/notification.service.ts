@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -67,7 +68,11 @@ export class NotificationService {
   /**
    * Bildirimi okundu olarak işaretler ve kullanıcıya güncelleme emit eder.
    */
-  async markAsRead(workspaceId: string, notificationId: string, userId: string) {
+  async markAsRead(
+    workspaceId: string,
+    notificationId: string,
+    userId: string,
+  ) {
     const client = this.supabaseService.getClient();
 
     const { data, error } = await client
@@ -119,7 +124,185 @@ export class NotificationService {
     return {
       message: 'Tüm bildirimler okundu olarak işaretlendi.',
       count: updated.length,
-      data: updated,
     };
+  }
+
+  /**
+   * Görev sahiplenme bildirimine kabul/red yanıtı (web respondToTaskClaim parity).
+   */
+  async respondToClaim(
+    workspaceId: string,
+    notificationId: string,
+    userId: string,
+    decision: 'accept' | 'decline',
+  ) {
+    const client = this.supabaseService.getClient();
+
+    const { data: notif, error: notifError } = await client
+      .from('notifications')
+      .select('id, user_id, type, metadata, payload, workspace_id')
+      .eq('id', notificationId)
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (notifError) {
+      throw new BadRequestException(notifError.message);
+    }
+    if (!notif) {
+      throw new NotFoundException('Bildirim bulunamadı.');
+    }
+
+    const meta =
+      (notif.payload && typeof notif.payload === 'object'
+        ? (notif.payload as Record<string, unknown>)
+        : null) ||
+      (notif.metadata && typeof notif.metadata === 'object'
+        ? (notif.metadata as Record<string, unknown>)
+        : null) ||
+      {};
+
+    const taskId = typeof meta.task_id === 'string' ? meta.task_id : null;
+    if (!taskId) {
+      throw new BadRequestException('Bildirimde görev bilgisi yok.');
+    }
+
+    const { data: task, error: taskError } = await client
+      .from('tasks')
+      .select(
+        'id, title, project_id, workspace_id, assignee_id, assigned_to, assignment_status, created_by',
+      )
+      .eq('id', taskId)
+      .maybeSingle();
+
+    if (taskError) {
+      throw new BadRequestException(taskError.message);
+    }
+    if (!task) {
+      throw new NotFoundException('Görev bulunamadı.');
+    }
+
+    const assignee =
+      (typeof task.assignee_id === 'string' && task.assignee_id) ||
+      (typeof task.assigned_to === 'string' && task.assigned_to) ||
+      null;
+
+    if (assignee !== userId) {
+      throw new ForbiddenException(
+        'Bu görevi yalnızca atanan kullanıcı kabul/reddedebilir.',
+      );
+    }
+
+    const nextStatus = decision === 'accept' ? 'accepted' : 'rejected';
+    const { data: updatedTask, error: updateError } = await client
+      .from('tasks')
+      .update({
+        assignment_status: nextStatus,
+        assignment_pending_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', taskId)
+      .select()
+      .maybeSingle();
+
+    if (updateError) {
+      if (updateError.message.includes('assignment_status')) {
+        throw new BadRequestException(
+          'assignment_status sütunu yok. Migration gerekli.',
+        );
+      }
+      throw new BadRequestException(updateError.message);
+    }
+
+    await client
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId)
+      .eq('user_id', userId);
+
+    const title = typeof task.title === 'string' ? task.title : 'görev';
+    const projectId =
+      typeof task.project_id === 'string' ? task.project_id : null;
+    const taskWorkspaceId =
+      typeof task.workspace_id === 'string' ? task.workspace_id : workspaceId;
+
+    if (decision === 'decline' && taskWorkspaceId) {
+      const adminIds = await this.getWorkspaceAdminIds(taskWorkspaceId);
+      await Promise.all(
+        adminIds
+          .filter((id) => id !== userId)
+          .map((adminId) =>
+            this.create(taskWorkspaceId, {
+              user_id: adminId,
+              type: 'task_claim_rejected',
+              title: 'Görev reddedildi',
+              message: `'${title}' görevi reddedildi. Yeniden atamak için Yeni Görev penceresini kullanabilirsiniz.`,
+              metadata: {
+                task_id: taskId,
+                project_id: projectId,
+                task_title: title,
+              },
+            }),
+          ),
+      );
+    }
+
+    if (updatedTask) {
+      this.notificationGateway.emitToWorkspace(
+        taskWorkspaceId,
+        'task_updated',
+        updatedTask,
+      );
+    }
+
+    this.notificationGateway.emitToUser(userId, 'notification_read', {
+      id: notificationId,
+      is_read: true,
+    });
+
+    return {
+      success: true,
+      message:
+        decision === 'accept'
+          ? 'Görev kabul edildi.'
+          : 'Görev reddedildi. Yöneticiler bilgilendirildi.',
+      assignment_status: nextStatus,
+      task_id: taskId,
+    };
+  }
+
+  private async getWorkspaceAdminIds(workspaceId: string): Promise<string[]> {
+    const client = this.supabaseService.getClient();
+    const ids = new Set<string>();
+
+    const { data: workspace } = await client
+      .from('workspaces')
+      .select('owner_id')
+      .eq('id', workspaceId)
+      .maybeSingle();
+    if (typeof workspace?.owner_id === 'string') {
+      ids.add(workspace.owner_id);
+    }
+
+    const { data: members } = await client
+      .from('workspace_members')
+      .select('user_id, role')
+      .eq('workspace_id', workspaceId);
+
+    for (const row of members ?? []) {
+      const role = String(row.role ?? '')
+        .trim()
+        .toUpperCase();
+      if (
+        role === 'ADMIN' ||
+        role === 'OWNER' ||
+        row.role === 'Admin' ||
+        row.role === 'OWNER'
+      ) {
+        if (typeof row.user_id === 'string') ids.add(row.user_id);
+      }
+    }
+
+    return Array.from(ids);
   }
 }

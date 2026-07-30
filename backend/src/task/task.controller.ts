@@ -110,9 +110,10 @@ export class TaskController {
   update(
     @Param('workspaceId') workspaceId: string,
     @Param('id') id: string,
+    @GetUser() user: { id: string },
     @Body() dto: UpdateTaskDto,
   ) {
-    return this.taskService.update(workspaceId, id, dto);
+    return this.taskService.update(workspaceId, id, user.id, dto);
   }
 
   @Delete(':id')

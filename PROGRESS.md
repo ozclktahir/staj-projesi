@@ -146,7 +146,7 @@
   - Üye listesi API + basit Üyeler UI (listeleme)
   - Görev oluştur/düzenle’de UUID yerine üye dropdown (web gibi)
   - Member için assignee = yalnızca kendisi kuralı
-- [ ] **Adım 5: Task Claim (sahiplenme) akışı**
+- [x] **Adım 5: Task Claim (sahiplenme) akışı**
   - `assignment_status` / pending claim alanları DTO + Kanban kart stilleri (soluk / SLA)
   - Bildirimde claim accept/reject aksiyonları (web `respondToTaskClaim`)
   - Pending iken durum değişimini kilitleme
@@ -562,3 +562,7 @@
 ### [30 Temmuz 2026] - Faz 8.2 Adım 4: Workspace üyeleri & assignee seçici
 - Nest `GET /workspaces/:id/members` (Admin: tümü, Member: kendisi) + mobil `MembersScreen` / Drawer / Settings.
 - `AssigneePickerField` create/edit görevde UUID yerine dropdown; Member yalnızca kendisine atanır. `flutter analyze` temiz.
+
+### [30 Temmuz 2026] - Faz 8.2 Adım 5: Task Claim (sahiplenme) akışı
+- Nest create/update `assignment_status` + `POST .../notifications/:id/respond-claim`; claim bildirimi (`task_claim_request`).
+- Mobil DTO/kart (soluk + SLA), detayda durum kilidi, bildirim Kabul/Reddet. `flutter analyze` temiz.

@@ -49,10 +49,25 @@ class NotificationDto {
     return t.contains('invite') || t.contains('invitation') || t == 'davet';
   }
 
+  bool get isClaimRequest {
+    final t = (type ?? '').toLowerCase();
+    return t == 'task_claim_request' ||
+        t == 'task_claim' ||
+        t == 'assignment_claim';
+  }
+
   String? get invitationId {
     final meta = metadata;
     if (meta == null) return null;
     final id = meta['invitation_id'] ?? meta['invite_id'] ?? meta['invitationId'];
+    if (id is String && id.isNotEmpty) return id;
+    return null;
+  }
+
+  String? get taskId {
+    final meta = metadata;
+    if (meta == null) return null;
+    final id = meta['task_id'] ?? meta['taskId'];
     if (id is String && id.isNotEmpty) return id;
     return null;
   }

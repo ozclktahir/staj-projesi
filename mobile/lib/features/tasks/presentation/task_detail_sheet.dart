@@ -91,6 +91,18 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
 
   Future<void> _changeStatus(TaskStatus status) async {
     if (_busy || status == _status) return;
+    if (!_task.canChangeStatus) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Sahiplenme onayı bekleyen görevin durumu değiştirilemez.',
+            ),
+          ),
+        );
+      return;
+    }
     setState(() {
       _busy = true;
       _status = status;
@@ -337,6 +349,30 @@ class _DetailsTab extends StatelessWidget {
           title: const Text('Öncelik'),
           subtitle: Text(task.priority.label),
         ),
+        if (task.isClaimPending) ...[
+          const SizedBox(height: 4),
+          Card(
+            color: task.isClaimOverdue
+                ? Colors.red.shade50
+                : Colors.amber.shade50,
+            child: ListTile(
+              leading: Icon(
+                Icons.hourglass_top,
+                color: task.isClaimOverdue
+                    ? Colors.red.shade700
+                    : Colors.amber.shade800,
+              ),
+              title: Text(
+                task.isClaimOverdue
+                    ? 'SLA aşıldı — sahiplenme bekleniyor'
+                    : 'Sahiplenme onayı bekleniyor',
+              ),
+              subtitle: const Text(
+                'Atanan kullanıcı kabul edene kadar durum değiştirilemez.',
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         Text('Durum', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
@@ -348,7 +384,7 @@ class _DetailsTab extends StatelessWidget {
               ChoiceChip(
                 label: Text(value.label),
                 selected: status == value,
-                onSelected: busy
+                onSelected: (busy || !task.canChangeStatus)
                     ? null
                     : (selected) {
                         if (selected) onStatusSelected(value);

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../invitations/data/invitation_dto.dart';
 import '../../invitations/data/invitation_repository.dart';
 import '../../invitations/providers/invitation_provider.dart';
+import '../../tasks/providers/task_provider.dart';
 import '../data/notification_dto.dart';
 import '../data/notification_repository.dart';
 import '../providers/notification_provider.dart';
@@ -219,6 +220,7 @@ class _NotificationTile extends ConsumerWidget {
         : null;
     final invitationId = item.invitationId;
     final showInviteActions = item.isInvitation && invitationId != null;
+    final showClaimActions = item.isClaimRequest && item.taskId != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -227,9 +229,11 @@ class _NotificationTile extends ConsumerWidget {
           leading: Icon(
             item.isInvitation
                 ? Icons.mail_outline
-                : item.isRead
-                    ? Icons.notifications_none
-                    : Icons.notifications_active,
+                : item.isClaimRequest
+                    ? Icons.handshake_outlined
+                    : item.isRead
+                        ? Icons.notifications_none
+                        : Icons.notifications_active,
             color: item.isRead
                 ? null
                 : Theme.of(context).colorScheme.primary,
@@ -273,6 +277,11 @@ class _NotificationTile extends ConsumerWidget {
               invitationId: invitationId,
               notificationId: item.id,
             ),
+          ),
+        if (showClaimActions)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: _ClaimActionButtons(notificationId: item.id),
           ),
       ],
     );
@@ -403,6 +412,78 @@ class _InviteActionButtonsState extends ConsumerState<_InviteActionButtons> {
                           .accept(widget.invitationId),
                       successMessage: 'Davet kabul edildi.',
                     ),
+            child: _busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Kabul Et'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ClaimActionButtons extends ConsumerStatefulWidget {
+  const _ClaimActionButtons({required this.notificationId});
+
+  final String notificationId;
+
+  @override
+  ConsumerState<_ClaimActionButtons> createState() =>
+      _ClaimActionButtonsState();
+}
+
+class _ClaimActionButtonsState extends ConsumerState<_ClaimActionButtons> {
+  var _busy = false;
+
+  Future<void> _respond(String decision) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final message =
+          await ref.read(notificationsProvider.notifier).respondToClaim(
+                notificationId: widget.notificationId,
+                decision: decision,
+              );
+      ref.invalidate(tasksProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    } on NotificationException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Sahiplenme yanıtı başarısız oldu.')),
+        );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: _busy ? null : () => _respond('decline'),
+            child: const Text('Reddet'),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: FilledButton(
+            onPressed: _busy ? null : () => _respond('accept'),
             child: _busy
                 ? const SizedBox(
                     width: 18,
