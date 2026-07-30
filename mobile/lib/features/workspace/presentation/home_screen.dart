@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
+import '../../../core/widgets/app_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
@@ -17,7 +18,7 @@ import '../providers/workspace_provider.dart';
 import 'create_project_dialog.dart';
 import 'workspace_switcher.dart';
 
-/// Ana ekran: Dashboard / Projeler / Kişisel Alan.
+/// Ana ekran: Dashboard / Projeler / Kişisel Alan — web Sidebar + Header kabuğu.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -26,7 +27,32 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  static const _wideBreakpoint = 900.0;
+
   var _index = 0;
+
+  static const _navLabels = ['Dashboard', 'Projeler', 'Kişisel'];
+  static const _navOverview = ['Genel bakış', 'Projeler', 'Kişisel alan'];
+
+  Future<void> _invite(String workspaceId) async {
+    final sent = await showInviteMemberDialog(
+      context,
+      ref,
+      workspaceId: workspaceId,
+    );
+    if (sent == true && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Davet gönderildi.')),
+        );
+    }
+  }
+
+  void _selectNav(int index, {bool closeDrawer = false}) {
+    if (closeDrawer) Navigator.of(context).pop();
+    setState(() => _index = index);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,95 +63,203 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final unreadCount = ref.watch(unreadNotificationCountProvider);
     final pendingInvites = ref.watch(pendingInvitationCountProvider);
     final badgeCount = unreadCount + pendingInvites;
+    final scheme = Theme.of(context).colorScheme;
+    final wide = MediaQuery.sizeOf(context).width >= _wideBreakpoint;
+
+    final content = active == null
+        ? _ProjectsBody(
+            workspaceLoading: workspaceState.isLoading,
+            workspaceError: workspaceState.errorMessage,
+            hasWorkspaces: workspaceState.workspaces.isNotEmpty,
+            hasActiveWorkspace: false,
+            projectsAsync: projectsAsync,
+            onRefreshWorkspaces: () =>
+                ref.read(workspaceProvider.notifier).refresh(),
+            onRefreshProjects: () =>
+                ref.read(projectsProvider.notifier).refresh(),
+            onOpenSwitcher: () => showWorkspaceSwitcher(context, ref),
+          )
+        : IndexedStack(
+            index: _index,
+            children: [
+              const DashboardScreen(),
+              _ProjectsBody(
+                workspaceLoading: workspaceState.isLoading,
+                workspaceError: workspaceState.errorMessage,
+                hasWorkspaces: workspaceState.workspaces.isNotEmpty,
+                hasActiveWorkspace: true,
+                projectsAsync: projectsAsync,
+                onRefreshWorkspaces: () async {
+                  await ref.read(workspaceProvider.notifier).refresh();
+                  ref.invalidate(dashboardProvider);
+                },
+                onRefreshProjects: () =>
+                    ref.read(projectsProvider.notifier).refresh(),
+                onOpenSwitcher: () => showWorkspaceSwitcher(context, ref),
+              ),
+              const PersonalScreen(),
+            ],
+          );
 
     return Scaffold(
       drawer: Drawer(
         child: SafeArea(
-          child: ListView(
-            padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              DrawerHeader(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(
-                        alpha: 0.15,
-                      ),
-                  border: Border(
-                    bottom: BorderSide(
-                      color: Theme.of(context).colorScheme.outline,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'STAJ-PROJESI',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            letterSpacing: 1.2,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.primary,
+                          ),
                     ),
-                  ),
-                ),
-                child: Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Text(
-                    workspaceTitle(active),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.primary,
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        showWorkspaceSwitcher(context, ref);
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                workspaceTitle(active),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Icon(
+                              Icons.unfold_more,
+                              size: 18,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ],
                         ),
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              ListTile(
-                leading: const Icon(Icons.settings_outlined),
-                title: const Text('Ayarlar'),
+              Divider(height: 1, color: scheme.outline),
+              const SizedBox(height: 8),
+              if (active != null) ...[
+                for (var i = 0; i < _navLabels.length; i++)
+                  _DrawerNavTile(
+                    icon: switch (i) {
+                      0 => Icons.dashboard_outlined,
+                      1 => Icons.folder_outlined,
+                      _ => Icons.person_outline,
+                    },
+                    selectedIcon: switch (i) {
+                      0 => Icons.dashboard,
+                      1 => Icons.folder,
+                      _ => Icons.person,
+                    },
+                    label: _navLabels[i],
+                    selected: _index == i,
+                    onTap: () => _selectNav(i, closeDrawer: true),
+                  ),
+              ],
+              _DrawerNavTile(
+                icon: Icons.settings_outlined,
+                selectedIcon: Icons.settings,
+                label: 'Ayarlar',
+                selected: false,
                 onTap: () {
                   Navigator.of(context).pop();
                   context.push(AppRoutes.settings);
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.logout),
-                title: const Text('Çıkış yap'),
+              if (active != null)
+                _DrawerNavTile(
+                  icon: Icons.person_add_alt_1_outlined,
+                  selectedIcon: Icons.person_add_alt_1,
+                  label: 'Üye davet et',
+                  selected: false,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _invite(active.id);
+                  },
+                ),
+              const Spacer(),
+              Divider(height: 1, color: scheme.outline),
+              _DrawerNavTile(
+                icon: Icons.logout,
+                selectedIcon: Icons.logout,
+                label: 'Çıkış yap',
+                selected: false,
                 onTap: () {
                   Navigator.of(context).pop();
                   ref.read(authProvider.notifier).logout();
                 },
               ),
+              const SizedBox(height: 8),
             ],
           ),
         ),
       ),
       appBar: AppBar(
+        titleSpacing: wide ? 8 : 0,
         title: InkWell(
           onTap: () => showWorkspaceSwitcher(context, ref),
           borderRadius: BorderRadius.circular(8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-            child: Row(
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Flexible(
-                  child: Text(
-                    workspaceTitle(active),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  active == null ? 'Genel bakış' : _navOverview[_index],
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                 ),
-                const SizedBox(width: 4),
-                const Icon(Icons.expand_more),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        workspaceTitle(active),
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.expand_more,
+                      size: 20,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
         ),
         actions: [
           if (active != null) ...[
-            IconButton(
-              tooltip: 'Üye Davet Et',
-              onPressed: () async {
-                final sent = await showInviteMemberDialog(
-                  context,
-                  ref,
-                  workspaceId: active.id,
-                );
-                if (sent == true && context.mounted) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(
-                      const SnackBar(content: Text('Davet gönderildi.')),
-                    );
-                }
-              },
-              icon: const Icon(Icons.person_add_alt_1_outlined),
-            ),
+            if (!wide)
+              IconButton(
+                tooltip: 'Üye Davet Et',
+                onPressed: () => _invite(active.id),
+                icon: const Icon(Icons.person_add_alt_1_outlined),
+              ),
             IconButton(
               tooltip: 'Bildirimler',
               onPressed: () => showNotificationsSheet(context, ref),
@@ -136,16 +270,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ],
-          IconButton(
-            tooltip: 'Ayarlar',
-            onPressed: () => context.push(AppRoutes.settings),
-            icon: const Icon(Icons.settings_outlined),
-          ),
-          IconButton(
-            tooltip: 'Çıkış',
-            onPressed: () => ref.read(authProvider.notifier).logout(),
-            icon: const Icon(Icons.logout),
-          ),
+          if (!wide)
+            IconButton(
+              tooltip: 'Çıkış',
+              onPressed: () => ref.read(authProvider.notifier).logout(),
+              icon: const Icon(Icons.logout),
+            ),
+          if (wide) ...[
+            IconButton(
+              tooltip: 'Ayarlar',
+              onPressed: () => context.push(AppRoutes.settings),
+              icon: const Icon(Icons.settings_outlined),
+            ),
+            IconButton(
+              tooltip: 'Çıkış',
+              onPressed: () => ref.read(authProvider.notifier).logout(),
+              icon: const Icon(Icons.logout),
+            ),
+          ],
         ],
       ),
       floatingActionButton: canCreateProject
@@ -164,9 +306,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: const Icon(Icons.add),
             )
           : null,
-      bottomNavigationBar: active == null
-          ? null
-          : NavigationBar(
+      bottomNavigationBar: (!wide && active != null)
+          ? NavigationBar(
               selectedIndex: _index,
               onDestinationSelected: (value) => setState(() => _index = value),
               destinations: const [
@@ -186,41 +327,113 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   label: 'Kişisel',
                 ),
               ],
-            ),
-      body: active == null
-          ? _ProjectsBody(
-              workspaceLoading: workspaceState.isLoading,
-              workspaceError: workspaceState.errorMessage,
-              hasWorkspaces: workspaceState.workspaces.isNotEmpty,
-              hasActiveWorkspace: false,
-              projectsAsync: projectsAsync,
-              onRefreshWorkspaces: () =>
-                  ref.read(workspaceProvider.notifier).refresh(),
-              onRefreshProjects: () =>
-                  ref.read(projectsProvider.notifier).refresh(),
-              onOpenSwitcher: () => showWorkspaceSwitcher(context, ref),
             )
-          : IndexedStack(
-              index: _index,
+          : null,
+      body: wide && active != null
+          ? Row(
               children: [
-                const DashboardScreen(),
-                _ProjectsBody(
-                  workspaceLoading: workspaceState.isLoading,
-                  workspaceError: workspaceState.errorMessage,
-                  hasWorkspaces: workspaceState.workspaces.isNotEmpty,
-                  hasActiveWorkspace: true,
-                  projectsAsync: projectsAsync,
-                  onRefreshWorkspaces: () async {
-                    await ref.read(workspaceProvider.notifier).refresh();
-                    ref.invalidate(dashboardProvider);
-                  },
-                  onRefreshProjects: () =>
-                      ref.read(projectsProvider.notifier).refresh(),
-                  onOpenSwitcher: () => showWorkspaceSwitcher(context, ref),
+                NavigationRail(
+                  selectedIndex: _index,
+                  onDestinationSelected: (value) =>
+                      setState(() => _index = value),
+                  labelType: NavigationRailLabelType.all,
+                  backgroundColor: scheme.surface,
+                  indicatorColor: scheme.primary.withValues(alpha: 0.15),
+                  selectedIconTheme: IconThemeData(color: scheme.primary),
+                  selectedLabelTextStyle: TextStyle(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                  destinations: const [
+                    NavigationRailDestination(
+                      icon: Icon(Icons.dashboard_outlined),
+                      selectedIcon: Icon(Icons.dashboard),
+                      label: Text('Dashboard'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.folder_outlined),
+                      selectedIcon: Icon(Icons.folder),
+                      label: Text('Projeler'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.person_outline),
+                      selectedIcon: Icon(Icons.person),
+                      label: Text('Kişisel'),
+                    ),
+                  ],
+                  trailing: Expanded(
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Üye davet et',
+                              onPressed: () => _invite(active.id),
+                              icon: const Icon(Icons.person_add_alt_1_outlined),
+                            ),
+                            IconButton(
+                              tooltip: 'Ayarlar',
+                              onPressed: () =>
+                                  context.push(AppRoutes.settings),
+                              icon: const Icon(Icons.settings_outlined),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                const PersonalScreen(),
+                VerticalDivider(width: 1, color: scheme.outline),
+                Expanded(child: content),
               ],
-            ),
+            )
+          : content,
+    );
+  }
+}
+
+class _DrawerNavTile extends StatelessWidget {
+  const _DrawerNavTile({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        selected: selected,
+        selectedTileColor: scheme.primary.withValues(alpha: 0.15),
+        leading: Icon(
+          selected ? selectedIcon : icon,
+          color: selected ? scheme.primary : null,
+        ),
+        title: Text(
+          label,
+          style: TextStyle(
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? scheme.primary : null,
+          ),
+        ),
+        onTap: onTap,
+      ),
     );
   }
 }
@@ -253,50 +466,36 @@ class _ProjectsBody extends StatelessWidget {
     }
 
     if (workspaceError != null && !hasWorkspaces) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(workspaceError!, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: onRefreshWorkspaces,
-                child: const Text('Tekrar dene'),
-              ),
-            ],
-          ),
+      return AppEmptyState(
+        icon: Icons.error_outline,
+        title: 'Çalışma alanları yüklenemedi',
+        subtitle: workspaceError,
+        action: FilledButton(
+          onPressed: onRefreshWorkspaces,
+          child: const Text('Tekrar dene'),
         ),
       );
     }
 
     if (!hasWorkspaces) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Henüz çalışma alanınız yok.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: onOpenSwitcher,
-                icon: const Icon(Icons.add),
-                label: const Text('Çalışma alanı oluştur'),
-              ),
-            ],
-          ),
+      return AppEmptyState(
+        icon: Icons.workspaces_outlined,
+        title: 'Henüz çalışma alanınız yok',
+        subtitle: 'Başlamak için bir çalışma alanı oluşturun.',
+        action: FilledButton.icon(
+          onPressed: onOpenSwitcher,
+          icon: const Icon(Icons.add),
+          label: const Text('Çalışma alanı oluştur'),
         ),
       );
     }
 
     if (!hasActiveWorkspace) {
-      return Center(
-        child: FilledButton(
+      return AppEmptyState(
+        icon: Icons.swap_horiz,
+        title: 'Çalışma alanı seçin',
+        subtitle: 'Devam etmek için bir çalışma alanı seçmeniz gerekiyor.',
+        action: FilledButton(
           onPressed: onOpenSwitcher,
           child: const Text('Çalışma alanı seç'),
         ),
@@ -318,16 +517,12 @@ class _ProjectsBody extends StatelessWidget {
         ),
         error: (error, _) => ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(24),
           children: [
-            const SizedBox(height: 80),
-            Text(
-              error.toString(),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Center(
-              child: FilledButton(
+            AppEmptyState(
+              icon: Icons.error_outline,
+              title: 'Projeler yüklenemedi',
+              subtitle: error.toString(),
+              action: FilledButton(
                 onPressed: onRefreshProjects,
                 child: const Text('Tekrar dene'),
               ),
@@ -338,14 +533,12 @@ class _ProjectsBody extends StatelessWidget {
           if (projects.isEmpty) {
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(24),
-              children: const [
-                SizedBox(height: 80),
-                Icon(Icons.folder_open_outlined, size: 48),
-                SizedBox(height: 16),
-                Text(
-                  'Henüz bu çalışma alanında proje yok',
-                  textAlign: TextAlign.center,
+              children: [
+                AppEmptyState(
+                  icon: Icons.folder_open_outlined,
+                  title: 'Henüz proje yok',
+                  subtitle:
+                      'Bu çalışma alanında henüz proje bulunmuyor. Yeni bir proje ekleyerek başlayın.',
                 ),
               ],
             );
@@ -353,11 +546,20 @@ class _ProjectsBody extends StatelessWidget {
 
           return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
-            itemCount: projects.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+            itemCount: projects.length + 1,
+            separatorBuilder: (_, index) =>
+                index == 0 ? const SizedBox.shrink() : const SizedBox(height: 8),
             itemBuilder: (context, index) {
-              final project = projects[index];
+              if (index == 0) {
+                return AppSectionHeader(
+                  eyebrow: 'Çalışma alanı',
+                  title: 'Projeler',
+                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+                );
+              }
+
+              final project = projects[index - 1];
               return Card(
                 child: ListTile(
                   leading: const Icon(Icons.folder_outlined),

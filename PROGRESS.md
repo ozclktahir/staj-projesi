@@ -134,7 +134,7 @@
   - Web `globals.css` / shadcn ile uyumlu ColorScheme (primary turuncu, background/card/border, dark/light)
   - Tipografi, radius (`0.5rem`), kart/buton/chip stilleri; `AppTheme` iskeletini ürün temasına çevir
   - Auth + Home + Settings ekranlarında görsel smoke kontrol
-- [ ] **Adım 2: Uygulama kabuğu (Shell) & navigasyon UX**
+- [x] **Adım 2: Uygulama kabuğu (Shell) & navigasyon UX**
   - Web Sidebar/Header hiyerarşisine yakın Drawer/NavigationRail + AppBar düzeni
   - Spacing, bölüm başlıkları, boş durum (empty state) kartları web ile hizalı
   - Auth split-screen / onboarding görsel dilini web’e yaklaştır
@@ -550,3 +550,7 @@
 ### [30 Temmuz 2026] - Faz 8.2 Adım 1: Tasarım sistemi & tema parity (Web token → Flutter)
 - `AppTheme`: primary light `#ea580c` / dark `#ff6a00`, border `#cbd5e1`/`#1e293b`, radius 8; Card/Input/Button/NavBar/Chip temaları web `globals.css` ile hizalandı.
 - Login/Register/Settings/Home drawer primary vurgusu; InputDecoration Outline override’ları kaldırıldı. `flutter analyze` temiz.
+
+### [30 Temmuz 2026] - Faz 8.2 Adım 2: Uygulama kabuğu (Shell) & navigasyon UX
+- Home: web Sidebar benzeri Drawer (Dashboard/Projeler/Kişisel/Ayarlar/Davet/Çıkış), ≥900px NavigationRail; AppBar “Genel bakış” + workspace başlığı.
+- `AppEmptyState` / `AppSectionHeader`; Auth `AuthSplitShell` + Login/Register/Onboarding split-panel. `flutter analyze` temiz.
