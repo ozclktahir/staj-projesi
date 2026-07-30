@@ -7,6 +7,7 @@ import '../../activity/presentation/activity_log_panel.dart';
 import '../../workspace/data/project_dto.dart';
 import '../../workspace/data/project_repository.dart';
 import '../../workspace/providers/project_provider.dart';
+import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../data/task_dto.dart';
 import '../providers/kanban_filter_provider.dart';
 import '../providers/task_provider.dart';
@@ -110,6 +111,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final filter = ref.watch(kanbanFilterProvider(widget.projectId));
+    final caps = ref.watch(workspaceCapabilitiesProvider);
 
     return DefaultTabController(
       length: TaskStatus.values.length + 1,
@@ -117,21 +119,22 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         appBar: AppBar(
           title: Text(widget.projectName ?? 'Proje'),
           actions: [
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'delete') _confirmDeleteProject();
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: 'delete',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.delete_outline),
-                    title: Text('Projeyi Sil'),
+            if (caps.canDeleteProject)
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'delete') _confirmDeleteProject();
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.delete_outline),
+                      title: Text('Projeyi Sil'),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
           ],
           bottom: TabBar(
             isScrollable: true,
@@ -142,24 +145,26 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             ],
           ),
         ),
-        floatingActionButton: FloatingActionButton(
-          tooltip: 'Yeni görev',
-          onPressed: () async {
-            final created = await showCreateTaskDialog(
-              context: context,
-              ref: ref,
-              projectId: widget.projectId,
-            );
-            if (created == true && context.mounted) {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  const SnackBar(content: Text('Görev oluşturuldu.')),
-                );
-            }
-          },
-          child: const Icon(Icons.add),
-        ),
+        floatingActionButton: caps.canCreateTask
+            ? FloatingActionButton(
+                tooltip: 'Yeni görev',
+                onPressed: () async {
+                  final created = await showCreateTaskDialog(
+                    context: context,
+                    ref: ref,
+                    projectId: widget.projectId,
+                  );
+                  if (created == true && context.mounted) {
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        const SnackBar(content: Text('Görev oluşturuldu.')),
+                      );
+                  }
+                },
+                child: const Icon(Icons.add),
+              )
+            : null,
         body: Column(
           children: [
             _KanbanToolbar(

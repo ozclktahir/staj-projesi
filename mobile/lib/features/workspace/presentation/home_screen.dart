@@ -14,6 +14,7 @@ import '../../notifications/providers/notification_provider.dart';
 import '../../personal/presentation/personal_screen.dart';
 import '../data/project_dto.dart';
 import '../providers/project_provider.dart';
+import '../providers/workspace_capabilities_provider.dart';
 import '../providers/workspace_provider.dart';
 import 'create_project_dialog.dart';
 import 'workspace_switcher.dart';
@@ -58,8 +59,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final workspaceState = ref.watch(workspaceProvider);
     final projectsAsync = ref.watch(projectsProvider);
+    final caps = ref.watch(workspaceCapabilitiesProvider);
     final active = workspaceState.activeWorkspace;
-    final canCreateProject = active != null && _index == 1;
+    final canCreateProject =
+        active != null && _index == 1 && caps.canCreateProject;
     final unreadCount = ref.watch(unreadNotificationCountProvider);
     final pendingInvites = ref.watch(pendingInvitationCountProvider);
     final badgeCount = unreadCount + pendingInvites;
@@ -183,7 +186,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   context.push(AppRoutes.settings);
                 },
               ),
-              if (active != null)
+              if (active != null && caps.canInvite)
                 _DrawerNavTile(
                   icon: Icons.person_add_alt_1_outlined,
                   selectedIcon: Icons.person_add_alt_1,
@@ -254,7 +257,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         actions: [
           if (active != null) ...[
-            if (!wide)
+            if (!wide && caps.canInvite)
               IconButton(
                 tooltip: 'Üye Davet Et',
                 onPressed: () => _invite(active.id),
@@ -370,11 +373,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              tooltip: 'Üye davet et',
-                              onPressed: () => _invite(active.id),
-                              icon: const Icon(Icons.person_add_alt_1_outlined),
-                            ),
+                            if (caps.canInvite)
+                              IconButton(
+                                tooltip: 'Üye davet et',
+                                onPressed: () => _invite(active.id),
+                                icon: const Icon(
+                                  Icons.person_add_alt_1_outlined,
+                                ),
+                              ),
                             IconButton(
                               tooltip: 'Ayarlar',
                               onPressed: () =>

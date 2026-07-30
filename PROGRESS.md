@@ -138,7 +138,7 @@
   - Web Sidebar/Header hiyerarşisine yakın Drawer/NavigationRail + AppBar düzeni
   - Spacing, bölüm başlıkları, boş durum (empty state) kartları web ile hizalı
   - Auth split-screen / onboarding görsel dilini web’e yaklaştır
-- [ ] **Adım 3: RBAC & yetki kapıları (UI)**
+- [x] **Adım 3: RBAC & yetki kapıları (UI)**
   - `isOwner` / `isAdminRole` helper’ları (OWNER|Admin)
   - Invite, proje oluştur/sil, workspace sil, yeniden atama vb. butonları role göre göster/gizle
   - Member’ın yalnızca kendi görünür projelerini görmesi (web `getMemberVisibleProjectIds` mantığı)
@@ -554,3 +554,7 @@
 ### [30 Temmuz 2026] - Faz 8.2 Adım 2: Uygulama kabuğu (Shell) & navigasyon UX
 - Home: web Sidebar benzeri Drawer (Dashboard/Projeler/Kişisel/Ayarlar/Davet/Çıkış), ≥900px NavigationRail; AppBar “Genel bakış” + workspace başlığı.
 - `AppEmptyState` / `AppSectionHeader`; Auth `AuthSplitShell` + Login/Register/Onboarding split-panel. `flutter analyze` temiz.
+
+### [30 Temmuz 2026] - Faz 8.2 Adım 3: RBAC & yetki kapıları (UI)
+- `workspace_rbac.dart` + `WorkspaceCapabilities` (invite / proje oluştur-sil / workspace sil / görev oluştur); UI kapıları Home/Settings/ProjectDetail.
+- Non-admin üye proje listesi: atanmış görev + `assigned_to`/`user_id`/`created_by` ile filtre (web `getMemberVisibleProjectIds`). `flutter analyze` temiz.

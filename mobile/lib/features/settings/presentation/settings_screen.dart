@@ -6,7 +6,7 @@ import '../../../core/locale/locale_provider.dart';
 import '../../../core/network/workspace_session_cleanup.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/theme_provider.dart';
-import '../../auth/providers/auth_provider.dart';
+import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../../workspace/providers/workspace_provider.dart';
 
 /// Tema, dil ve (OWNER ise) workspace silme.
@@ -80,16 +80,11 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final locale = ref.watch(localePreferenceProvider);
-    final active = ref.watch(
-      workspaceProvider.select((s) => s.activeWorkspace),
-    );
     final submitting = ref.watch(
       workspaceProvider.select((s) => s.isSubmitting),
     );
-    final userId = ref.watch(authProvider.select((s) => s.userId));
-    final canDeleteWorkspace = active != null &&
-        (active.isOwner ||
-            (active.ownerId != null && active.ownerId == userId));
+    final canDeleteWorkspace =
+        ref.watch(workspaceCapabilitiesProvider).canDeleteWorkspace;
 
     return Scaffold(
       appBar: AppBar(

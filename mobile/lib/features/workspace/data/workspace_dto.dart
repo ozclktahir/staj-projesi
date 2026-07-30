@@ -1,3 +1,5 @@
+import '../../../core/rbac/workspace_rbac.dart';
+
 /// Workspace API modelleri / DTO'ları.
 class WorkspaceDto {
   const WorkspaceDto({
@@ -30,10 +32,9 @@ class WorkspaceDto {
   final String? createdAt;
   final String? updatedAt;
 
-  bool get isOwner {
-    final r = role?.toUpperCase();
-    return r == 'OWNER';
-  }
+  bool get isOwner => isOwnerRole(role);
+
+  bool get isAdmin => isAdminRole(role);
 }
 
 class CreateWorkspaceDto {

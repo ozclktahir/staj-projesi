@@ -6,6 +6,8 @@ class ProjectDto {
     required this.workspaceId,
     this.description,
     this.createdBy,
+    this.userId,
+    this.assignedTo,
     this.createdAt,
     this.updatedAt,
   });
@@ -17,6 +19,8 @@ class ProjectDto {
       workspaceId: json['workspace_id'] as String? ?? '',
       description: json['description'] as String?,
       createdBy: json['created_by'] as String?,
+      userId: json['user_id'] as String?,
+      assignedTo: json['assigned_to'] as String?,
       createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
     );
@@ -27,8 +31,16 @@ class ProjectDto {
   final String workspaceId;
   final String? description;
   final String? createdBy;
+  final String? userId;
+  final String? assignedTo;
   final String? createdAt;
   final String? updatedAt;
+
+  bool isLinkedToUser(String userId) {
+    return createdBy == userId ||
+        this.userId == userId ||
+        assignedTo == userId;
+  }
 }
 
 class CreateProjectDto {
