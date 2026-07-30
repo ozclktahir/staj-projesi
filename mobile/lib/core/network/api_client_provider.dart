@@ -15,6 +15,18 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(secureStorage: ref.watch(secureStorageProvider));
 });
 
+/// Auth token → Dio bellek senkronu (workspace isteklerinden önce).
+final authTokenSyncProvider = Provider<void>((ref) {
+  final client = ref.watch(apiClientProvider);
+  ref.listen<AuthState>(
+    authProvider,
+    (previous, next) {
+      client.updateAccessToken(next.token);
+    },
+    fireImmediately: true,
+  );
+});
+
 /// Dio 403 bus dinleyicisi — aktif workspace stale ise temizler.
 final workspaceForbiddenListenerProvider = Provider<void>((ref) {
   final sub = WorkspaceAccessBus.instance.stream.listen((workspaceId) {

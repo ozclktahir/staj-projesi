@@ -75,12 +75,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return AppRoutes.login;
       }
 
+      // Authenticated ama token henüz yoksa (geçiş) splash'ta kal.
+      if (auth.token == null || auth.token!.isEmpty) {
+        return isSplash ? null : AppRoutes.splash;
+      }
+
       // Authenticated — workspace bootstrap bitmeden karar verme.
       if (workspace.isLoading) {
-        if (isSplash || isOnboarding || location == AppRoutes.home) {
-          return isSplash ? null : AppRoutes.splash;
-        }
-        return null;
+        return isSplash ? null : AppRoutes.splash;
       }
 
       final needsOnboarding = workspace.workspaces.isEmpty;

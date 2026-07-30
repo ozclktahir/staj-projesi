@@ -50,34 +50,58 @@ class _StajMobileAppState extends ConsumerState<StajMobileApp> {
     final themeMode = ref.watch(themeModeProvider);
     final localeOption = ref.watch(localePreferenceProvider);
     final strings = ref.watch(appStringsProvider);
+    ref.watch(authTokenSyncProvider);
     ref.watch(realtimeConnectionProvider);
     ref.watch(workspaceScopeSyncProvider);
     ref.watch(workspaceForbiddenListenerProvider);
     ref.watch(unauthorizedSessionListenerProvider);
 
-    return MaterialApp.router(
-      title: 'Staj Projesi',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: themeMode,
-      locale: Locale(localeOption.code),
-      supportedLocales: const [
-        Locale('tr'),
-        Locale('en'),
-      ],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      routerConfig: router,
-      builder: (context, child) {
-        return wrapWithAppStrings(
-          strings: strings,
-          child: child ?? const SizedBox.shrink(),
-        );
-      },
+    final appLocale = switch (localeOption) {
+      AppLocaleOption.tr => const Locale('tr', 'TR'),
+      AppLocaleOption.en => const Locale('en', 'US'),
+    };
+
+    // AppStrings MaterialApp dışında — Localizations ağacını bozmaz.
+    return wrapWithAppStrings(
+      strings: strings,
+      child: MaterialApp.router(
+        title: 'Staj Projesi',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: themeMode,
+        locale: appLocale,
+        supportedLocales: const [
+          Locale('tr', 'TR'),
+          Locale('tr'),
+          Locale('en', 'US'),
+          Locale('en'),
+        ],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        localeResolutionCallback: (locale, supported) {
+          if (locale == null) return supported.first;
+          for (final candidate in supported) {
+            if (candidate.languageCode == locale.languageCode &&
+                (candidate.countryCode == null ||
+                    candidate.countryCode!.isEmpty ||
+                    candidate.countryCode == locale.countryCode)) {
+              return candidate;
+            }
+          }
+          for (final candidate in supported) {
+            if (candidate.languageCode == locale.languageCode) {
+              return candidate;
+            }
+          }
+          // Material delegate tr desteklemezse en'e düş (AppStrings yine TR kalır).
+          return const Locale('en', 'US');
+        },
+        routerConfig: router,
+      ),
     );
   }
 }

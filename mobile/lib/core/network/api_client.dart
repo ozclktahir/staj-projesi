@@ -29,10 +29,14 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token =
-              await _secureStorage.read(key: StorageKeys.accessToken);
+          var token = _memoryAccessToken;
+          if (token == null || token.isEmpty) {
+            token = await _secureStorage.read(key: StorageKeys.accessToken);
+          }
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
+          } else {
+            options.headers.remove('Authorization');
           }
           handler.next(options);
         },
@@ -49,7 +53,16 @@ class ApiClient {
   final FlutterSecureStorage _secureStorage;
   var _clearingUnauthorized = false;
 
+  /// Auth state ile senkron bellek token'ı (web secure-storage yarışını önler).
+  String? _memoryAccessToken;
+
   Dio get dio => _dio;
+
+  void updateAccessToken(String? token) {
+    final trimmed = token?.trim();
+    _memoryAccessToken =
+        (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+  }
 
   void _maybeHandleUnauthorized(DioException error) {
     if (error.response?.statusCode != 401) return;
@@ -67,6 +80,7 @@ class ApiClient {
     if (_clearingUnauthorized) return;
     _clearingUnauthorized = true;
     try {
+      _memoryAccessToken = null;
       await _secureStorage.delete(key: StorageKeys.accessToken);
       await _secureStorage.delete(key: StorageKeys.refreshToken);
       await _secureStorage.delete(key: StorageKeys.userId);

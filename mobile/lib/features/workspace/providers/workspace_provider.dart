@@ -237,12 +237,21 @@ final workspaceProvider =
     prefs: ref.watch(sharedPreferencesProvider),
   );
 
-  // Auth bootstrap bitmeden /workspace çağırma — 401 yarışını önler.
+  // Token Dio belleğine yazılsın, sonra /workspace çağrılsın.
   ref.listen<AuthState>(
     authProvider,
     (previous, next) {
       if (next.status == AuthStatus.unknown) return;
+
+      final client = ref.read(apiClientProvider);
+      client.updateAccessToken(next.token);
+
       if (next.status == AuthStatus.authenticated) {
+        final token = next.token;
+        if (token == null || token.isEmpty) {
+          notifier.resetLocal();
+          return;
+        }
         if (previous?.status != AuthStatus.authenticated ||
             previous?.token != next.token) {
           notifier.refresh();

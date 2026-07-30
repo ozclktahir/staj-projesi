@@ -589,3 +589,7 @@
 ### [30 Temmuz 2026] - Fix: MaterialLocalizations dil hatası ve 401 Unauthorized oturum yönlendirme sorunu çözüldü.
 - `flutter_localizations` + GlobalMaterial/Widgets/Cupertino delegates; `tr`/`en` locale uyarısı giderildi.
 - Auth bootstrap JWT `exp` kontrolü; workspace fetch auth hazır olana kadar bekliyor; 401’de token secure storage’dan silinip `/login` yönlendirmesi. `flutter analyze` temiz.
+
+### [30 Temmuz 2026] - Fix: MaterialLocalizations tr locale hatası ve workspace 401 yetkilendirme/yönlendirme sorunu çözüldü.
+- Locale `tr_TR`/`en_US` + `localeResolutionCallback`; AppStrings MaterialApp dışına alındı (Localizations ağacı).
+- Dio bellek token senkronu (`authTokenSyncProvider`); `/workspace` yalnızca token hazırken; router token/workspace yüklenene kadar splash. `flutter analyze` temiz.
