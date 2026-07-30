@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../auth/providers/auth_provider.dart';
+import '../../workspace/presentation/assignee_picker_field.dart';
+import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../data/task_dto.dart';
 import '../data/task_repository.dart';
 import '../data/update_task_dto.dart';
@@ -17,8 +20,11 @@ Future<TaskDto?> showEditTaskDialog({
   final titleController = TextEditingController(text: task.title);
   final descriptionController =
       TextEditingController(text: task.description ?? '');
-  final assigneeController =
-      TextEditingController(text: task.effectiveAssigneeId ?? '');
+  final caps = ref.read(workspaceCapabilitiesProvider);
+  final userId = ref.read(authProvider).userId;
+  String? assigneeId = caps.isAdmin
+      ? task.effectiveAssigneeId
+      : (task.effectiveAssigneeId ?? userId);
   var priority = task.priority;
   DateTime? dueDate = task.dueDate != null
       ? DateTime.tryParse(task.dueDate!)?.toLocal()
@@ -51,7 +57,6 @@ Future<TaskDto?> showEditTaskDialog({
                         enabled: !submitting,
                         decoration: const InputDecoration(
                           labelText: 'Başlık',
-                          border: OutlineInputBorder(),
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
@@ -67,7 +72,6 @@ Future<TaskDto?> showEditTaskDialog({
                         maxLines: 3,
                         decoration: const InputDecoration(
                           labelText: 'Açıklama',
-                          border: OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -75,7 +79,6 @@ Future<TaskDto?> showEditTaskDialog({
                         initialValue: priority,
                         decoration: const InputDecoration(
                           labelText: 'Öncelik',
-                          border: OutlineInputBorder(),
                         ),
                         items: [
                           for (final value in TaskPriority.values)
@@ -118,14 +121,11 @@ Future<TaskDto?> showEditTaskDialog({
                           child: const Text('Teslim tarihini kaldır'),
                         ),
                       const SizedBox(height: 8),
-                      TextFormField(
-                        controller: assigneeController,
+                      AssigneePickerField(
+                        value: assigneeId,
                         enabled: !submitting,
-                        decoration: const InputDecoration(
-                          labelText: 'Atanan (kullanıcı UUID)',
-                          border: OutlineInputBorder(),
-                          helperText: 'Boş bırakılırsa atama kaldırılmaz.',
-                        ),
+                        onChanged: (value) =>
+                            setLocal(() => assigneeId = value),
                       ),
                       if (errorText != null) ...[
                         const SizedBox(height: 12),
@@ -159,7 +159,15 @@ Future<TaskDto?> showEditTaskDialog({
                             errorText = null;
                           });
                           try {
-                            final assignee = assigneeController.text.trim();
+                            final resolvedAssignee = caps.isAdmin
+                                ? assigneeId
+                                : (assigneeId ?? userId);
+                            final clearAssignee = caps.isAdmin &&
+                                (resolvedAssignee == null ||
+                                    resolvedAssignee.isEmpty) &&
+                                (task.effectiveAssigneeId != null &&
+                                    task.effectiveAssigneeId!.isNotEmpty);
+
                             final updated = await ref
                                 .read(tasksProvider(projectId).notifier)
                                 .updateTask(
@@ -168,8 +176,10 @@ Future<TaskDto?> showEditTaskDialog({
                                     title: titleController.text,
                                     description: descriptionController.text,
                                     priority: priority,
-                                    assigneeId:
-                                        assignee.isEmpty ? null : assignee,
+                                    assigneeId: clearAssignee
+                                        ? null
+                                        : resolvedAssignee,
+                                    clearAssignee: clearAssignee,
                                     dueDate: dueDate?.toUtc().toIso8601String(),
                                     clearDueDate: dueDate == null &&
                                         task.dueDate != null,
@@ -207,6 +217,5 @@ Future<TaskDto?> showEditTaskDialog({
   } finally {
     titleController.dispose();
     descriptionController.dispose();
-    assigneeController.dispose();
   }
 }

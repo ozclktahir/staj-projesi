@@ -162,6 +162,15 @@ class SettingsScreen extends ConsumerWidget {
               ref.read(localePreferenceProvider.notifier).setLocale(value);
             },
           ),
+          const SizedBox(height: 28),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.group_outlined),
+            title: const Text('Üyeler'),
+            subtitle: const Text('Çalışma alanı üyelerini görüntüle'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(AppRoutes.members),
+          ),
           if (canDeleteWorkspace) ...[
             const SizedBox(height: 36),
             Text(

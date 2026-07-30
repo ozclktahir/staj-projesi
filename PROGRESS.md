@@ -142,7 +142,7 @@
   - `isOwner` / `isAdminRole` helper’ları (OWNER|Admin)
   - Invite, proje oluştur/sil, workspace sil, yeniden atama vb. butonları role göre göster/gizle
   - Member’ın yalnızca kendi görünür projelerini görmesi (web `getMemberVisibleProjectIds` mantığı)
-- [ ] **Adım 4: Workspace üyeleri & assignee seçici**
+- [x] **Adım 4: Workspace üyeleri & assignee seçici**
   - Üye listesi API + basit Üyeler UI (listeleme)
   - Görev oluştur/düzenle’de UUID yerine üye dropdown (web gibi)
   - Member için assignee = yalnızca kendisi kuralı
@@ -558,3 +558,7 @@
 ### [30 Temmuz 2026] - Faz 8.2 Adım 3: RBAC & yetki kapıları (UI)
 - `workspace_rbac.dart` + `WorkspaceCapabilities` (invite / proje oluştur-sil / workspace sil / görev oluştur); UI kapıları Home/Settings/ProjectDetail.
 - Non-admin üye proje listesi: atanmış görev + `assigned_to`/`user_id`/`created_by` ile filtre (web `getMemberVisibleProjectIds`). `flutter analyze` temiz.
+
+### [30 Temmuz 2026] - Faz 8.2 Adım 4: Workspace üyeleri & assignee seçici
+- Nest `GET /workspaces/:id/members` (Admin: tümü, Member: kendisi) + mobil `MembersScreen` / Drawer / Settings.
+- `AssigneePickerField` create/edit görevde UUID yerine dropdown; Member yalnızca kendisine atanır. `flutter analyze` temiz.

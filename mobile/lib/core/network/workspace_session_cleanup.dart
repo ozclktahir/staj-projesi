@@ -8,6 +8,7 @@ import '../../features/personal/providers/personal_notes_provider.dart';
 import '../../features/personal/providers/personal_tasks_provider.dart';
 import '../../features/tasks/providers/task_provider.dart';
 import '../../features/workspace/providers/project_provider.dart';
+import '../../features/workspace/providers/workspace_members_provider.dart';
 
 /// Aktif workspace değişince / silinince eski id ile istek atan provider'ları temizler.
 void invalidateWorkspaceScopedProviders(Ref ref) {
@@ -26,6 +27,7 @@ void invalidateWorkspaceScopedProviders(Ref ref) {
   safe(personalNotesProvider);
   safe(tasksProvider);
   safe(activityLogProvider);
+  safe(workspaceMembersProvider);
 }
 
 /// WidgetRef için aynı temizlik.
@@ -45,4 +47,5 @@ void invalidateWorkspaceScopedProvidersWithWidgetRef(WidgetRef ref) {
   safe(personalNotesProvider);
   safe(tasksProvider);
   safe(activityLogProvider);
+  safe(workspaceMembersProvider);
 }

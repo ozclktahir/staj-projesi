@@ -132,6 +132,14 @@ class TaskDto {
     return '${id.substring(0, 8)}…';
   }
 
+  String assigneeDisplayName([Map<String, String>? labels]) {
+    final id = effectiveAssigneeId;
+    if (id == null || id.isEmpty) return 'Atanmadı';
+    final fromMap = labels?[id];
+    if (fromMap != null && fromMap.isNotEmpty) return fromMap;
+    return assigneeLabel;
+  }
+
   TaskDto copyWith({
     String? title,
     String? description,

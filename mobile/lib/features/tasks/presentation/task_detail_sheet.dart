@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../workspace/providers/workspace_members_provider.dart';
 import '../../workspace/providers/workspace_provider.dart';
 import '../data/task_dto.dart';
 import '../data/task_repository.dart';
@@ -238,6 +239,9 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
                 children: [
                   _DetailsTab(
                     task: _task,
+                    assigneeLabel: _task.assigneeDisplayName(
+                      ref.watch(workspaceMemberLabelMapProvider),
+                    ),
                     status: _status,
                     busy: _busy,
                     onEdit: _edit,
@@ -272,6 +276,7 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
 class _DetailsTab extends StatelessWidget {
   const _DetailsTab({
     required this.task,
+    required this.assigneeLabel,
     required this.status,
     required this.busy,
     required this.onEdit,
@@ -280,6 +285,7 @@ class _DetailsTab extends StatelessWidget {
   });
 
   final TaskDto task;
+  final String assigneeLabel;
   final TaskStatus status;
   final bool busy;
   final VoidCallback onEdit;
@@ -317,7 +323,7 @@ class _DetailsTab extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.person_outline),
           title: const Text('Atanan'),
-          subtitle: Text(task.assigneeLabel),
+          subtitle: Text(assigneeLabel),
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,

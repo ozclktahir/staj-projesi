@@ -10,6 +10,7 @@ import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/tasks/presentation/project_detail_screen.dart';
 import '../../features/workspace/presentation/home_screen.dart';
+import '../../features/workspace/presentation/members_screen.dart';
 import '../../features/workspace/providers/workspace_provider.dart';
 
 /// Rota path sabitleri.
@@ -20,6 +21,7 @@ abstract final class AppRoutes {
   static const home = '/home';
   static const onboarding = '/onboarding';
   static const settings = '/settings';
+  static const members = '/members';
   static const project = '/project/:id';
 
   static String projectDetail(String projectId) => '/project/$projectId';
@@ -127,6 +129,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.settings,
         name: 'settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.members,
+        name: 'members',
+        builder: (context, state) => const MembersScreen(),
       ),
       GoRoute(
         path: AppRoutes.project,

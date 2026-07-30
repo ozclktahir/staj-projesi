@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../auth/providers/auth_provider.dart';
+import '../../workspace/presentation/assignee_picker_field.dart';
+import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../data/task_dto.dart';
 import '../data/task_repository.dart';
 import '../providers/task_provider.dart';
@@ -14,7 +17,9 @@ Future<bool?> showCreateTaskDialog({
   final formKey = GlobalKey<FormState>();
   final titleController = TextEditingController();
   final descriptionController = TextEditingController();
-  final assigneeController = TextEditingController();
+  final caps = ref.read(workspaceCapabilitiesProvider);
+  final userId = ref.read(authProvider).userId;
+  String? assigneeId = caps.isAdmin ? null : userId;
   var priority = TaskPriority.medium;
   var status = TaskStatus.todo;
   DateTime? dueDate;
@@ -47,7 +52,6 @@ Future<bool?> showCreateTaskDialog({
                         textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
                           labelText: 'Başlık',
-                          border: OutlineInputBorder(),
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
@@ -63,7 +67,6 @@ Future<bool?> showCreateTaskDialog({
                         maxLines: 3,
                         decoration: const InputDecoration(
                           labelText: 'Açıklama (opsiyonel)',
-                          border: OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -71,7 +74,6 @@ Future<bool?> showCreateTaskDialog({
                         initialValue: priority,
                         decoration: const InputDecoration(
                           labelText: 'Öncelik',
-                          border: OutlineInputBorder(),
                         ),
                         items: [
                           for (final value in TaskPriority.values)
@@ -93,7 +95,6 @@ Future<bool?> showCreateTaskDialog({
                         initialValue: status,
                         decoration: const InputDecoration(
                           labelText: 'Durum',
-                          border: OutlineInputBorder(),
                         ),
                         items: [
                           for (final value in TaskStatus.values)
@@ -129,13 +130,11 @@ Future<bool?> showCreateTaskDialog({
                         label: Text(dateLabel),
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
-                        controller: assigneeController,
+                      AssigneePickerField(
+                        value: assigneeId,
                         enabled: !submitting,
-                        decoration: const InputDecoration(
-                          labelText: 'Atanan (UUID, opsiyonel)',
-                          border: OutlineInputBorder(),
-                        ),
+                        onChanged: (value) =>
+                            setLocal(() => assigneeId = value),
                       ),
                       if (errorText != null) ...[
                         const SizedBox(height: 12),
@@ -169,7 +168,9 @@ Future<bool?> showCreateTaskDialog({
                             errorText = null;
                           });
                           try {
-                            final assignee = assigneeController.text.trim();
+                            final resolvedAssignee = caps.isAdmin
+                                ? assigneeId
+                                : (assigneeId ?? userId);
                             final ok = await ref
                                 .read(tasksProvider(projectId).notifier)
                                 .createTask(
@@ -177,8 +178,7 @@ Future<bool?> showCreateTaskDialog({
                                   description: descriptionController.text,
                                   status: status,
                                   priority: priority,
-                                  assigneeId:
-                                      assignee.isEmpty ? null : assignee,
+                                  assigneeId: resolvedAssignee,
                                   dueDate:
                                       dueDate?.toUtc().toIso8601String(),
                                 );
@@ -214,6 +214,5 @@ Future<bool?> showCreateTaskDialog({
   } finally {
     titleController.dispose();
     descriptionController.dispose();
-    assigneeController.dispose();
   }
 }

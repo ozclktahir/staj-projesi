@@ -186,6 +186,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   context.push(AppRoutes.settings);
                 },
               ),
+              if (active != null)
+                _DrawerNavTile(
+                  icon: Icons.group_outlined,
+                  selectedIcon: Icons.group,
+                  label: 'Üyeler',
+                  selected: false,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    context.push(AppRoutes.members);
+                  },
+                ),
               if (active != null && caps.canInvite)
                 _DrawerNavTile(
                   icon: Icons.person_add_alt_1_outlined,
