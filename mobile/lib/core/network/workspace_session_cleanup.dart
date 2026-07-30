@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/activity/providers/activity_log_provider.dart';
 import '../../features/dashboard/providers/dashboard_provider.dart';
 import '../../features/notifications/providers/notification_provider.dart';
-import '../../features/personal/providers/personal_notes_provider.dart';
 import '../../features/personal/providers/personal_tasks_provider.dart';
 import '../../features/tasks/providers/task_provider.dart';
 import '../../features/workspace/providers/project_provider.dart';
@@ -24,7 +23,6 @@ void invalidateWorkspaceScopedProviders(Ref ref) {
   safe(dashboardProvider);
   safe(notificationsProvider);
   safe(personalTasksProvider);
-  safe(personalNotesProvider);
   safe(tasksProvider);
   safe(activityLogProvider);
   safe(workspaceMembersProvider);
@@ -44,7 +42,6 @@ void invalidateWorkspaceScopedProvidersWithWidgetRef(WidgetRef ref) {
   safe(dashboardProvider);
   safe(notificationsProvider);
   safe(personalTasksProvider);
-  safe(personalNotesProvider);
   safe(tasksProvider);
   safe(activityLogProvider);
   safe(workspaceMembersProvider);

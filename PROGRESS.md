@@ -122,7 +122,7 @@
 - Tema: Web primary turuncu (`#ea580c` / `#ff6a00`) + koyu yüzeyler; mobil Material mavi seed (`#2563EB`) — marka uyumsuz.
 - Shell: Web Sidebar + Header; mobil AppBar/Drawer/BottomNav — hiyerarşi ve spacing farklı.
 - İş akışları: Task Claim, dual silme onayı, reddedilen görevi yeniden atama — mobilde yok (yalnızca davet accept/reject).
-- Personal: Web’de 4 sekme (Atanan / Notlar / Todos / Dosyalar); mobilde yalnızca Atanan + Notlar (not düzenleme yok).
+- Personal: Web ile aynı 4 sekme (Atanan / Notlar / Todos / Dosyalar) + not düzenleme / todo / dosya.
 - Üyeler: Web assignee dropdown + üye görünürlük kuralları; mobilde UUID elle giriş, üye listesi/yönetim yok.
 - RBAC UI: Web Admin/OWNER kapıları; mobilde çoğu aksiyon herkese açık (API 403’e bırakılmış).
 - Dashboard: Web workload / priority grafikleri + activity feed; mobil KPI + basit pasta.
@@ -154,7 +154,7 @@
   - İlerlemeli görev silmede onay isteği (admin↔assignee)
   - Bildirim türleri: `task_deletion_request` approve/reject
   - Reddedilen görevleri admin’in Create Task’tan yeniden ataması
-- [ ] **Adım 7: Personal Workspace tam parity (`/personal`)**
+- [x] **Adım 7: Personal Workspace tam parity (`/personal`)**
   - Sekmeler: Atanan | Notlar | Todos | Dosyalar (web ile aynı)
   - Not düzenleme (PATCH); todo CRUD + due; kişisel dosya upload/liste/sil
   - Filtreler (öncelik/durum/tarih) atanmış görevlerde
@@ -569,3 +569,7 @@
 
 ### [30 Temmuz 2026] - Faz 8.2 Adım 6: Dual silme onayı & bildirim aksiyonları
 - Nest `requestOrDelete` (ilerleme→onay), `respond-deletion`, rejected list + reassign; mobil silme/onay UI + Create Task yeniden atama. `flutter analyze` temiz.
+
+### [30 Temmuz 2026] - Faz 8.2 Adım 7: Personal Workspace tam parity
+- Nest `PersonalModule` (`/personal/notes|todos|files`) + mobil 4 sekme (Atanan/Notlar/Todos/Dosyalar).
+- Not PATCH, todo CRUD+due, dosya upload/liste/sil; atanmış görevlerde öncelik/durum/tarih/arama filtreleri. `flutter analyze` + backend `tsc` temiz.

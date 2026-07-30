@@ -97,4 +97,12 @@ abstract final class ApiConstants {
 
   static String workspaceTaskReassign(String workspaceId, String taskId) =>
       '/workspaces/$workspaceId/tasks/$taskId/reassign';
+
+  static const String personalNotes = '/personal/notes';
+  static String personalNote(String noteId) => '/personal/notes/$noteId';
+  static const String personalTodos = '/personal/todos';
+  static String personalTodo(String todoId) => '/personal/todos/$todoId';
+  static const String personalFiles = '/personal/files';
+  static const String personalFilesUpload = '/personal/files/upload';
+  static String personalFile(String fileId) => '/personal/files/$fileId';
 }

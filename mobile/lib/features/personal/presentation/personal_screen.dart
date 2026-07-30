@@ -1,16 +1,20 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/widgets/app_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../tasks/data/task_dto.dart';
 import '../../tasks/presentation/task_card.dart';
 import '../../tasks/presentation/task_detail_sheet.dart';
-import '../data/note_dto.dart';
-import '../data/note_repository.dart';
-import '../providers/personal_notes_provider.dart';
+import '../data/personal_dto.dart';
+import '../data/personal_repository.dart';
 import '../providers/personal_tasks_provider.dart';
+import '../providers/personal_workspace_provider.dart';
 
-/// Kişisel alan: bana atanan görevler + kişisel notlar.
+/// Kişisel alan — web `/personal` 4 sekme parity.
 class PersonalScreen extends ConsumerStatefulWidget {
   const PersonalScreen({super.key});
 
@@ -25,7 +29,7 @@ class _PersonalScreenState extends ConsumerState<PersonalScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -40,9 +44,12 @@ class _PersonalScreenState extends ConsumerState<PersonalScreen>
       children: [
         TabBar(
           controller: _tabController,
+          isScrollable: true,
           tabs: const [
-            Tab(text: 'Bana Atananlar'),
-            Tab(text: 'Kişisel Notlar'),
+            Tab(text: 'Atanan'),
+            Tab(text: 'Notlar'),
+            Tab(text: 'Todos'),
+            Tab(text: 'Dosyalar'),
           ],
         ),
         Expanded(
@@ -50,7 +57,9 @@ class _PersonalScreenState extends ConsumerState<PersonalScreen>
             controller: _tabController,
             children: const [
               _AssignedTasksTab(),
-              _PersonalNotesTab(),
+              _NotesTab(),
+              _TodosTab(),
+              _FilesTab(),
             ],
           ),
         ),
@@ -59,249 +68,199 @@ class _PersonalScreenState extends ConsumerState<PersonalScreen>
   }
 }
 
-class _AssignedTasksTab extends ConsumerWidget {
+// ─── Assigned + filters ─────────────────────────────────────────────────────
+
+class _AssignedTasksTab extends ConsumerStatefulWidget {
   const _AssignedTasksTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final userId = ref.watch(authProvider.select((s) => s.userId));
-    final async = ref.watch(personalTasksProvider);
-
-    if (userId == null || userId.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Kullanıcı kimliği bulunamadı. Lütfen tekrar giriş yapın.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    return async.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(error.toString(), textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () =>
-                    ref.read(personalTasksProvider.notifier).refresh(),
-                child: const Text('Tekrar dene'),
-              ),
-            ],
-          ),
-        ),
-      ),
-      data: (tasks) {
-        if (tasks.isEmpty) {
-          return RefreshIndicator(
-            onRefresh: () =>
-                ref.read(personalTasksProvider.notifier).refresh(),
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(24),
-              children: const [
-                SizedBox(height: 80),
-                Icon(Icons.person_outline, size: 48),
-                SizedBox(height: 16),
-                Text(
-                  'Size atanmış görev bulunmuyor.',
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: () => ref.read(personalTasksProvider.notifier).refresh(),
-          child: ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(top: 8, bottom: 24),
-            itemCount: tasks.length,
-            itemBuilder: (context, index) {
-              final task = tasks[index];
-              return TaskCard(
-                task: task,
-                onTap: () => _openTask(context, ref, task),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _openTask(
-    BuildContext context,
-    WidgetRef ref,
-    TaskDto task,
-  ) async {
-    final projectId = task.projectId;
-    if (projectId == null || projectId.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Bu görevin proje bilgisi yok.')),
-        );
-      return;
-    }
-    await showTaskDetailSheet(
-      context: context,
-      ref: ref,
-      projectId: projectId,
-      task: task,
-    );
-    ref.invalidate(personalTasksProvider);
-  }
+  ConsumerState<_AssignedTasksTab> createState() => _AssignedTasksTabState();
 }
 
-class _PersonalNotesTab extends ConsumerStatefulWidget {
-  const _PersonalNotesTab();
-
-  @override
-  ConsumerState<_PersonalNotesTab> createState() => _PersonalNotesTabState();
-}
-
-class _PersonalNotesTabState extends ConsumerState<_PersonalNotesTab> {
-  final _titleController = TextEditingController();
-  final _contentController = TextEditingController();
-  var _saving = false;
+class _AssignedTasksTabState extends ConsumerState<_AssignedTasksTab> {
+  final _search = TextEditingController();
+  TaskPriority? _priority;
+  TaskStatus? _status;
+  String _dateFilter = 'all'; // all | hasDue | noDue | overdue
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _contentController.dispose();
+    _search.dispose();
     super.dispose();
   }
 
-  Future<void> _addNote() async {
-    final title = _titleController.text.trim();
-    if (title.isEmpty || _saving) return;
+  List<TaskDto> _apply(List<TaskDto> items) {
+    final q = _search.text.trim().toLowerCase();
+    final now = DateTime.now();
+    return [
+      for (final task in items)
+        if ((q.isEmpty || task.title.toLowerCase().contains(q)) &&
+            (_priority == null || task.priority == _priority) &&
+            (_status == null || task.status == _status) &&
+            !_rejected(task) &&
+            _matchDate(task, now))
+          task,
+    ];
+  }
 
-    setState(() => _saving = true);
-    try {
-      await ref.read(personalNotesProvider.notifier).addNote(
-            title: title,
-            content: _contentController.text,
-          );
-      _titleController.clear();
-      _contentController.clear();
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(content: Text('Not eklendi.')));
-      }
-    } on NoteException catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(error.message)));
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(content: Text('Not eklenemedi.')),
-          );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
+  bool _rejected(TaskDto task) => task.assignmentStatus.isRejected;
+
+  bool _matchDate(TaskDto task, DateTime now) {
+    final due = task.dueDate != null ? DateTime.tryParse(task.dueDate!) : null;
+    switch (_dateFilter) {
+      case 'hasDue':
+        return due != null;
+      case 'noDue':
+        return due == null;
+      case 'overdue':
+        return due != null && due.isBefore(now) && !task.isDone;
+      default:
+        return true;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final async = ref.watch(personalNotesProvider);
+    final userId = ref.watch(authProvider.select((s) => s.userId));
+    final async = ref.watch(personalTasksProvider);
+
+    if (userId == null || userId.isEmpty) {
+      return const AppEmptyState(
+        icon: Icons.person_off_outlined,
+        title: 'Kullanıcı bulunamadı',
+        subtitle: 'Lütfen tekrar giriş yapın.',
+      );
+    }
 
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-          child: Column(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: TextField(
+            controller: _search,
+            decoration: const InputDecoration(
+              hintText: 'Görev ara…',
+              prefixIcon: Icon(Icons.search),
+              isDense: true,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
             children: [
-              TextField(
-                controller: _titleController,
-                enabled: !_saving,
-                decoration: const InputDecoration(
-                  labelText: 'Not başlığı',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+              FilterChip(
+                label: Text(_priority?.label ?? 'Öncelik'),
+                selected: _priority != null,
+                onSelected: (_) async {
+                  final next = await showModalBottomSheet<TaskPriority?>(
+                    context: context,
+                    builder: (ctx) => SafeArea(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ListTile(
+                            title: const Text('Tümü'),
+                            onTap: () => Navigator.pop(ctx, null),
+                          ),
+                          for (final p in TaskPriority.values)
+                            ListTile(
+                              title: Text(p.label),
+                              onTap: () => Navigator.pop(ctx, p),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                  setState(() => _priority = next);
+                },
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _contentController,
-                enabled: !_saving,
-                minLines: 2,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'İçerik (opsiyonel)',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+              const SizedBox(width: 6),
+              FilterChip(
+                label: Text(_status?.label ?? 'Durum'),
+                selected: _status != null,
+                onSelected: (_) async {
+                  final next = await showModalBottomSheet<TaskStatus?>(
+                    context: context,
+                    builder: (ctx) => SafeArea(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ListTile(
+                            title: const Text('Tümü'),
+                            onTap: () => Navigator.pop(ctx, null),
+                          ),
+                          for (final s in TaskStatus.values)
+                            ListTile(
+                              title: Text(s.label),
+                              onTap: () => Navigator.pop(ctx, s),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                  setState(() => _status = next);
+                },
               ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed: _saving ? null : _addNote,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.add),
-                  label: const Text('Ekle'),
+              const SizedBox(width: 6),
+              for (final entry in const [
+                ('all', 'Tarih'),
+                ('hasDue', 'Tarihli'),
+                ('noDue', 'Tarihsiz'),
+                ('overdue', 'Geciken'),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    label: Text(entry.$2),
+                    selected: _dateFilter == entry.$1,
+                    onSelected: (_) =>
+                        setState(() => _dateFilter = entry.$1),
+                  ),
                 ),
-              ),
             ],
           ),
         ),
-        const Divider(height: 1),
         Expanded(
           child: async.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(error.toString(), textAlign: TextAlign.center),
-                    const SizedBox(height: 8),
-                    FilledButton(
-                      onPressed: () =>
-                          ref.read(personalNotesProvider.notifier).refresh(),
-                      child: const Text('Tekrar dene'),
-                    ),
-                  ],
-                ),
+            error: (e, _) => AppEmptyState(
+              icon: Icons.error_outline,
+              title: 'Görevler yüklenemedi',
+              subtitle: e.toString(),
+              action: FilledButton(
+                onPressed: () =>
+                    ref.read(personalTasksProvider.notifier).refresh(),
+                child: const Text('Tekrar dene'),
               ),
             ),
-            data: (notes) {
-              if (notes.isEmpty) {
-                return const Center(child: Text('Henüz kişisel not yok.'));
+            data: (items) {
+              final filtered = _apply(items);
+              if (filtered.isEmpty) {
+                return const AppEmptyState(
+                  icon: Icons.inbox_outlined,
+                  title: 'Atanan görev yok',
+                  subtitle: 'Filtrelere uyan görev bulunamadı.',
+                );
               }
               return RefreshIndicator(
                 onRefresh: () =>
-                    ref.read(personalNotesProvider.notifier).refresh(),
-                child: ListView.separated(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-                  itemCount: notes.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    ref.read(personalTasksProvider.notifier).refresh(),
+                child: ListView.builder(
+                  itemCount: filtered.length,
                   itemBuilder: (context, index) {
-                    final note = notes[index];
-                    return _NoteTile(note: note);
+                    final task = filtered[index];
+                    return TaskCard(
+                      task: task,
+                      onTap: () => showTaskDetailSheet(
+                        context: context,
+                        ref: ref,
+                        projectId: task.projectId ?? '',
+                        task: task,
+                      ),
+                    );
                   },
                 ),
               );
@@ -313,41 +272,442 @@ class _PersonalNotesTabState extends ConsumerState<_PersonalNotesTab> {
   }
 }
 
-class _NoteTile extends ConsumerWidget {
-  const _NoteTile({required this.note});
+// ─── Notes ──────────────────────────────────────────────────────────────────
 
-  final NoteDto note;
+class _NotesTab extends ConsumerWidget {
+  const _NotesTab();
+
+  Future<void> _edit(
+    BuildContext context,
+    WidgetRef ref, {
+    PersonalNoteDto? existing,
+  }) async {
+    final title = TextEditingController(text: existing?.title ?? '');
+    final content = TextEditingController(text: existing?.content ?? '');
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(existing == null ? 'Yeni not' : 'Notu düzenle'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: title,
+                decoration: const InputDecoration(labelText: 'Başlık'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: content,
+                maxLines: 5,
+                decoration: const InputDecoration(labelText: 'İçerik'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('İptal'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Kaydet'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      if (existing == null) {
+        await ref.read(personalNotesV2Provider.notifier).create(
+              title: title.text,
+              content: content.text,
+            );
+      } else {
+        await ref.read(personalNotesV2Provider.notifier).updateNote(
+              noteId: existing.id,
+              title: title.text,
+              content: content.text,
+            );
+      }
+    } on PersonalException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      title.dispose();
+      content.dispose();
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Card(
-      child: ListTile(
-        leading: const Icon(Icons.sticky_note_2_outlined),
-        title: Text(note.title),
-        subtitle: note.plainText.isEmpty
-            ? null
-            : Text(
-                note.plainText,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-        trailing: IconButton(
-          tooltip: 'Sil',
-          onPressed: () async {
-            try {
-              await ref
-                  .read(personalNotesProvider.notifier)
-                  .deleteNote(note.id);
-            } on NoteException catch (error) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(SnackBar(content: Text(error.message)));
-              }
-            }
-          },
-          icon: const Icon(Icons.delete_outline),
+    final async = ref.watch(personalNotesV2Provider);
+    return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'personal-note-fab',
+        onPressed: () => _edit(context, ref),
+        child: const Icon(Icons.add),
+      ),
+      body: async.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => AppEmptyState(
+          icon: Icons.error_outline,
+          title: 'Notlar yüklenemedi',
+          subtitle: e.toString(),
+          action: FilledButton(
+            onPressed: () =>
+                ref.read(personalNotesV2Provider.notifier).refresh(),
+            child: const Text('Tekrar dene'),
+          ),
         ),
+        data: (notes) {
+          if (notes.isEmpty) {
+            return const AppEmptyState(
+              icon: Icons.note_alt_outlined,
+              title: 'Henüz not yok',
+              subtitle: 'Kişisel notlarınızı burada tutabilirsiniz.',
+            );
+          }
+          return RefreshIndicator(
+            onRefresh: () =>
+                ref.read(personalNotesV2Provider.notifier).refresh(),
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
+              itemCount: notes.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final note = notes[index];
+                return Card(
+                  child: ListTile(
+                    leading: Icon(
+                      note.isCompleted
+                          ? Icons.check_circle
+                          : Icons.note_outlined,
+                      color: note.isCompleted
+                          ? Colors.green
+                          : Theme.of(context).colorScheme.primary,
+                    ),
+                    title: Text(
+                      note.title,
+                      style: TextStyle(
+                        decoration: note.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                    ),
+                    subtitle: Text(
+                      note.content.isEmpty ? 'İçerik yok' : note.content,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (value) async {
+                        try {
+                          if (value == 'edit') {
+                            await _edit(context, ref, existing: note);
+                          } else if (value == 'toggle') {
+                            await ref
+                                .read(personalNotesV2Provider.notifier)
+                                .updateNote(
+                                  noteId: note.id,
+                                  isCompleted: !note.isCompleted,
+                                );
+                          } else if (value == 'delete') {
+                            await ref
+                                .read(personalNotesV2Provider.notifier)
+                                .remove(note.id);
+                          }
+                        } on PersonalException catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(e.message)),
+                            );
+                          }
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'edit', child: Text('Düzenle')),
+                        PopupMenuItem(
+                          value: 'toggle',
+                          child: Text('Tamamlandı işaretle'),
+                        ),
+                        PopupMenuItem(value: 'delete', child: Text('Sil')),
+                      ],
+                    ),
+                    onTap: () => _edit(context, ref, existing: note),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─── Todos ──────────────────────────────────────────────────────────────────
+
+class _TodosTab extends ConsumerWidget {
+  const _TodosTab();
+
+  Future<void> _add(BuildContext context, WidgetRef ref) async {
+    final taskCtrl = TextEditingController();
+    DateTime? due;
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setLocal) {
+              return AlertDialog(
+                title: const Text('Yeni todo'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: taskCtrl,
+                      decoration: const InputDecoration(labelText: 'Görev'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: due ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) setLocal(() => due = picked);
+                      },
+                      icon: const Icon(Icons.event),
+                      label: Text(
+                        due == null
+                            ? 'Bitiş tarihi (opsiyonel)'
+                            : DateFormat('dd.MM.yyyy').format(due!),
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('İptal'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Ekle'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+      if (ok != true || taskCtrl.text.trim().isEmpty) return;
+      await ref.read(personalTodosProvider.notifier).create(
+            task: taskCtrl.text.trim(),
+            dueDate: due != null
+                ? DateFormat('yyyy-MM-dd').format(due!)
+                : null,
+          );
+    } on PersonalException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } finally {
+      taskCtrl.dispose();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(personalTodosProvider);
+    return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'personal-todo-fab',
+        onPressed: () => _add(context, ref),
+        child: const Icon(Icons.add),
+      ),
+      body: async.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => AppEmptyState(
+          icon: Icons.error_outline,
+          title: 'Todos yüklenemedi',
+          subtitle: e.toString(),
+        ),
+        data: (todos) {
+          if (todos.isEmpty) {
+            return const AppEmptyState(
+              icon: Icons.checklist_outlined,
+              title: 'Todo yok',
+              subtitle: 'Kişisel yapılacaklar listenizi oluşturun.',
+            );
+          }
+          return RefreshIndicator(
+            onRefresh: () =>
+                ref.read(personalTodosProvider.notifier).refresh(),
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 88),
+              itemCount: todos.length,
+              itemBuilder: (context, index) {
+                final todo = todos[index];
+                return CheckboxListTile(
+                  value: todo.isCompleted,
+                  title: Text(
+                    todo.task,
+                    style: TextStyle(
+                      decoration: todo.isCompleted
+                          ? TextDecoration.lineThrough
+                          : null,
+                    ),
+                  ),
+                  subtitle: todo.dueDate != null
+                      ? Text('Bitiş: ${todo.dueDate}')
+                      : null,
+                  secondary: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () async {
+                      try {
+                        await ref
+                            .read(personalTodosProvider.notifier)
+                            .remove(todo.id);
+                      } on PersonalException catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.message)),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  onChanged: (value) async {
+                    try {
+                      await ref
+                          .read(personalTodosProvider.notifier)
+                          .toggle(todo.id, value ?? false);
+                    } on PersonalException catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(e.message)),
+                        );
+                      }
+                    }
+                  },
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─── Files ──────────────────────────────────────────────────────────────────
+
+class _FilesTab extends ConsumerWidget {
+  const _FilesTab();
+
+  Future<void> _upload(BuildContext context, WidgetRef ref) async {
+    final result = await FilePicker.platform.pickFiles();
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.path == null) return;
+    try {
+      await ref.read(personalFilesProvider.notifier).upload(
+            filePath: file.path!,
+            fileName: file.name,
+          );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Dosya yüklendi.')),
+        );
+      }
+    } on PersonalException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(personalFilesProvider);
+    return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'personal-file-fab',
+        onPressed: () => _upload(context, ref),
+        child: const Icon(Icons.upload_file),
+      ),
+      body: async.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => AppEmptyState(
+          icon: Icons.error_outline,
+          title: 'Dosyalar yüklenemedi',
+          subtitle: e.toString(),
+        ),
+        data: (files) {
+          if (files.isEmpty) {
+            return const AppEmptyState(
+              icon: Icons.folder_open_outlined,
+              title: 'Dosya yok',
+              subtitle: 'Kişisel dosyalarınızı buraya yükleyin.',
+            );
+          }
+          return RefreshIndicator(
+            onRefresh: () =>
+                ref.read(personalFilesProvider.notifier).refresh(),
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
+              itemCount: files.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final file = files[index];
+                return Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.insert_drive_file_outlined),
+                    title: Text(file.fileName),
+                    subtitle: file.fileSize != null
+                        ? Text('${(file.fileSize! / 1024).toStringAsFixed(1)} KB')
+                        : null,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () async {
+                        try {
+                          await ref
+                              .read(personalFilesProvider.notifier)
+                              .remove(file.id);
+                        } on PersonalException catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(e.message)),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    onTap: () async {
+                      final uri = Uri.tryParse(file.fileUrl);
+                      if (uri != null) {
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }
+                    },
+                  ),
+                );
+              },
+            ),
+          );
+        },
       ),
     );
   }
