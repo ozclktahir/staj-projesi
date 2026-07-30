@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/l10n/app_strings.dart';
 import '../../../core/locale/locale_provider.dart';
 import '../../../core/network/workspace_session_cleanup.dart';
 import '../../../core/router/app_router.dart';
@@ -19,25 +20,26 @@ class SettingsScreen extends ConsumerWidget {
   ) async {
     final active = ref.read(workspaceProvider).activeWorkspace;
     if (active == null) return;
+    final s = ref.read(appStringsProvider);
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Çalışma alanını sil'),
+        title: Text(s.settingsDeleteWorkspaceTitle),
         content: Text(
-          '"${active.name}" kalıcı olarak silinecek. Bu işlem geri alınamaz. Devam etmek istiyor musunuz?',
+          s.t('settings.deleteWorkspaceBody', {'name': active.name}),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('İptal'),
+            child: Text(s.commonCancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Sil'),
+            child: Text(s.commonDelete),
           ),
         ],
       ),
@@ -45,23 +47,19 @@ class SettingsScreen extends ConsumerWidget {
 
     if (confirmed != true || !context.mounted) return;
 
-    // Silmeden önce eski workspace bağımlı state'i temizle.
     invalidateWorkspaceScopedProvidersWithWidgetRef(ref);
 
     final ok =
         await ref.read(workspaceProvider.notifier).deleteWorkspace(active.id);
     if (!context.mounted) return;
 
-    // Silme sonrası (aktif null / yeni workspace) tekrar temizle + yenile.
     invalidateWorkspaceScopedProvidersWithWidgetRef(ref);
 
     if (ok) {
       final remaining = ref.read(workspaceProvider).workspaces;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Çalışma alanı silindi.')),
-        );
+        ..showSnackBar(SnackBar(content: Text(s.settingsWorkspaceDeleted)));
       if (remaining.isEmpty) {
         context.go(AppRoutes.onboarding);
       } else {
@@ -69,7 +67,7 @@ class SettingsScreen extends ConsumerWidget {
       }
     } else {
       final message =
-          ref.read(workspaceProvider).errorMessage ?? 'Silinemedi.';
+          ref.read(workspaceProvider).errorMessage ?? s.settingsDeleteFailed;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(message)));
@@ -80,6 +78,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final locale = ref.watch(localePreferenceProvider);
+    final s = ref.watch(appStringsProvider);
     final submitting = ref.watch(
       workspaceProvider.select((s) => s.isSubmitting),
     );
@@ -88,41 +87,41 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ayarlar'),
+        title: Text(s.settingsTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           Text(
-            'Görünüm',
+            s.settingsAppearance,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Tema',
+            s.settingsTheme,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
           ),
           const SizedBox(height: 8),
           SegmentedButton<ThemeMode>(
-            segments: const [
+            segments: [
               ButtonSegment(
                 value: ThemeMode.light,
-                label: Text('Açık'),
-                icon: Icon(Icons.light_mode_outlined),
+                label: Text(s.settingsThemeLight),
+                icon: const Icon(Icons.light_mode_outlined),
               ),
               ButtonSegment(
                 value: ThemeMode.dark,
-                label: Text('Koyu'),
-                icon: Icon(Icons.dark_mode_outlined),
+                label: Text(s.settingsThemeDark),
+                icon: const Icon(Icons.dark_mode_outlined),
               ),
               ButtonSegment(
                 value: ThemeMode.system,
-                label: Text('Sistem'),
-                icon: Icon(Icons.settings_suggest_outlined),
+                label: Text(s.settingsThemeSystem),
+                icon: const Icon(Icons.settings_suggest_outlined),
               ),
             ],
             selected: {themeMode},
@@ -132,12 +131,12 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 28),
           Text(
-            'Dil',
+            s.settingsLanguage,
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 4),
           Text(
-            'Şimdilik yalnızca tercih kaydı (çeviri yakında).',
+            s.settingsLanguageDesc,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -146,9 +145,9 @@ class SettingsScreen extends ConsumerWidget {
           DropdownButtonFormField<AppLocaleOption>(
             // ignore: deprecated_member_use
             value: locale,
-            decoration: const InputDecoration(
-              labelText: 'Uygulama dili',
-              prefixIcon: Icon(Icons.language),
+            decoration: InputDecoration(
+              labelText: s.settingsAppLanguage,
+              prefixIcon: const Icon(Icons.language),
             ),
             items: [
               for (final option in AppLocaleOption.values)
@@ -166,15 +165,15 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.group_outlined),
-            title: const Text('Üyeler'),
-            subtitle: const Text('Çalışma alanı üyelerini görüntüle'),
+            title: Text(s.settingsMembers),
+            subtitle: Text(s.settingsMembersDesc),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoutes.members),
           ),
           if (canDeleteWorkspace) ...[
             const SizedBox(height: 36),
             Text(
-              'Tehlikeli bölge',
+              s.settingsDangerZone,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Theme.of(context).colorScheme.error,
                   ),
@@ -194,7 +193,7 @@ class SettingsScreen extends ConsumerWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.delete_forever_outlined),
-              label: const Text('Çalışma Alanını Sil'),
+              label: Text(s.settingsDeleteWorkspace),
             ),
           ],
         ],

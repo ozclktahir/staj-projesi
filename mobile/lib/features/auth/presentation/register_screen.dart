@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/widgets/auth_split_shell.dart';
 import '../providers/auth_provider.dart';
@@ -44,8 +45,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!mounted) return;
 
     if (!ok) {
+      final s = ref.read(appStringsProvider);
       final message =
-          ref.read(authProvider).errorMessage ?? 'Kayıt başarısız.';
+          ref.read(authProvider).errorMessage ?? s.authRegisterFailed;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(message)));
@@ -56,6 +58,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final busy = auth.isSubmitting;
+    final s = ref.watch(appStringsProvider);
 
     return AuthSplitShell(
       child: AuthFormCard(
@@ -67,13 +70,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: IconButton(
-                  tooltip: 'Girişe dön',
+                  tooltip: s.authBackToLogin,
                   onPressed: busy ? null : () => context.go(AppRoutes.login),
                   icon: const Icon(Icons.arrow_back, color: Colors.white70),
                 ),
               ),
               Text(
-                'Kayıt Ol',
+                s.authRegister,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
@@ -82,7 +85,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Birkaç adımda çalışma alanına katılın',
+                s.authRegisterSubtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFFA1A1AA),
                     ),
@@ -179,12 +182,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       )
-                    : const Text('Kayıt Ol'),
+                    : Text(s.authRegister),
               ),
               const SizedBox(height: 12),
               TextButton(
                 onPressed: busy ? null : () => context.go(AppRoutes.login),
-                child: const Text('Zaten hesabın var mı? Giriş yap'),
+                child: Text(s.authHaveAccount),
               ),
             ],
           ),

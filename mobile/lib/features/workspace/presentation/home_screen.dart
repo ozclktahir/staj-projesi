@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -32,9 +33,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   var _index = 0;
 
-  static const _navLabels = ['Dashboard', 'Projeler', 'Kişisel'];
-  static const _navOverview = ['Genel bakış', 'Projeler', 'Kişisel alan'];
-
   Future<void> _invite(String workspaceId) async {
     final sent = await showInviteMemberDialog(
       context,
@@ -42,10 +40,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       workspaceId: workspaceId,
     );
     if (sent == true && mounted) {
+      final s = ref.read(appStringsProvider);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Davet gönderildi.')),
+          SnackBar(content: Text(s.errorsInviteSent)),
         );
     }
   }
@@ -68,6 +67,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final badgeCount = unreadCount + pendingInvites;
     final scheme = Theme.of(context).colorScheme;
     final wide = MediaQuery.sizeOf(context).width >= _wideBreakpoint;
+    final s = ref.watch(appStringsProvider);
+    final navLabels = [s.navDashboard, s.navProjects, s.navPersonal];
+    final navOverview = [s.commonOverview, s.navProjects, s.navPersonalArea];
 
     final content = active == null
         ? _ProjectsBody(
@@ -159,7 +161,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Divider(height: 1, color: scheme.outline),
               const SizedBox(height: 8),
               if (active != null) ...[
-                for (var i = 0; i < _navLabels.length; i++)
+                for (var i = 0; i < navLabels.length; i++)
                   _DrawerNavTile(
                     icon: switch (i) {
                       0 => Icons.dashboard_outlined,
@@ -171,7 +173,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       1 => Icons.folder,
                       _ => Icons.person,
                     },
-                    label: _navLabels[i],
+                    label: navLabels[i],
                     selected: _index == i,
                     onTap: () => _selectNav(i, closeDrawer: true),
                   ),
@@ -179,7 +181,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               _DrawerNavTile(
                 icon: Icons.settings_outlined,
                 selectedIcon: Icons.settings,
-                label: 'Ayarlar',
+                label: s.navSettings,
                 selected: false,
                 onTap: () {
                   Navigator.of(context).pop();
@@ -190,7 +192,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 _DrawerNavTile(
                   icon: Icons.group_outlined,
                   selectedIcon: Icons.group,
-                  label: 'Üyeler',
+                  label: s.navMembers,
                   selected: false,
                   onTap: () {
                     Navigator.of(context).pop();
@@ -201,7 +203,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 _DrawerNavTile(
                   icon: Icons.person_add_alt_1_outlined,
                   selectedIcon: Icons.person_add_alt_1,
-                  label: 'Üye davet et',
+                  label: s.navInvite,
                   selected: false,
                   onTap: () {
                     Navigator.of(context).pop();
@@ -213,7 +215,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               _DrawerNavTile(
                 icon: Icons.logout,
                 selectedIcon: Icons.logout,
-                label: 'Çıkış yap',
+                label: s.navLogout,
                 selected: false,
                 onTap: () {
                   Navigator.of(context).pop();
@@ -237,7 +239,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  active == null ? 'Genel bakış' : _navOverview[_index],
+                  active == null ? s.commonOverview : navOverview[_index],
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -270,12 +272,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           if (active != null) ...[
             if (!wide && caps.canInvite)
               IconButton(
-                tooltip: 'Üye Davet Et',
+                tooltip: s.navInvite,
                 onPressed: () => _invite(active.id),
                 icon: const Icon(Icons.person_add_alt_1_outlined),
               ),
             IconButton(
-              tooltip: 'Bildirimler',
+              tooltip: s.commonNotifications,
               onPressed: () => showNotificationsSheet(context, ref),
               icon: Badge(
                 isLabelVisible: badgeCount > 0,
@@ -286,18 +288,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
           if (!wide)
             IconButton(
-              tooltip: 'Çıkış',
+              tooltip: s.navLogout,
               onPressed: () => ref.read(authProvider.notifier).logout(),
               icon: const Icon(Icons.logout),
             ),
           if (wide) ...[
             IconButton(
-              tooltip: 'Ayarlar',
+              tooltip: s.navSettings,
               onPressed: () => context.push(AppRoutes.settings),
               icon: const Icon(Icons.settings_outlined),
             ),
             IconButton(
-              tooltip: 'Çıkış',
+              tooltip: s.navLogout,
               onPressed: () => ref.read(authProvider.notifier).logout(),
               icon: const Icon(Icons.logout),
             ),
@@ -306,14 +308,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       floatingActionButton: canCreateProject
           ? FloatingActionButton(
-              tooltip: 'Yeni proje',
+              tooltip: s.commonNewProject,
               onPressed: () async {
                 final created = await showCreateProjectDialog(context, ref);
                 if (created == true && context.mounted) {
                   ScaffoldMessenger.of(context)
                     ..hideCurrentSnackBar()
                     ..showSnackBar(
-                      const SnackBar(content: Text('Proje oluşturuldu.')),
+                      SnackBar(content: Text(s.errorsProjectCreated)),
                     );
                 }
               },
@@ -324,21 +326,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ? NavigationBar(
               selectedIndex: _index,
               onDestinationSelected: (value) => setState(() => _index = value),
-              destinations: const [
+              destinations: [
                 NavigationDestination(
-                  icon: Icon(Icons.dashboard_outlined),
-                  selectedIcon: Icon(Icons.dashboard),
-                  label: 'Dashboard',
+                  icon: const Icon(Icons.dashboard_outlined),
+                  selectedIcon: const Icon(Icons.dashboard),
+                  label: s.navDashboard,
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.folder_outlined),
-                  selectedIcon: Icon(Icons.folder),
-                  label: 'Projeler',
+                  icon: const Icon(Icons.folder_outlined),
+                  selectedIcon: const Icon(Icons.folder),
+                  label: s.navProjects,
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
-                  label: 'Kişisel',
+                  icon: const Icon(Icons.person_outline),
+                  selectedIcon: const Icon(Icons.person),
+                  label: s.navPersonal,
                 ),
               ],
             )
@@ -359,21 +361,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
-                  destinations: const [
+                  destinations: [
                     NavigationRailDestination(
-                      icon: Icon(Icons.dashboard_outlined),
-                      selectedIcon: Icon(Icons.dashboard),
-                      label: Text('Dashboard'),
+                      icon: const Icon(Icons.dashboard_outlined),
+                      selectedIcon: const Icon(Icons.dashboard),
+                      label: Text(s.navDashboard),
                     ),
                     NavigationRailDestination(
-                      icon: Icon(Icons.folder_outlined),
-                      selectedIcon: Icon(Icons.folder),
-                      label: Text('Projeler'),
+                      icon: const Icon(Icons.folder_outlined),
+                      selectedIcon: const Icon(Icons.folder),
+                      label: Text(s.navProjects),
                     ),
                     NavigationRailDestination(
-                      icon: Icon(Icons.person_outline),
-                      selectedIcon: Icon(Icons.person),
-                      label: Text('Kişisel'),
+                      icon: const Icon(Icons.person_outline),
+                      selectedIcon: const Icon(Icons.person),
+                      label: Text(s.navPersonal),
                     ),
                   ],
                   trailing: Expanded(
@@ -386,14 +388,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           children: [
                             if (caps.canInvite)
                               IconButton(
-                                tooltip: 'Üye davet et',
+                                tooltip: s.navInvite,
                                 onPressed: () => _invite(active.id),
                                 icon: const Icon(
                                   Icons.person_add_alt_1_outlined,
                                 ),
                               ),
                             IconButton(
-                              tooltip: 'Ayarlar',
+                              tooltip: s.navSettings,
                               onPressed: () =>
                                   context.push(AppRoutes.settings),
                               icon: const Icon(Icons.settings_outlined),
@@ -478,6 +480,8 @@ class _ProjectsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+
     if (workspaceLoading && !hasWorkspaces) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -485,11 +489,11 @@ class _ProjectsBody extends StatelessWidget {
     if (workspaceError != null && !hasWorkspaces) {
       return AppEmptyState(
         icon: Icons.error_outline,
-        title: 'Çalışma alanları yüklenemedi',
+        title: s.homeWorkspacesLoadError,
         subtitle: workspaceError,
         action: FilledButton(
           onPressed: onRefreshWorkspaces,
-          child: const Text('Tekrar dene'),
+          child: Text(s.commonRetry),
         ),
       );
     }
@@ -497,12 +501,12 @@ class _ProjectsBody extends StatelessWidget {
     if (!hasWorkspaces) {
       return AppEmptyState(
         icon: Icons.workspaces_outlined,
-        title: 'Henüz çalışma alanınız yok',
-        subtitle: 'Başlamak için bir çalışma alanı oluşturun.',
+        title: s.homeNoWorkspacesTitle,
+        subtitle: s.homeNoWorkspacesSubtitle,
         action: FilledButton.icon(
           onPressed: onOpenSwitcher,
           icon: const Icon(Icons.add),
-          label: const Text('Çalışma alanı oluştur'),
+          label: Text(s.commonCreateWorkspace),
         ),
       );
     }
@@ -510,11 +514,11 @@ class _ProjectsBody extends StatelessWidget {
     if (!hasActiveWorkspace) {
       return AppEmptyState(
         icon: Icons.swap_horiz,
-        title: 'Çalışma alanı seçin',
-        subtitle: 'Devam etmek için bir çalışma alanı seçmeniz gerekiyor.',
+        title: s.homeSelectWorkspaceTitle,
+        subtitle: s.homeSelectWorkspaceSubtitle,
         action: FilledButton(
           onPressed: onOpenSwitcher,
-          child: const Text('Çalışma alanı seç'),
+          child: Text(s.commonSelectWorkspace),
         ),
       );
     }
@@ -537,11 +541,11 @@ class _ProjectsBody extends StatelessWidget {
           children: [
             AppEmptyState(
               icon: Icons.error_outline,
-              title: 'Projeler yüklenemedi',
+              title: s.homeProjectsLoadError,
               subtitle: error.toString(),
               action: FilledButton(
                 onPressed: onRefreshProjects,
-                child: const Text('Tekrar dene'),
+                child: Text(s.commonRetry),
               ),
             ),
           ],

@@ -126,7 +126,7 @@
 - Üyeler: Web assignee dropdown + üye görünürlük kuralları; mobilde UUID elle giriş, üye listesi/yönetim yok.
 - RBAC UI: Web Admin/OWNER kapıları; mobilde çoğu aksiyon herkese açık (API 403’e bırakılmış).
 - Dashboard: Web ile yakın KPI (oran/üyeler) + öncelik/workload bar + aktivite feed.
-- i18n: Web TR/EN kısmen uygulanmış; mobil tercih kaydı var, UI hard-coded TR.
+- i18n: TR/EN string katmanı Settings dil tercihine bağlı (nav/settings/auth/notifications/activity).
 - Kanban: Web ile kolon sıralama + claim pending kart görselleri; filtre/arama mevcut.
 - Bildirimler: Web claim/silme-onay aksiyonları; mobil yalnızca davet + okundu.
 
@@ -166,7 +166,7 @@
   - Kolon sıralama (öncelik), claim pending görselleri, kart badge’leri web ile uyumlu
   - Task detail sheet bölüm düzeni (Detay / Alt görev / Yorum / Dosya) spacing & tipografi
   - Create/Edit dialog form stilleri (outline input, primary CTA)
-- [ ] **Adım 10: i18n gerçek uygulama + kalan uyum**
+- [x] **Adım 10: i18n gerçek uygulama + kalan uyum**
   - TR/EN string katmanı (nav, settings, ortak butonlar, hatalar) — Settings dil tercihine bağla
   - Bildirim/Activity metinlerinde dil desteği
   - Son regressiyon: `flutter analyze` + kritik akış smoke listesi
@@ -581,3 +581,7 @@
 ### [30 Temmuz 2026] - Faz 8.2 Adım 9: Kanban & görev detay UI cilası
 - Kolon sıralama (öncelik/tarih) + varsayılan priority_desc; kart: açıklama, assignee chip, priority border renkleri, claim/SLA badge.
 - Detay sekmesi label/spacing; create/edit outline İptal + primary CTA; input border light `width: 2`. `flutter analyze` temiz.
+
+### [30 Temmuz 2026] - Faz 8.2 Adım 10: i18n TR/EN + kalan uyum
+- `AppStrings` TR/EN sözlük + `appStringsProvider` / InheritedScope; MaterialApp.locale Settings `locale_code` ile bağlı.
+- Nav/settings/auth/notifications/activity mesajları lokalize; “çeviri yakında” kaldırıldı. `flutter analyze` temiz. Faz 8.2 tamamlandı.

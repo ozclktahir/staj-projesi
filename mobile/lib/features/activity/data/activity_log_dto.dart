@@ -1,3 +1,6 @@
+import '../../../core/l10n/app_strings.dart';
+import '../../../core/locale/locale_provider.dart';
+
 class ActivityLogDto {
   const ActivityLogDto({
     required this.id,
@@ -67,48 +70,90 @@ class ActivityLogDto {
     return 'görev';
   }
 
-  /// İnsan okunur zaman tüneli mesajı.
-  String get formattedMessage {
-    final name = actorName;
-    final title = taskTitle;
+  /// İnsan okunur zaman tüneli mesajı (varsayılan TR).
+  String get formattedMessage => formatMessage();
+
+  /// Locale-aware aktivite mesajı.
+  String formatMessage([AppStrings? strings]) {
+    final s = strings ?? AppStrings.ofLocale(AppLocaleOption.tr);
+    final name = () {
+      final d = details;
+      if (d == null) return s.activityUnknownUser;
+      final n = d['actor_name'] ?? d['actorName'];
+      if (n is String && n.trim().isNotEmpty) return n.trim();
+      return s.activityUnknownUser;
+    }();
+    final title = () {
+      final d = details;
+      if (d == null) return s.activityTaskFallback;
+      final t = d['task_title'] ?? d['taskTitle'] ?? d['title'];
+      if (t is String && t.trim().isNotEmpty) return t.trim();
+      return s.activityTaskFallback;
+    }();
     final d = details ?? const <String, dynamic>{};
 
     switch (actionType) {
       case 'task_created':
       case 'created':
-        return '$name "$title" görevini oluşturdu';
+        return s.activityCreated(name, title);
       case 'task_deleted':
       case 'deleted':
-        return '$name "$title" görevini sildi';
+        return s.activityDeleted(name, title);
       case 'status_changed':
         final to = d['new_value'] ?? d['to'] ?? d['status'];
-        return '$name "$title" görevini "${to ?? 'yeni durum'}" olarak işaretledi';
+        return s.activityStatus(
+          name,
+          title,
+          to?.toString() ?? (s.isEnglish ? 'new status' : 'yeni durum'),
+        );
       case 'priority_changed':
         final to = d['new_value'] ?? d['to'] ?? d['priority'];
-        return '$name "$title" önceliğini "${to ?? 'yeni öncelik'}" yaptı';
+        return s.activityPriority(
+          name,
+          title,
+          to?.toString() ?? (s.isEnglish ? 'new priority' : 'yeni öncelik'),
+        );
       case 'assignee_changed':
         final assignee = d['new_assignee_name'] ?? d['assignee_name'];
-        return '$name "$title" görevini ${assignee is String && assignee.isNotEmpty ? assignee : 'birine'} atadı';
+        return s.activityAssignee(
+          name,
+          title,
+          assignee is String && assignee.isNotEmpty
+              ? assignee
+              : (s.isEnglish ? 'someone' : 'birine'),
+        );
       case 'comment_added':
-        return '$name "$title" görevine yorum ekledi';
+        return s.activityComment(name, title);
       case 'attachment_added':
         final fileName = d['file_name'];
-        return '$name "$title" görevine ${fileName is String && fileName.isNotEmpty ? fileName : 'bir dosya'} ekledi';
+        return s.activityAttachment(
+          name,
+          title,
+          fileName is String && fileName.isNotEmpty
+              ? fileName
+              : (s.isEnglish ? 'a file' : 'bir dosya'),
+        );
       case 'task_updated':
       case 'updated':
-        return '$name "$title" görevini güncelledi';
+        return s.activityUpdated(name, title);
       case 'task_claim_accepted':
-        return "$name, '$title' görevini kabul etti ve üzerinde çalışmaya başladı.";
+        return s.activityClaimAccepted(name, title);
       case 'task_claim_rejected':
-        return "$name, kendisine atanan '$title' görevini reddetti.";
+        return s.activityClaimRejected(name, title);
       case 'task_reassigned':
         final assignee = d['new_assignee_name'];
-        return "$name, reddedilen '$title' görevini ${assignee is String && assignee.isNotEmpty ? assignee : 'bir kullanıcı'}'na yeniden atadı.";
+        return s.activityReassigned(
+          name,
+          title,
+          assignee is String && assignee.isNotEmpty
+              ? assignee
+              : (s.isEnglish ? 'a user' : 'bir kullanıcı'),
+        );
       default:
-        if (actionType.isNotEmpty) {
-          return '$name bir işlem yaptı ($actionType)';
-        }
-        return '$name bir işlem yaptı';
+        return s.activityGeneric(
+          name,
+          actionType.isNotEmpty ? actionType : null,
+        );
     }
   }
 }

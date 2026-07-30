@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/widgets/auth_split_shell.dart';
 import '../providers/auth_provider.dart';
@@ -38,8 +39,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
 
     if (!ok) {
+      final s = ref.read(appStringsProvider);
       final message =
-          ref.read(authProvider).errorMessage ?? 'Giriş başarısız.';
+          ref.read(authProvider).errorMessage ?? s.authLoginFailed;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(message)));
@@ -50,6 +52,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final busy = auth.isSubmitting;
+    final s = ref.watch(appStringsProvider);
 
     return AuthSplitShell(
       child: AuthFormCard(
@@ -59,7 +62,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Giriş Yap',
+                s.authLogin,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
@@ -68,7 +71,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Çalışma alanına hoş geldiniz',
+                s.authLoginSubtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFFA1A1AA),
                     ),
@@ -82,15 +85,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 autofillHints: const [AutofillHints.email],
                 textInputAction: TextInputAction.next,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'E-posta',
+                decoration: InputDecoration(
+                  labelText: s.isEnglish ? 'Email' : 'E-posta',
                 ),
                 validator: (value) {
                   final email = value?.trim() ?? '';
-                  if (email.isEmpty) return 'E-posta zorunludur';
+                  if (email.isEmpty) {
+                    return s.isEnglish
+                        ? 'Email is required'
+                        : 'E-posta zorunludur';
+                  }
                   final ok =
                       RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
-                  if (!ok) return 'Geçerli bir e-posta girin';
+                  if (!ok) {
+                    return s.isEnglish
+                        ? 'Enter a valid email'
+                        : 'Geçerli bir e-posta girin';
+                  }
                   return null;
                 },
               ),
@@ -104,7 +115,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onFieldSubmitted: (_) => _submit(),
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  labelText: 'Şifre',
+                  labelText: s.isEnglish ? 'Password' : 'Şifre',
                   suffixIcon: IconButton(
                     onPressed: busy
                         ? null
@@ -120,9 +131,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 validator: (value) {
                   final password = value ?? '';
-                  if (password.isEmpty) return 'Şifre zorunludur';
+                  if (password.isEmpty) {
+                    return s.isEnglish
+                        ? 'Password is required'
+                        : 'Şifre zorunludur';
+                  }
                   if (password.length < 6) {
-                    return 'Şifre en az 6 karakter olmalıdır';
+                    return s.isEnglish
+                        ? 'Password must be at least 6 characters'
+                        : 'Şifre en az 6 karakter olmalıdır';
                   }
                   return null;
                 },
@@ -139,13 +156,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       )
-                    : const Text('Giriş Yap'),
+                    : Text(s.authLogin),
               ),
               const SizedBox(height: 12),
               TextButton(
                 onPressed:
                     busy ? null : () => context.push(AppRoutes.register),
-                child: const Text('Hesabın yok mu? Kayıt ol'),
+                child: Text(s.authNoAccount),
               ),
             ],
           ),

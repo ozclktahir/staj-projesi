@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/l10n/app_strings.dart';
+import 'core/locale/locale_provider.dart';
 import 'core/network/api_client_provider.dart';
 import 'core/network/realtime_provider.dart';
 import 'core/network/workspace_scope_sync.dart';
@@ -35,7 +37,6 @@ class _StajMobileAppState extends ConsumerState<StajMobileApp> {
   @override
   void initState() {
     super.initState();
-    // Socket bağlantısını ilk frame sonrasında başlat (build sırasında invalidate riski azalır).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(realtimeConnectionProvider);
@@ -46,7 +47,8 @@ class _StajMobileAppState extends ConsumerState<StajMobileApp> {
   Widget build(BuildContext context) {
     final router = ref.watch(goRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
-    // Bağımlılıklar değişince provider yeniden çalışır (socket reconnect).
+    final localeOption = ref.watch(localePreferenceProvider);
+    final strings = ref.watch(appStringsProvider);
     ref.watch(realtimeConnectionProvider);
     ref.watch(workspaceScopeSyncProvider);
     ref.watch(workspaceForbiddenListenerProvider);
@@ -58,7 +60,18 @@ class _StajMobileAppState extends ConsumerState<StajMobileApp> {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
+      locale: Locale(localeOption.code),
+      supportedLocales: const [
+        Locale('tr'),
+        Locale('en'),
+      ],
       routerConfig: router,
+      builder: (context, child) {
+        return wrapWithAppStrings(
+          strings: strings,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

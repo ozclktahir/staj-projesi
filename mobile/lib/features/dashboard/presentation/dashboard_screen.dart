@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/l10n/app_strings.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../activity/data/activity_log_dto.dart';
 import '../../activity/providers/activity_log_provider.dart';
@@ -870,7 +871,7 @@ class _ActivityRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  log.formattedMessage,
+                  log.formatMessage(AppStrings.of(context)),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 2),

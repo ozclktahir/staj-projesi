@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/l10n/app_strings.dart';
 import '../../invitations/data/invitation_dto.dart';
 import '../../invitations/data/invitation_repository.dart';
 import '../../invitations/providers/invitation_provider.dart';
@@ -28,6 +29,7 @@ class _NotificationsSheetBody extends ConsumerWidget {
     final invitationsAsync = ref.watch(myInvitationsProvider);
     final height = MediaQuery.sizeOf(context).height * 0.75;
     final formatter = DateFormat('dd.MM.yyyy HH:mm');
+    final s = ref.watch(appStringsProvider);
 
     return SizedBox(
       height: height,
@@ -39,7 +41,7 @@ class _NotificationsSheetBody extends ConsumerWidget {
             child: Row(
               children: [
                 Text(
-                  'Bildirimler',
+                  s.notificationsTitle,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const Spacer(),
@@ -62,14 +64,14 @@ class _NotificationsSheetBody extends ConsumerWidget {
                         ScaffoldMessenger.of(context)
                           ..hideCurrentSnackBar()
                           ..showSnackBar(
-                            const SnackBar(
-                              content: Text('Bildirimler güncellenemedi.'),
+                            SnackBar(
+                              content: Text(s.notificationsRefreshFailed),
                             ),
                           );
                       }
                     }
                   },
-                  child: const Text('Tümünü okundu'),
+                  child: Text(s.notificationsMarkAll),
                 ),
               ],
             ),
@@ -94,7 +96,9 @@ class _NotificationsSheetBody extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: Text(
-                      'Workspace bildirimleri',
+                      s.isEnglish
+                          ? 'Workspace notifications'
+                          : 'Workspace bildirimleri',
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                   ),
@@ -113,16 +117,16 @@ class _NotificationsSheetBody extends ConsumerWidget {
                             onPressed: () => ref
                                 .read(notificationsProvider.notifier)
                                 .refresh(),
-                            child: const Text('Tekrar dene'),
+                            child: Text(s.commonRetry),
                           ),
                         ],
                       ),
                     ),
                     data: (items) {
                       if (items.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 32),
-                          child: Center(child: Text('Bildirim yok.')),
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Center(child: Text(s.notificationsEmpty)),
                         );
                       }
                       return Column(
@@ -173,27 +177,28 @@ class _PendingInvitationsSection extends ConsumerWidget {
       ),
       data: (items) {
         final pending = items.where((i) => i.isPending).toList();
+        final s = AppStrings.of(context);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Text(
-                'Bekleyen davetler${pending.isEmpty ? '' : ' (${pending.length})'}',
+                '${s.notificationsPendingInvites}${pending.isEmpty ? '' : ' (${pending.length})'}',
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
             if (pending.isEmpty)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text('Bekleyen davet yok.'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(s.notificationsNoPendingInvites),
               )
             else
               for (final invite in pending)
                 _InvitationActionCard(
-                  title: invite.workspaceName ?? 'Çalışma alanı daveti',
+                  title: invite.workspaceName ?? s.notificationsInviteFallback,
                   subtitle:
-                      '${invite.role} rolü • ${invite.email}${invite.createdAt != null ? '\n${_formatTime(formatter, invite.createdAt)}' : ''}',
+                      '${invite.role} • ${invite.email}${invite.createdAt != null ? '\n${_formatTime(formatter, invite.createdAt)}' : ''}',
                   invitationId: invite.id,
                   notificationId: null,
                 ),
@@ -385,7 +390,7 @@ class _InviteActionButtonsState extends ConsumerState<_InviteActionButtons> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Davet işlemi başarısız oldu.')),
+          SnackBar(content: Text(AppStrings.of(context).notificationsInviteFailed)),
         );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -394,6 +399,7 @@ class _InviteActionButtonsState extends ConsumerState<_InviteActionButtons> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Row(
       children: [
         Expanded(
@@ -404,9 +410,11 @@ class _InviteActionButtonsState extends ConsumerState<_InviteActionButtons> {
                       action: () => ref
                           .read(myInvitationsProvider.notifier)
                           .reject(widget.invitationId),
-                      successMessage: 'Davet reddedildi.',
+                      successMessage: s.isEnglish
+                          ? 'Invite rejected.'
+                          : 'Davet reddedildi.',
                     ),
-            child: const Text('Reddet'),
+            child: Text(s.commonReject),
           ),
         ),
         const SizedBox(width: 8),
@@ -418,7 +426,9 @@ class _InviteActionButtonsState extends ConsumerState<_InviteActionButtons> {
                       action: () => ref
                           .read(myInvitationsProvider.notifier)
                           .accept(widget.invitationId),
-                      successMessage: 'Davet kabul edildi.',
+                      successMessage: s.isEnglish
+                          ? 'Invite accepted.'
+                          : 'Davet kabul edildi.',
                     ),
             child: _busy
                 ? const SizedBox(
@@ -426,7 +436,7 @@ class _InviteActionButtonsState extends ConsumerState<_InviteActionButtons> {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Kabul Et'),
+                : Text(s.commonAccept),
           ),
         ),
       ],
@@ -472,7 +482,7 @@ class _DeletionActionButtonsState
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Silme onayı yanıtı başarısız oldu.')),
+          SnackBar(content: Text(AppStrings.of(context).notificationsDeletionFailed)),
         );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -481,12 +491,13 @@ class _DeletionActionButtonsState
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Row(
       children: [
         Expanded(
           child: OutlinedButton(
             onPressed: _busy ? null : () => _respond('decline'),
-            child: const Text('Reddet'),
+            child: Text(s.commonReject),
           ),
         ),
         const SizedBox(width: 8),
@@ -499,7 +510,7 @@ class _DeletionActionButtonsState
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Onayla ve sil'),
+                : Text(s.notificationsApproveDelete),
           ),
         ),
       ],
@@ -544,7 +555,7 @@ class _ClaimActionButtonsState extends ConsumerState<_ClaimActionButtons> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Sahiplenme yanıtı başarısız oldu.')),
+          SnackBar(content: Text(AppStrings.of(context).notificationsClaimFailed)),
         );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -553,12 +564,13 @@ class _ClaimActionButtonsState extends ConsumerState<_ClaimActionButtons> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Row(
       children: [
         Expanded(
           child: OutlinedButton(
             onPressed: _busy ? null : () => _respond('decline'),
-            child: const Text('Reddet'),
+            child: Text(s.commonReject),
           ),
         ),
         const SizedBox(width: 8),
@@ -571,7 +583,7 @@ class _ClaimActionButtonsState extends ConsumerState<_ClaimActionButtons> {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Kabul Et'),
+                : Text(s.commonAccept),
           ),
         ),
       ],

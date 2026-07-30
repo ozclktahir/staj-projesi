@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_strings.dart';
 import '../providers/auth_provider.dart';
 
 /// Oturum çözülürken gösterilen splash (form yok).
@@ -9,17 +10,17 @@ class SplashPlaceholderPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Bootstrap tetiklensin diye watch
     ref.watch(authProvider);
+    final s = ref.watch(appStringsProvider);
 
-    return const Scaffold(
+    return Scaffold(
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Oturum kontrol ediliyor…'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(s.authCheckingSession),
           ],
         ),
       ),

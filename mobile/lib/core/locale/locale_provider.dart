@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/storage_keys.dart';
 import '../storage/shared_preferences_provider.dart';
 
-/// Desteklenen arayüz dilleri (şimdilik yalnızca tercih kaydı; i18n bağlanacak).
+/// Desteklenen arayüz dilleri (`AppStrings` / MaterialApp.locale ile bağlı).
 enum AppLocaleOption {
   tr('tr', 'Türkçe'),
   en('en', 'English');

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/l10n/app_strings.dart';
 import '../data/activity_log_dto.dart';
 import '../data/activity_log_repository.dart';
 import '../providers/activity_log_provider.dart';
@@ -48,6 +49,7 @@ class ActivityLogPanel extends ConsumerWidget {
         ),
       ),
       data: (logs) {
+        final s = AppStrings.of(context);
         if (logs.isEmpty) {
           return RefreshIndicator(
             onRefresh: () =>
@@ -55,12 +57,12 @@ class ActivityLogPanel extends ConsumerWidget {
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: padding,
-              children: const [
-                SizedBox(height: 80),
-                Icon(Icons.history, size: 48),
-                SizedBox(height: 16),
+              children: [
+                const SizedBox(height: 80),
+                const Icon(Icons.history, size: 48),
+                const SizedBox(height: 16),
                 Text(
-                  'Henüz aktivite kaydı yok',
+                  s.activityEmpty,
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -150,7 +152,7 @@ class _ActivityTimelineTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    log.formattedMessage,
+                    log.formatMessage(AppStrings.of(context)),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   if (timeLabel.isNotEmpty) ...[
