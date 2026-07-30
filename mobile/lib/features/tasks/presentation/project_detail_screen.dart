@@ -170,11 +170,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             _KanbanToolbar(
               searchController: _searchController,
               selectedPriority: filter.priority,
+              selectedSort: filter.sort,
               onSearchChanged: _onSearchChanged,
               onPrioritySelected: (priority) {
                 ref
                     .read(kanbanFilterProvider(widget.projectId).notifier)
                     .setPriority(priority);
+              },
+              onSortSelected: (sort) {
+                ref
+                    .read(kanbanFilterProvider(widget.projectId).notifier)
+                    .setSort(sort);
               },
               onClearSearch: () {
                 _searchController.clear();
@@ -190,6 +196,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     _StatusColumnBody(
                       projectId: widget.projectId,
                       status: status,
+                      sort: filter.sort,
                     ),
                   ActivityLogPanel(projectId: widget.projectId),
                 ],
@@ -206,15 +213,19 @@ class _KanbanToolbar extends StatelessWidget {
   const _KanbanToolbar({
     required this.searchController,
     required this.selectedPriority,
+    required this.selectedSort,
     required this.onSearchChanged,
     required this.onPrioritySelected,
+    required this.onSortSelected,
     required this.onClearSearch,
   });
 
   final TextEditingController searchController;
   final TaskPriority? selectedPriority;
+  final KanbanSort selectedSort;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<TaskPriority?> onPrioritySelected;
+  final ValueChanged<KanbanSort> onSortSelected;
   final VoidCallback onClearSearch;
 
   @override
@@ -250,26 +261,81 @@ class _KanbanToolbar extends StatelessWidget {
               },
             ),
             const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _PriorityChip(
-                    label: 'ALL',
-                    selected: selectedPriority == null,
-                    onSelected: () => onPrioritySelected(null),
-                  ),
-                  for (final priority in TaskPriority.values)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 6),
-                      child: _PriorityChip(
-                        label: priority.apiValue,
-                        selected: selectedPriority == priority,
-                        onSelected: () => onPrioritySelected(priority),
-                      ),
+            Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _PriorityChip(
+                          label: 'ALL',
+                          selected: selectedPriority == null,
+                          onSelected: () => onPrioritySelected(null),
+                        ),
+                        for (final priority in TaskPriority.values)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: _PriorityChip(
+                              label: priority.apiValue,
+                              selected: selectedPriority == priority,
+                              onSelected: () => onPrioritySelected(priority),
+                            ),
+                          ),
+                      ],
                     ),
-                ],
-              ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                PopupMenuButton<KanbanSort>(
+                  tooltip: 'Sıralama',
+                  initialValue: selectedSort,
+                  onSelected: onSortSelected,
+                  itemBuilder: (context) => [
+                    for (final sort in KanbanSort.values)
+                      PopupMenuItem(
+                        value: sort,
+                        child: Row(
+                          children: [
+                            if (sort == selectedSort)
+                              Icon(
+                                Icons.check,
+                                size: 16,
+                                color: Theme.of(context).colorScheme.primary,
+                              )
+                            else
+                              const SizedBox(width: 16),
+                            const SizedBox(width: 8),
+                            Flexible(child: Text(sort.label)),
+                          ],
+                        ),
+                      ),
+                  ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.sort,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Sıra',
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -305,10 +371,12 @@ class _StatusColumnBody extends ConsumerWidget {
   const _StatusColumnBody({
     required this.projectId,
     required this.status,
+    required this.sort,
   });
 
   final String projectId;
   final TaskStatus status;
+  final KanbanSort sort;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -333,12 +401,17 @@ class _StatusColumnBody extends ConsumerWidget {
           ),
         ),
       ),
-      data: (state) => _TaskColumn(
-        projectId: projectId,
-        tasks: state.items.where((task) => task.status == status).toList(),
-        hasMore: state.hasMore,
-        isLoadingMore: state.isLoadingMore,
-      ),
+      data: (state) {
+        final column = state.items
+            .where((task) => task.status == status)
+            .toList();
+        return _TaskColumn(
+          projectId: projectId,
+          tasks: applyKanbanSort(column, sort),
+          hasMore: state.hasMore,
+          isLoadingMore: state.isLoadingMore,
+        );
+      },
     );
   }
 }

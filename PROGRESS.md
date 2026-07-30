@@ -127,7 +127,7 @@
 - RBAC UI: Web Admin/OWNER kapıları; mobilde çoğu aksiyon herkese açık (API 403’e bırakılmış).
 - Dashboard: Web ile yakın KPI (oran/üyeler) + öncelik/workload bar + aktivite feed.
 - i18n: Web TR/EN kısmen uygulanmış; mobil tercih kaydı var, UI hard-coded TR.
-- Kanban: Web sıralama + claim pending görselleri; mobil tab kolonları, claim yok.
+- Kanban: Web ile kolon sıralama + claim pending kart görselleri; filtre/arama mevcut.
 - Bildirimler: Web claim/silme-onay aksiyonları; mobil yalnızca davet + okundu.
 
 - [x] **Adım 1: Tasarım sistemi & tema parity (Web token → Flutter)**
@@ -162,7 +162,7 @@
   - Öncelik bar / üye iş yükü (workload) grafikleri
   - Dashboard’da son aktiviteler feed’i (web QuickActivityFeed)
   - KPI kartları ve boş durumları web layout’una yakınlaştır
-- [ ] **Adım 9: Kanban & görev detay UI cilası**
+- [x] **Adım 9: Kanban & görev detay UI cilası**
   - Kolon sıralama (öncelik), claim pending görselleri, kart badge’leri web ile uyumlu
   - Task detail sheet bölüm düzeni (Detay / Alt görev / Yorum / Dosya) spacing & tipografi
   - Create/Edit dialog form stilleri (outline input, primary CTA)
@@ -577,3 +577,7 @@
 ### [30 Temmuz 2026] - Faz 8.2 Adım 8: Dashboard / Analytics parity
 - KPI: Toplam / Tamamlanma % / Geciken / Aktif Üyeler; Durum donut + Öncelik bar + Üye iş yükü bar (`fl_chart`).
 - Dashboard’da Son Aktiviteler feed (`activityLogProvider`); boş grafik/deadline durumları web’e yakın. `flutter analyze` temiz.
+
+### [30 Temmuz 2026] - Faz 8.2 Adım 9: Kanban & görev detay UI cilası
+- Kolon sıralama (öncelik/tarih) + varsayılan priority_desc; kart: açıklama, assignee chip, priority border renkleri, claim/SLA badge.
+- Detay sekmesi label/spacing; create/edit outline İptal + primary CTA; input border light `width: 2`. `flutter analyze` temiz.

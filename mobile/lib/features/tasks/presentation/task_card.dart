@@ -20,88 +20,65 @@ class TaskCard extends ConsumerWidget {
     final labels = ref.watch(workspaceMemberLabelMapProvider);
     final claimPending = task.isClaimPending;
     final claimOverdue = task.isClaimOverdue;
+    final assignee = task.assigneeDisplayName(labels);
+    final desc = task.description?.trim();
 
     return Opacity(
-      opacity: claimPending && !claimOverdue ? 0.65 : 1,
+      opacity: claimPending && !claimOverdue ? 0.6 : 1,
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         clipBehavior: Clip.antiAlias,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(
             color: claimOverdue
                 ? Colors.red.shade400
-                : scheme.outline.withValues(alpha: 0.6),
-            width: claimOverdue ? 1.5 : 1,
+                : scheme.outline.withValues(alpha: 0.85),
+            width: claimOverdue
+                ? 1.5
+                : (scheme.brightness == Brightness.light ? 2 : 1),
           ),
         ),
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (claimPending) ...[
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: claimOverdue
-                            ? Colors.red.shade100
-                            : Colors.amber.shade100,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: claimOverdue
-                              ? Colors.red.shade300
-                              : Colors.amber.shade300,
-                        ),
-                      ),
-                      child: Text(
-                        claimOverdue
-                            ? 'Kullanıcı henüz görevi kabul etmedi! (SLA)'
-                            : 'Onay bekliyor',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: claimOverdue
-                              ? Colors.red.shade800
-                              : Colors.amber.shade900,
-                        ),
-                      ),
+                if (claimPending || task.isDeletionPending)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        if (claimPending)
+                          _StatusBadge(
+                            label: claimOverdue
+                                ? 'Kullanıcı henüz görevi kabul etmedi! (SLA)'
+                                : 'Onay bekliyor',
+                            bg: claimOverdue
+                                ? Colors.red.shade100
+                                : Colors.amber.shade100,
+                            fg: claimOverdue
+                                ? Colors.red.shade800
+                                : Colors.amber.shade900,
+                            border: claimOverdue
+                                ? Colors.red.shade300
+                                : Colors.amber.shade300,
+                          ),
+                        if (task.isDeletionPending)
+                          _StatusBadge(
+                            label: 'Silme onayı bekleniyor',
+                            bg: Colors.orange.shade100,
+                            fg: Colors.orange.shade900,
+                            border: Colors.orange.shade300,
+                          ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                ],
-                if (task.isDeletionPending) ...[
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.orange.shade300),
-                      ),
-                      child: Text(
-                        'Silme onayı bekleniyor',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.orange.shade900,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -111,40 +88,130 @@ class TaskCard extends ConsumerWidget {
                         children: [
                           Text(
                             task.title,
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.person_outline,
-                                size: 16,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  task.assigneeDisplayName(labels),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
-                            ],
-                          ),
+                          if (desc != null && desc.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              desc,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
                     const SizedBox(width: 8),
+                    _AssigneeChip(label: assignee),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
                     PriorityBadge(priority: task.priority),
+                    const Spacer(),
+                    Text(
+                      task.status.label,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
                   ],
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({
+    required this.label,
+    required this.bg,
+    required this.fg,
+    required this.border,
+  });
+
+  final String label;
+  final Color bg;
+  final Color fg;
+  final Color border;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
+    );
+  }
+}
+
+class _AssigneeChip extends StatelessWidget {
+  const _AssigneeChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final initial = label.isNotEmpty ? label.characters.first.toUpperCase() : '?';
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 120),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 11,
+            backgroundColor: scheme.surfaceContainerHighest,
+            child: Text(
+              initial,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -157,18 +224,31 @@ class PriorityBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (Color bg, Color fg) = switch (priority) {
-      TaskPriority.urgent => (Colors.purple.shade100, Colors.purple.shade900),
-      TaskPriority.high => (Colors.red.shade100, Colors.red.shade800),
-      TaskPriority.medium => (Colors.orange.shade100, Colors.orange.shade800),
-      TaskPriority.low => (Colors.green.shade100, Colors.green.shade800),
+    // Web `priorityClass`: HIGH red, LOW emerald, default (MEDIUM/URGENT) amber.
+    final (Color bg, Color fg, Color border) = switch (priority) {
+      TaskPriority.high => (
+          Colors.red.shade100,
+          Colors.red.shade700,
+          Colors.red.shade300,
+        ),
+      TaskPriority.low => (
+          Colors.green.shade100,
+          Colors.green.shade700,
+          Colors.green.shade300,
+        ),
+      TaskPriority.medium || TaskPriority.urgent => (
+          Colors.amber.shade100,
+          Colors.amber.shade800,
+          Colors.amber.shade300,
+        ),
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: border),
       ),
       child: Text(
         priority.label,
@@ -176,7 +256,7 @@ class PriorityBadge extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: fg,
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
       ),

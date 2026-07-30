@@ -251,13 +251,16 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 4, 0),
+              padding: const EdgeInsets.fromLTRB(20, 0, 4, 4),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
                       _task.title,
-                      style: Theme.of(context).textTheme.titleLarge,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
+                          ),
                     ),
                   ),
                   PriorityBadge(priority: _task.priority),
@@ -277,6 +280,7 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
             TabBar(
               controller: _tabController,
               isScrollable: true,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w600),
               tabs: const [
                 Tab(text: 'Detay'),
                 Tab(text: 'Alt Görevler'),
@@ -345,6 +349,7 @@ class _DetailsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final dueLabel = task.dueDate == null
         ? 'Belirtilmedi'
         : DateFormat('dd.MM.yyyy').format(
@@ -352,82 +357,84 @@ class _DetailsTab extends StatelessWidget {
           );
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       children: [
+        Row(
+          children: [
+            Text(
+              'Detay',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const Spacer(),
+            OutlinedButton.icon(
+              onPressed: busy ? null : onEdit,
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('Düzenle'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _FieldLabel(text: 'Açıklama'),
+        const SizedBox(height: 6),
+        Text(
+          (task.description != null && task.description!.trim().isNotEmpty)
+              ? task.description!
+              : 'Açıklama yok.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: (task.description != null &&
+                        task.description!.trim().isNotEmpty)
+                    ? null
+                    : scheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 20),
+        _FieldLabel(text: 'Atanan'),
+        const SizedBox(height: 6),
+        Text(assigneeLabel, style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: 16),
+        _FieldLabel(text: 'Teslim tarihi'),
+        const SizedBox(height: 6),
+        Text(dueLabel, style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: 16),
+        _FieldLabel(text: 'Öncelik'),
+        const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerLeft,
-          child: FilledButton.tonalIcon(
-            onPressed: busy ? null : onEdit,
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Düzenle'),
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (task.description != null && task.description!.isNotEmpty) ...[
-          Text(
-            task.description!,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-        ],
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.person_outline),
-          title: const Text('Atanan'),
-          subtitle: Text(assigneeLabel),
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.event_outlined),
-          title: const Text('Teslim tarihi'),
-          subtitle: Text(dueLabel),
-        ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.flag_outlined),
-          title: const Text('Öncelik'),
-          subtitle: Text(task.priority.label),
+          child: PriorityBadge(priority: task.priority),
         ),
         if (task.isClaimPending) ...[
-          const SizedBox(height: 4),
-          Card(
+          const SizedBox(height: 16),
+          _InfoBanner(
+            icon: Icons.hourglass_top,
             color: task.isClaimOverdue
-                ? Colors.red.shade50
-                : Colors.amber.shade50,
-            child: ListTile(
-              leading: Icon(
-                Icons.hourglass_top,
-                color: task.isClaimOverdue
-                    ? Colors.red.shade700
-                    : Colors.amber.shade800,
-              ),
-              title: Text(
-                task.isClaimOverdue
-                    ? 'SLA aşıldı — sahiplenme bekleniyor'
-                    : 'Sahiplenme onayı bekleniyor',
-              ),
-              subtitle: const Text(
+                ? Colors.red
+                : Colors.amber,
+            title: task.isClaimOverdue
+                ? 'SLA aşıldı — sahiplenme bekleniyor'
+                : 'Sahiplenme onayı bekleniyor',
+            subtitle:
                 'Atanan kullanıcı kabul edene kadar durum değiştirilemez.',
-              ),
-            ),
           ),
         ],
         if (task.isDeletionPending) ...[
-          const SizedBox(height: 4),
-          Card(
-            color: Colors.orange.shade50,
-            child: const ListTile(
-              leading: Icon(Icons.delete_forever_outlined),
-              title: Text('Silme onayı bekleniyor'),
-              subtitle: Text(
-                'Karşı taraf onaylayana kadar görev silinmez.',
-              ),
-            ),
+          const SizedBox(height: 12),
+          const _InfoBanner(
+            icon: Icons.delete_forever_outlined,
+            color: Colors.orange,
+            title: 'Silme onayı bekleniyor',
+            subtitle: 'Karşı taraf onaylayana kadar görev silinmez.',
           ),
         ],
-        const SizedBox(height: 8),
-        Text('Durum', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
+        const SizedBox(height: 20),
+        Text(
+          'Durum',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: 10),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -444,7 +451,7 @@ class _DetailsTab extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
         Row(
           children: [
             if (busy)
@@ -455,6 +462,7 @@ class _DetailsTab extends StatelessWidget {
               ),
             const Spacer(),
             TextButton(
+              style: TextButton.styleFrom(foregroundColor: scheme.error),
               onPressed: (busy || task.isDeletionPending) ? null : onDelete,
               child: Text(
                 task.isDeletionPending ? 'Onay bekleniyor' : 'Sil',
@@ -463,6 +471,80 @@ class _DetailsTab extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.2,
+          ),
+    );
+  }
+}
+
+class _InfoBanner extends StatelessWidget {
+  const _InfoBanner({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final MaterialColor color;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: color.shade800),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: color.shade900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: color.shade800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

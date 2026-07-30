@@ -140,11 +140,17 @@ abstract final class AppTheme {
             const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: borderRadius,
-          borderSide: BorderSide(color: scheme.outline),
+          borderSide: BorderSide(
+            color: scheme.outline,
+            width: scheme.brightness == Brightness.light ? 2 : 1,
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: borderRadius,
-          borderSide: BorderSide(color: scheme.outline),
+          borderSide: BorderSide(
+            color: scheme.outline,
+            width: scheme.brightness == Brightness.light ? 2 : 1,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: borderRadius,
@@ -152,7 +158,10 @@ abstract final class AppTheme {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: borderRadius,
-          borderSide: BorderSide(color: scheme.error),
+          borderSide: BorderSide(
+            color: scheme.error,
+            width: scheme.brightness == Brightness.light ? 2 : 1,
+          ),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: borderRadius,

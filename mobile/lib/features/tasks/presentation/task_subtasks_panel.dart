@@ -87,8 +87,18 @@ class _TaskSubtasksPanelState extends ConsumerState<TaskSubtasksPanel> {
             ),
             data: (subtasks) {
               if (subtasks.isEmpty) {
-                return const Center(
-                  child: Text('Henüz alt görev yok.'),
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      'Henüz alt görev yok.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                    ),
+                  ),
                 );
               }
               return ListView.builder(

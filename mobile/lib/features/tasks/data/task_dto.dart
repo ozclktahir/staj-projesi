@@ -67,6 +67,19 @@ enum TaskPriority {
         return 'Acil';
     }
   }
+
+  /// Web `getPriorityWeight`: HIGH/URGENT=3, MEDIUM=2, LOW=1.
+  int get weight {
+    switch (this) {
+      case TaskPriority.urgent:
+      case TaskPriority.high:
+        return 3;
+      case TaskPriority.medium:
+        return 2;
+      case TaskPriority.low:
+        return 1;
+    }
+  }
 }
 
 /// Görev sahiplenme durumu (web assignment_status).

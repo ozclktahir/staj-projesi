@@ -120,7 +120,7 @@ Future<bool?> showCreateTaskDialog({
                                   },
                           ),
                         if (rejectedTasks.isNotEmpty)
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
                       ],
                       TextFormField(
                         controller: titleController,
@@ -136,7 +136,7 @@ Future<bool?> showCreateTaskDialog({
                           return null;
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       if (!isReassign)
                         TextFormField(
                           controller: descriptionController,
@@ -146,7 +146,7 @@ Future<bool?> showCreateTaskDialog({
                             labelText: 'Açıklama (opsiyonel)',
                           ),
                         ),
-                      if (!isReassign) const SizedBox(height: 12),
+                      if (!isReassign) const SizedBox(height: 16),
                       if (!isReassign)
                         DropdownButtonFormField<TaskPriority>(
                           initialValue: priority,
@@ -168,7 +168,7 @@ Future<bool?> showCreateTaskDialog({
                                   }
                                 },
                         ),
-                      if (!isReassign) const SizedBox(height: 12),
+                      if (!isReassign) const SizedBox(height: 16),
                       if (!isReassign)
                         DropdownButtonFormField<TaskStatus>(
                           initialValue: status,
@@ -190,7 +190,7 @@ Future<bool?> showCreateTaskDialog({
                                   }
                                 },
                         ),
-                      if (!isReassign) const SizedBox(height: 12),
+                      if (!isReassign) const SizedBox(height: 16),
                       OutlinedButton.icon(
                         onPressed: submitting
                             ? null
@@ -208,7 +208,7 @@ Future<bool?> showCreateTaskDialog({
                         icon: const Icon(Icons.event),
                         label: Text(dateLabel),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       AssigneePickerField(
                         value: assigneeId,
                         enabled: !submitting,
@@ -218,7 +218,7 @@ Future<bool?> showCreateTaskDialog({
                             setLocal(() => assigneeId = value),
                       ),
                       if (errorText != null) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         Text(
                           errorText!,
                           style: TextStyle(
@@ -231,7 +231,7 @@ Future<bool?> showCreateTaskDialog({
                 ),
               ),
               actions: [
-                TextButton(
+                OutlinedButton(
                   onPressed: submitting
                       ? null
                       : () => Navigator.of(dialogContext).pop(false),

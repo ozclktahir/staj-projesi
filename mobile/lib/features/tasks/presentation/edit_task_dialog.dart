@@ -65,7 +65,7 @@ Future<TaskDto?> showEditTaskDialog({
                           return null;
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       TextFormField(
                         controller: descriptionController,
                         enabled: !submitting,
@@ -74,7 +74,7 @@ Future<TaskDto?> showEditTaskDialog({
                           labelText: 'Açıklama',
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       DropdownButtonFormField<TaskPriority>(
                         initialValue: priority,
                         decoration: const InputDecoration(
@@ -95,7 +95,7 @@ Future<TaskDto?> showEditTaskDialog({
                                 }
                               },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       OutlinedButton.icon(
                         onPressed: submitting
                             ? null
@@ -128,7 +128,7 @@ Future<TaskDto?> showEditTaskDialog({
                             setLocal(() => assigneeId = value),
                       ),
                       if (errorText != null) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         Text(
                           errorText!,
                           style: TextStyle(
@@ -141,7 +141,7 @@ Future<TaskDto?> showEditTaskDialog({
                 ),
               ),
               actions: [
-                TextButton(
+                OutlinedButton(
                   onPressed: submitting
                       ? null
                       : () => Navigator.of(dialogContext).pop(),
