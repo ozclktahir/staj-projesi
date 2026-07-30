@@ -593,3 +593,7 @@
 ### [30 Temmuz 2026] - Fix: MaterialLocalizations tr locale hatası ve workspace 401 yetkilendirme/yönlendirme sorunu çözüldü.
 - Locale `tr_TR`/`en_US` + `localeResolutionCallback`; AppStrings MaterialApp dışına alındı (Localizations ağacı).
 - Dio bellek token senkronu (`authTokenSyncProvider`); `/workspace` yalnızca token hazırken; router token/workspace yüklenene kadar splash. `flutter analyze` temiz.
+
+### [30 Temmuz 2026] - Fix: Web için CanvasKit yükleme sorunu (HTML renderer ile) ve FontManifest 404 hatası çözüldü.
+- Flutter 3.44’te `--web-renderer html` kaldırıldığı için CanvasKit CDN bypass: `.vscode/launch.json` → `--no-web-resources-cdn` (yerel canvaskit).
+- `uses-material-design: true` doğrulandı; `flutter clean` + `flutter pub get` ile FontManifest/asset önbelleği yenilendi.
