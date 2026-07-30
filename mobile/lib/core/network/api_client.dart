@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -45,6 +47,7 @@ class ApiClient {
 
   final Dio _dio;
   final FlutterSecureStorage _secureStorage;
+  var _clearingUnauthorized = false;
 
   Dio get dio => _dio;
 
@@ -56,7 +59,23 @@ class ApiClient {
       return;
     }
     debugPrint('[ApiClient] 401 Unauthorized → session bus');
-    AuthSessionBus.instance.notifyUnauthorized();
+    unawaited(_clearLocalTokensThenNotify());
+  }
+
+  /// Token'ı depodan siler, sonra Riverpod / router dinleyicisini tetikler.
+  Future<void> _clearLocalTokensThenNotify() async {
+    if (_clearingUnauthorized) return;
+    _clearingUnauthorized = true;
+    try {
+      await _secureStorage.delete(key: StorageKeys.accessToken);
+      await _secureStorage.delete(key: StorageKeys.refreshToken);
+      await _secureStorage.delete(key: StorageKeys.userId);
+    } catch (error, stack) {
+      debugPrint('[ApiClient] token clear failed: $error\n$stack');
+    } finally {
+      AuthSessionBus.instance.notifyUnauthorized();
+      _clearingUnauthorized = false;
+    }
   }
 
   void _maybeHandleWorkspaceForbidden(DioException error) {

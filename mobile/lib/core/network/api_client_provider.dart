@@ -38,7 +38,12 @@ final unauthorizedSessionListenerProvider = Provider<void>((ref) {
     scheduleMicrotask(() async {
       try {
         final auth = ref.read(authProvider);
-        if (auth.status == AuthStatus.unauthenticated) return;
+        if (auth.status == AuthStatus.unauthenticated) {
+          // Token interceptor'da silinmiş olabilir; state'i yine de sabitle.
+          ref.read(workspaceProvider.notifier).resetLocal();
+          invalidateWorkspaceScopedProviders(ref);
+          return;
+        }
         await ref.read(authProvider.notifier).clearSessionLocally();
         ref.read(workspaceProvider.notifier).resetLocal();
         invalidateWorkspaceScopedProviders(ref);

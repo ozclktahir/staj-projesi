@@ -51,16 +51,10 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
   WorkspaceNotifier({
     required this.repository,
     required this.prefs,
-  }) : super(const WorkspaceState(isLoading: true)) {
-    _bootstrap();
-  }
+  }) : super(const WorkspaceState(isLoading: true));
 
   final WorkspaceRepository repository;
   final SharedPreferences prefs;
-
-  Future<void> _bootstrap() async {
-    await refresh();
-  }
 
   Future<void> refresh() async {
     state = state.copyWith(isLoading: true, clearError: true);
@@ -243,14 +237,22 @@ final workspaceProvider =
     prefs: ref.watch(sharedPreferencesProvider),
   );
 
-  // Auth oturumu açılınca / kapanınca workspace listesini senkronla.
-  ref.listen<AuthState>(authProvider, (previous, next) {
-    if (next.status == AuthStatus.authenticated) {
-      notifier.refresh();
-    } else if (next.status == AuthStatus.unauthenticated) {
-      notifier.resetLocal();
-    }
-  });
+  // Auth bootstrap bitmeden /workspace çağırma — 401 yarışını önler.
+  ref.listen<AuthState>(
+    authProvider,
+    (previous, next) {
+      if (next.status == AuthStatus.unknown) return;
+      if (next.status == AuthStatus.authenticated) {
+        if (previous?.status != AuthStatus.authenticated ||
+            previous?.token != next.token) {
+          notifier.refresh();
+        }
+      } else if (next.status == AuthStatus.unauthenticated) {
+        notifier.resetLocal();
+      }
+    },
+    fireImmediately: true,
+  );
 
   return notifier;
 });

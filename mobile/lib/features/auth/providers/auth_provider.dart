@@ -87,16 +87,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _bootstrap() async {
     final token = await secureStorage.read(key: StorageKeys.accessToken);
-    if (token != null && token.isNotEmpty) {
+    if (token != null && token.isNotEmpty && !isJwtExpired(token)) {
       var userId = await secureStorage.read(key: StorageKeys.userId);
       userId ??= userIdFromJwt(token);
       if (userId != null) {
         await secureStorage.write(key: StorageKeys.userId, value: userId);
       }
       state = AuthState.authenticated(token: token, userId: userId);
-    } else {
-      state = const AuthState.unauthenticated();
+      return;
     }
+
+    // Süresi dolmuş / bozuk token'ı temizle.
+    if (token != null && token.isNotEmpty) {
+      await secureStorage.delete(key: StorageKeys.accessToken);
+      await secureStorage.delete(key: StorageKeys.refreshToken);
+      await secureStorage.delete(key: StorageKeys.userId);
+    }
+    state = const AuthState.unauthenticated();
   }
 
   Future<void> _persistSession(AuthSession session) async {

@@ -585,3 +585,7 @@
 ### [30 Temmuz 2026] - Faz 8.2 Adım 10: i18n TR/EN + kalan uyum
 - `AppStrings` TR/EN sözlük + `appStringsProvider` / InheritedScope; MaterialApp.locale Settings `locale_code` ile bağlı.
 - Nav/settings/auth/notifications/activity mesajları lokalize; “çeviri yakında” kaldırıldı. `flutter analyze` temiz. Faz 8.2 tamamlandı.
+
+### [30 Temmuz 2026] - Fix: MaterialLocalizations dil hatası ve 401 Unauthorized oturum yönlendirme sorunu çözüldü.
+- `flutter_localizations` + GlobalMaterial/Widgets/Cupertino delegates; `tr`/`en` locale uyarısı giderildi.
+- Auth bootstrap JWT `exp` kontrolü; workspace fetch auth hazır olana kadar bekliyor; 401’de token secure storage’dan silinip `/login` yönlendirmesi. `flutter analyze` temiz.
