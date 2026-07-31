@@ -23,7 +23,13 @@ export class CommentService {
       throw new BadRequestException(error.message);
     }
 
-    return data;
+    const { data: profile } = await client
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+
+    return { ...data, author: profile ?? null };
   }
 
   async findAll(taskId: string) {

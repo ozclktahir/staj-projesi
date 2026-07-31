@@ -99,34 +99,24 @@ class SettingsScreen extends ConsumerWidget {
                 ),
           ),
           const SizedBox(height: 8),
-          Text(
-            s.settingsTheme,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: 8),
-          SegmentedButton<ThemeMode>(
-            segments: [
-              ButtonSegment(
-                value: ThemeMode.light,
-                label: Text(s.settingsThemeLight),
-                icon: const Icon(Icons.light_mode_outlined),
-              ),
-              ButtonSegment(
-                value: ThemeMode.dark,
-                label: Text(s.settingsThemeDark),
-                icon: const Icon(Icons.dark_mode_outlined),
-              ),
-              ButtonSegment(
-                value: ThemeMode.system,
-                label: Text(s.settingsThemeSystem),
-                icon: const Icon(Icons.settings_suggest_outlined),
-              ),
-            ],
-            selected: {themeMode},
-            onSelectionChanged: (selected) {
-              ref.read(themeModeProvider.notifier).setThemeMode(selected.first);
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: Icon(
+              themeMode == ThemeMode.dark
+                  ? Icons.dark_mode_outlined
+                  : Icons.light_mode_outlined,
+            ),
+            title: Text(s.settingsTheme),
+            subtitle: Text(
+              themeMode == ThemeMode.dark
+                  ? s.settingsThemeDark
+                  : s.settingsThemeLight,
+            ),
+            value: themeMode == ThemeMode.dark,
+            onChanged: (enabled) {
+              ref.read(themeModeProvider.notifier).setThemeMode(
+                    enabled ? ThemeMode.dark : ThemeMode.light,
+                  );
             },
           ),
           const SizedBox(height: 28),
@@ -147,7 +137,7 @@ class SettingsScreen extends ConsumerWidget {
             value: locale,
             decoration: InputDecoration(
               labelText: s.settingsAppLanguage,
-              prefixIcon: const Icon(Icons.language),
+              prefixIcon: const Icon(Icons.translate),
             ),
             items: [
               for (final option in AppLocaleOption.values)
@@ -164,7 +154,7 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 28),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.group_outlined),
+            leading: const Icon(Icons.people_outline),
             title: Text(s.settingsMembers),
             subtitle: Text(s.settingsMembersDesc),
             trailing: const Icon(Icons.chevron_right),

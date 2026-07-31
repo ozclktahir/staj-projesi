@@ -47,13 +47,17 @@ class PersonalNotesV2Notifier
     required String noteId,
     String? title,
     String? content,
+    String? taskId,
     bool? isCompleted,
+    bool clearTaskId = false,
   }) async {
     final updated = await ref.read(personalRepositoryProvider).updateNote(
           noteId: noteId,
           title: title,
           content: content,
+          taskId: taskId,
           isCompleted: isCompleted,
+          clearTaskId: clearTaskId,
         );
     final current = state.valueOrNull ?? const <PersonalNoteDto>[];
     state = AsyncData([

@@ -30,13 +30,13 @@ class CommentsNotifier
   }
 
   Future<void> addComment(String content) async {
-    final created = await ref.read(commentRepositoryProvider).addComment(
+    await ref.read(commentRepositoryProvider).addComment(
           workspaceId: arg.workspaceId,
           taskId: arg.taskId,
           dto: CreateCommentDto(content: content),
         );
-    final current = state.valueOrNull ?? const <CommentDto>[];
-    state = AsyncData([...current, created]);
+    // Create response may omit author; refresh to load profile-enriched list.
+    await refresh();
   }
 }
 

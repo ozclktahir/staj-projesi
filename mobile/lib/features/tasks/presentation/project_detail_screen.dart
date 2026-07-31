@@ -263,30 +263,91 @@ class _KanbanToolbar extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _PriorityChip(
-                          label: 'ALL',
-                          selected: selectedPriority == null,
-                          onSelected: () => onPrioritySelected(null),
+                PopupMenuButton<String>(
+                  tooltip: 'Filtre',
+                  onSelected: (value) {
+                    if (value == 'all') {
+                      onPrioritySelected(null);
+                      return;
+                    }
+                    for (final priority in TaskPriority.values) {
+                      if (priority.name == value) {
+                        onPrioritySelected(priority);
+                        return;
+                      }
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem<String>(
+                      value: 'all',
+                      child: Row(
+                        children: [
+                          if (selectedPriority == null)
+                            Icon(
+                              Icons.check,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.primary,
+                            )
+                          else
+                            const SizedBox(width: 16),
+                          const SizedBox(width: 8),
+                          const Text('Tümü'),
+                        ],
+                      ),
+                    ),
+                    for (final priority in TaskPriority.values)
+                      PopupMenuItem<String>(
+                        value: priority.name,
+                        child: Row(
+                          children: [
+                            if (selectedPriority == priority)
+                              Icon(
+                                Icons.check,
+                                size: 16,
+                                color: Theme.of(context).colorScheme.primary,
+                              )
+                            else
+                              const SizedBox(width: 16),
+                            const SizedBox(width: 8),
+                            Text(priority.label),
+                          ],
                         ),
-                        for (final priority in TaskPriority.values)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 6),
-                            child: _PriorityChip(
-                              label: priority.apiValue,
-                              selected: selectedPriority == priority,
-                              onSelected: () => onPrioritySelected(priority),
-                            ),
+                      ),
+                  ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.filter_list,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Filtre',
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        if (selectedPriority != null) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.circle,
+                            size: 8,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
+                        ],
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
+                const Spacer(),
                 PopupMenuButton<KanbanSort>(
                   tooltip: 'Sıralama',
                   initialValue: selectedSort,
@@ -327,9 +388,10 @@ class _KanbanToolbar extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           'Sıra',
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                         ),
                       ],
                     ),
@@ -340,29 +402,6 @@ class _KanbanToolbar extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _PriorityChip extends StatelessWidget {
-  const _PriorityChip({
-    required this.label,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onSelected(),
-      showCheckmark: false,
-      visualDensity: VisualDensity.compact,
     );
   }
 }

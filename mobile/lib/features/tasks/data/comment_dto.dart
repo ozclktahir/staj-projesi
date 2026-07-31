@@ -8,12 +8,24 @@ class CommentAuthorDto {
   });
 
   factory CommentAuthorDto.fromJson(Map<String, dynamic> json) {
+    String? asString(dynamic value) {
+      if (value == null) return null;
+      final text = value.toString().trim();
+      return text.isEmpty ? null : text;
+    }
+
+    final fullName = asString(json['full_name']) ??
+        asString(json['fullName']) ??
+        asString(json['display_name']) ??
+        asString(json['displayName']) ??
+        asString(json['name']);
+
     return CommentAuthorDto(
-      id: json['id'] as String?,
-      email: json['email'] as String?,
-      fullName: json['full_name'] as String?,
-      firstName: json['first_name'] as String?,
-      lastName: json['last_name'] as String?,
+      id: asString(json['id']),
+      email: asString(json['email']),
+      fullName: fullName,
+      firstName: asString(json['first_name']) ?? asString(json['firstName']),
+      lastName: asString(json['last_name']) ?? asString(json['lastName']),
     );
   }
 
@@ -24,14 +36,21 @@ class CommentAuthorDto {
   final String? lastName;
 
   String get displayName {
-    if (fullName != null && fullName!.trim().isNotEmpty) return fullName!;
+    if (fullName != null && fullName!.trim().isNotEmpty) {
+      return fullName!.trim();
+    }
     final combined = [firstName, lastName]
         .whereType<String>()
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .join(' ');
     if (combined.isNotEmpty) return combined;
-    if (email != null && email!.isNotEmpty) return email!;
+    final mail = email?.trim();
+    if (mail != null && mail.isNotEmpty) {
+      final at = mail.indexOf('@');
+      if (at > 0) return mail.substring(0, at);
+      return mail;
+    }
     return 'Kullanıcı';
   }
 }
@@ -47,13 +66,14 @@ class CommentDto {
   });
 
   factory CommentDto.fromJson(Map<String, dynamic> json) {
-    final authorRaw = json['author'];
+    final authorRaw = json['author'] ?? json['profile'] ?? json['user'];
     return CommentDto(
       id: json['id'] as String,
-      taskId: json['task_id'] as String? ?? '',
-      userId: json['user_id'] as String? ?? '',
+      taskId: json['task_id'] as String? ?? json['taskId'] as String? ?? '',
+      userId: json['user_id'] as String? ?? json['userId'] as String? ?? '',
       content: json['content'] as String? ?? '',
-      createdAt: json['created_at'] as String?,
+      createdAt:
+          json['created_at'] as String? ?? json['createdAt'] as String?,
       author: authorRaw is Map
           ? CommentAuthorDto.fromJson(Map<String, dynamic>.from(authorRaw))
           : null,
@@ -68,6 +88,17 @@ class CommentDto {
   final CommentAuthorDto? author;
 
   String get authorLabel => author?.displayName ?? 'Kullanıcı';
+
+  CommentDto copyWith({CommentAuthorDto? author}) {
+    return CommentDto(
+      id: id,
+      taskId: taskId,
+      userId: userId,
+      content: content,
+      createdAt: createdAt,
+      author: author ?? this.author,
+    );
+  }
 }
 
 class CreateCommentDto {

@@ -284,49 +284,88 @@ class _NotesTab extends ConsumerWidget {
   }) async {
     final title = TextEditingController(text: existing?.title ?? '');
     final content = TextEditingController(text: existing?.content ?? '');
+    String? selectedTaskId = existing?.taskId;
+    final tasks = ref.read(personalTasksProvider).valueOrNull ?? const <TaskDto>[];
     try {
       final ok = await showDialog<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(existing == null ? 'Yeni not' : 'Notu düzenle'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: title,
-                decoration: const InputDecoration(labelText: 'Başlık'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: content,
-                maxLines: 5,
-                decoration: const InputDecoration(labelText: 'İçerik'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('İptal'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Kaydet'),
-            ),
-          ],
-        ),
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setLocal) {
+              return AlertDialog(
+                title: Text(existing == null ? 'Yeni not' : 'Notu düzenle'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: title,
+                        decoration: const InputDecoration(labelText: 'Başlık'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: content,
+                        maxLines: 5,
+                        decoration: const InputDecoration(labelText: 'İçerik'),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String?>(
+                        // ignore: deprecated_member_use
+                        value: selectedTaskId,
+                        decoration: const InputDecoration(
+                          labelText: 'İlgili Görev',
+                          prefixIcon: Icon(Icons.assignment_outlined),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('Görev seçilmedi'),
+                          ),
+                          for (final task in tasks)
+                            DropdownMenuItem<String?>(
+                              value: task.id,
+                              child: Text(
+                                task.title,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: (value) =>
+                            setLocal(() => selectedTaskId = value),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('İptal'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Kaydet'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
       );
       if (ok != true) return;
       if (existing == null) {
         await ref.read(personalNotesV2Provider.notifier).create(
               title: title.text,
               content: content.text,
+              taskId: selectedTaskId,
             );
       } else {
+        final clearTask = selectedTaskId == null && existing.taskId != null;
         await ref.read(personalNotesV2Provider.notifier).updateNote(
               noteId: existing.id,
               title: title.text,
               content: content.text,
+              taskId: selectedTaskId,
+              clearTaskId: clearTask,
             );
       }
     } on PersonalException catch (e) {
@@ -379,6 +418,7 @@ class _NotesTab extends ConsumerWidget {
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final note = notes[index];
+                final linked = note.taskTitle?.trim();
                 return Card(
                   child: ListTile(
                     leading: Icon(
@@ -397,11 +437,46 @@ class _NotesTab extends ConsumerWidget {
                             : null,
                       ),
                     ),
-                    subtitle: Text(
-                      note.content.isEmpty ? 'İçerik yok' : note.content,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          note.content.isEmpty ? 'İçerik yok' : note.content,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (linked != null && linked.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Görev: $linked',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary,
+                                ),
+                          ),
+                        ] else if (note.taskId != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Göreve bağlı',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary,
+                                ),
+                          ),
+                        ],
+                      ],
                     ),
+                    isThreeLine: note.taskId != null,
                     trailing: PopupMenuButton<String>(
                       onSelected: (value) async {
                         try {

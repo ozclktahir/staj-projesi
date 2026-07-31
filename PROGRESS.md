@@ -597,3 +597,13 @@
 ### [30 Temmuz 2026] - Fix: Web için CanvasKit yükleme sorunu (HTML renderer ile) ve FontManifest 404 hatası çözüldü.
 - Flutter 3.44’te `--web-renderer html` kaldırıldığı için CanvasKit CDN bypass: `.vscode/launch.json` → `--no-web-resources-cdn` (yerel canvaskit).
 - `uses-material-design: true` doğrulandı; `flutter clean` + `flutter pub get` ile FontManifest/asset önbelleği yenilendi.
+
+### [31 Temmuz 2026] - UI/UX parity paketi (Dashboard, Projeler, Kanban, Yorumlar, Notlar, Tema)
+- Dashboard KPI overflow: `childAspectRatio` 1.95 + `Flexible`/ellipsis/sıkı tipografi; fl_chart pie/bar `touchData.enabled: false` (tooltip kapalı).
+- Projeler: web `dashboard-home` kart grid’i (ikon tile, açıklama fallback, oluşturma tarihi, responsive 1/2/3 kolon).
+- Proje detay toolbar: LOW/MEDIUM/HIGH chip’leri kaldırıldı; yalnızca **Filtre** menüsü (+ Sıra).
+- Create Task: “Açıklama” / “Teslim tarihi” etiketlerinden `(opsiyonel)` kaldırıldı.
+- Yorumlar: `CommentAuthorDto` camelCase/display_name + e-posta local-part fallback; create sonrası liste refresh; Nest create yanıtına `author` eklendi.
+- Personal not: “İlgili Görev” dropdown (`personalTasksProvider`); create/update `taskId`; listede görev rozeti.
+- Ayarlar: Light/Dark `SwitchListTile` → `themeModeProvider`; dil ikonu `Icons.translate`, üyeler `Icons.people_outline`.
+- `flutter analyze`: No issues found.

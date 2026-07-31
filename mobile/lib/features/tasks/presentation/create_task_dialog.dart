@@ -54,9 +54,7 @@ Future<bool?> showCreateTaskDialog({
           builder: (context, setLocal) {
             final isReassign = rejectedTaskId != null;
             final dateLabel = dueDate == null
-                ? (isReassign
-                    ? 'Yeni bitiş tarihi (opsiyonel)'
-                    : 'Teslim tarihi (opsiyonel)')
+                ? (isReassign ? 'Yeni bitiş tarihi' : 'Teslim tarihi')
                 : DateFormat('dd.MM.yyyy').format(dueDate!);
 
             return AlertDialog(
@@ -143,7 +141,7 @@ Future<bool?> showCreateTaskDialog({
                           enabled: !submitting,
                           maxLines: 3,
                           decoration: const InputDecoration(
-                            labelText: 'Açıklama (opsiyonel)',
+                            labelText: 'Açıklama',
                           ),
                         ),
                       if (!isReassign) const SizedBox(height: 16),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
@@ -565,44 +566,126 @@ class _ProjectsBody extends StatelessWidget {
             );
           }
 
-          return ListView.separated(
+          return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
-            itemCount: projects.length + 1,
-            separatorBuilder: (_, index) =>
-                index == 0 ? const SizedBox.shrink() : const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return AppSectionHeader(
-                  eyebrow: 'Çalışma alanı',
-                  title: 'Projeler',
-                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-                );
-              }
-
-              final project = projects[index - 1];
-              return Card(
-                child: ListTile(
-                  leading: const Icon(Icons.folder_outlined),
-                  title: Text(project.name),
-                  subtitle: project.description != null &&
-                          project.description!.isNotEmpty
-                      ? Text(
-                          project.description!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      : null,
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push(
-                    AppRoutes.projectDetail(project.id),
-                    extra: project,
-                  ),
-                ),
-              );
-            },
+            children: [
+              AppSectionHeader(
+                eyebrow: 'Çalışma alanı',
+                title: 'Projeler',
+                padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+              ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossAxisCount = constraints.maxWidth >= 720
+                      ? 3
+                      : constraints.maxWidth >= 480
+                          ? 2
+                          : 1;
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: projects.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: crossAxisCount == 1 ? 2.4 : 1.15,
+                    ),
+                    itemBuilder: (context, index) {
+                      final project = projects[index];
+                      return _ProjectCard(project: project);
+                    },
+                  );
+                },
+              ),
+            ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _ProjectCard extends StatelessWidget {
+  const _ProjectCard({required this.project});
+
+  final ProjectDto project;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final description = project.description?.trim();
+    final createdLabel = () {
+      final raw = project.createdAt;
+      if (raw == null || raw.isEmpty) return 'Tarih yok';
+      final dt = DateTime.tryParse(raw)?.toLocal();
+      if (dt == null) return 'Tarih yok';
+      return DateFormat('dd.MM.yyyy').format(dt);
+    }();
+
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: InkWell(
+        onTap: () => context.push(
+          AppRoutes.projectDetail(project.id),
+          extra: project,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.folder_special_outlined,
+                  color: scheme.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                project.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              Expanded(
+                child: Text(
+                  (description != null && description.isNotEmpty)
+                      ? description
+                      : 'Açıklama eklenmemiş',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                createdLabel,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

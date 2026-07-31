@@ -133,7 +133,7 @@ class _KpiGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 10,
       crossAxisSpacing: 10,
-      childAspectRatio: 2.35,
+      childAspectRatio: 1.95,
       children: [
         _KpiCard(
           label: 'Toplam Görev',
@@ -194,23 +194,24 @@ class _KpiCard extends StatelessWidget {
         side: BorderSide(color: accent.withValues(alpha: 0.45), width: 1.5),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
                 color: accent.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: accent, size: 18),
+              child: Icon(icon, color: accent, size: 16),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     label,
@@ -219,14 +220,20 @@ class _KpiCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                           fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
                           height: 1.1,
                         ),
+                  ),
+                  Flexible(
+                    child: Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            height: 1.15,
+                          ),
+                    ),
                   ),
                   Text(
                     hint,
@@ -235,6 +242,7 @@ class _KpiCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                           fontSize: 10,
+                          height: 1.1,
                         ),
                   ),
                 ],
@@ -433,6 +441,7 @@ class _StatusPieChart extends StatelessWidget {
               height: 200,
               child: PieChart(
                 PieChartData(
+                  pieTouchData: PieTouchData(enabled: false),
                   sectionsSpace: 3,
                   centerSpaceRadius: 48,
                   sections: [
@@ -492,6 +501,7 @@ class _PriorityBarChart extends StatelessWidget {
                 BarChartData(
                   maxY: (maxY + 1).toDouble(),
                   alignment: BarChartAlignment.spaceAround,
+                  barTouchData: const BarTouchData(enabled: false),
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
@@ -608,6 +618,7 @@ class _WorkloadBarChart extends StatelessWidget {
                 BarChartData(
                   maxY: (maxY + 1).toDouble(),
                   alignment: BarChartAlignment.spaceAround,
+                  barTouchData: const BarTouchData(enabled: false),
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
