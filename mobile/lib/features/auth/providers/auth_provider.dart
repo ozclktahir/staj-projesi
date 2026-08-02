@@ -78,31 +78,49 @@ class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier({
     required this.repository,
     required this.secureStorage,
+    required this.onTokensUpdated,
   }) : super(const AuthState.unknown()) {
     _bootstrap();
   }
 
   final AuthRepository repository;
   final FlutterSecureStorage secureStorage;
+  final void Function(String? access, String? refresh) onTokensUpdated;
 
   Future<void> _bootstrap() async {
     final token = await secureStorage.read(key: StorageKeys.accessToken);
+    final refresh = await secureStorage.read(key: StorageKeys.refreshToken);
+
     if (token != null && token.isNotEmpty && !isJwtExpired(token)) {
       var userId = await secureStorage.read(key: StorageKeys.userId);
       userId ??= userIdFromJwt(token);
       if (userId != null) {
         await secureStorage.write(key: StorageKeys.userId, value: userId);
       }
+      onTokensUpdated(token, refresh);
       state = AuthState.authenticated(token: token, userId: userId);
       return;
     }
 
-    // Süresi dolmuş / bozuk token'ı temizle.
-    if (token != null && token.isNotEmpty) {
-      await secureStorage.delete(key: StorageKeys.accessToken);
-      await secureStorage.delete(key: StorageKeys.refreshToken);
-      await secureStorage.delete(key: StorageKeys.userId);
+    // Access dolmuşsa refresh ile sessiz yenile.
+    if (refresh != null && refresh.isNotEmpty) {
+      try {
+        final session = await repository.refresh(refresh);
+        await _persistSession(session);
+        state = AuthState.authenticated(
+          token: session.accessToken,
+          userId: session.userId,
+        );
+        return;
+      } catch (_) {
+        // Aşağıda temizle.
+      }
     }
+
+    await secureStorage.delete(key: StorageKeys.accessToken);
+    await secureStorage.delete(key: StorageKeys.refreshToken);
+    await secureStorage.delete(key: StorageKeys.userId);
+    onTokensUpdated(null, null);
     state = const AuthState.unauthenticated();
   }
 
@@ -123,6 +141,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         value: session.userId,
       );
     }
+    onTokensUpdated(session.accessToken, session.refreshToken);
   }
 
   Future<bool> login({
@@ -218,8 +237,13 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 });
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  final api = ref.watch(apiClientProvider);
   return AuthNotifier(
     repository: ref.watch(authRepositoryProvider),
     secureStorage: ref.watch(secureStorageProvider),
+    onTokensUpdated: (access, refresh) {
+      api.updateAccessToken(access);
+      api.updateRefreshToken(refresh);
+    },
   );
 });

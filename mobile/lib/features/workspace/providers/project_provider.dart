@@ -24,20 +24,15 @@ class ProjectsNotifier extends AsyncNotifier<List<ProjectDto>> {
     );
     final userId = ref.watch(authProvider.select((s) => s.userId));
     if (workspace == null) return const [];
-    try {
-      final projects =
-          await ref.read(projectRepositoryProvider).fetchProjects(workspace.id);
-      return _applyVisibilityFilter(
-        projects: projects,
-        workspaceId: workspace.id,
-        role: workspace.role,
-        ownerId: workspace.ownerId,
-        userId: userId,
-      );
-    } on ProjectException catch (error) {
-      debugPrint('[Projects] fetch: $error');
-      return const [];
-    }
+    final projects =
+        await ref.read(projectRepositoryProvider).fetchProjects(workspace.id);
+    return _applyVisibilityFilter(
+      projects: projects,
+      workspaceId: workspace.id,
+      role: workspace.role,
+      ownerId: workspace.ownerId,
+      userId: userId,
+    );
   }
 
   Future<void> refresh() async {

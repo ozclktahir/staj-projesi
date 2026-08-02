@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/l10n/app_strings.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../tasks/data/task_dto.dart';
@@ -40,16 +41,17 @@ class _PersonalScreenState extends ConsumerState<PersonalScreen>
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(appStringsProvider);
     return Column(
       children: [
         TabBar(
           controller: _tabController,
           isScrollable: true,
-          tabs: const [
-            Tab(text: 'Atanan'),
-            Tab(text: 'Notlar'),
-            Tab(text: 'Todos'),
-            Tab(text: 'Dosyalar'),
+          tabs: [
+            Tab(text: s.personalTabAssigned),
+            Tab(text: s.personalTabNotes),
+            Tab(text: s.personalTabTodos),
+            Tab(text: s.personalTabFiles),
           ],
         ),
         Expanded(
@@ -121,7 +123,8 @@ class _AssignedTasksTabState extends ConsumerState<_AssignedTasksTab> {
 
   @override
   Widget build(BuildContext context) {
-    final userId = ref.watch(authProvider.select((s) => s.userId));
+    final s = ref.watch(appStringsProvider);
+    final userId = ref.watch(authProvider.select((auth) => auth.userId));
     final async = ref.watch(personalTasksProvider);
 
     if (userId == null || userId.isEmpty) {
@@ -138,9 +141,9 @@ class _AssignedTasksTabState extends ConsumerState<_AssignedTasksTab> {
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
           child: TextField(
             controller: _search,
-            decoration: const InputDecoration(
-              hintText: 'Görev ara…',
-              prefixIcon: Icon(Icons.search),
+            decoration: InputDecoration(
+              hintText: s.personalSearchTasks,
+              prefixIcon: const Icon(Icons.search),
               isDense: true,
             ),
             onChanged: (_) => setState(() {}),
@@ -282,6 +285,7 @@ class _NotesTab extends ConsumerWidget {
     WidgetRef ref, {
     PersonalNoteDto? existing,
   }) async {
+    final s = ref.read(appStringsProvider);
     final title = TextEditingController(text: existing?.title ?? '');
     final content = TextEditingController(text: existing?.content ?? '');
     String? selectedTaskId = existing?.taskId;
@@ -300,7 +304,7 @@ class _NotesTab extends ConsumerWidget {
                     children: [
                       TextField(
                         controller: title,
-                        decoration: const InputDecoration(labelText: 'Başlık'),
+                        decoration: InputDecoration(labelText: s.personalTitle),
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -382,6 +386,7 @@ class _NotesTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(appStringsProvider);
     final async = ref.watch(personalNotesV2Provider);
     return Scaffold(
       floatingActionButton: FloatingActionButton(
@@ -502,13 +507,13 @@ class _NotesTab extends ConsumerWidget {
                           }
                         }
                       },
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'edit', child: Text('Düzenle')),
-                        PopupMenuItem(
+                      itemBuilder: (_) => [
+                        PopupMenuItem(value: 'edit', child: Text(s.personalEdit)),
+                        const PopupMenuItem(
                           value: 'toggle',
                           child: Text('Tamamlandı işaretle'),
                         ),
-                        PopupMenuItem(value: 'delete', child: Text('Sil')),
+                        const PopupMenuItem(value: 'delete', child: Text('Sil')),
                       ],
                     ),
                     onTap: () => _edit(context, ref, existing: note),
@@ -689,6 +694,7 @@ class _FilesTab extends ConsumerWidget {
   const _FilesTab();
 
   Future<void> _upload(BuildContext context, WidgetRef ref) async {
+    final s = ref.read(appStringsProvider);
     final result = await FilePicker.platform.pickFiles();
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
@@ -700,7 +706,7 @@ class _FilesTab extends ConsumerWidget {
           );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Dosya yüklendi.')),
+          SnackBar(content: Text(s.personalFileUploaded)),
         );
       }
     } on PersonalException catch (e) {

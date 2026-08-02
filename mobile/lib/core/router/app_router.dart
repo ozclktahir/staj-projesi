@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/admin/presentation/admin_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_placeholder_page.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
+import '../../features/progress/presentation/progress_reports_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/tasks/presentation/project_detail_screen.dart';
+import '../../features/tasks/presentation/trash_screen.dart';
 import '../../features/workspace/presentation/home_screen.dart';
 import '../../features/workspace/presentation/members_screen.dart';
 import '../../features/workspace/providers/workspace_provider.dart';
@@ -22,6 +25,9 @@ abstract final class AppRoutes {
   static const onboarding = '/onboarding';
   static const settings = '/settings';
   static const members = '/members';
+  static const trash = '/trash';
+  static const admin = '/admin';
+  static const progress = '/progress';
   static const project = '/project/:id';
 
   static String projectDetail(String projectId) => '/project/$projectId';
@@ -136,6 +142,21 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.members,
         name: 'members',
         builder: (context, state) => const MembersScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.trash,
+        name: 'trash',
+        builder: (context, state) => const TrashScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.admin,
+        name: 'admin',
+        builder: (context, state) => const AdminScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.progress,
+        name: 'progress',
+        builder: (context, state) => const ProgressReportsScreen(),
       ),
       GoRoute(
         path: AppRoutes.project,

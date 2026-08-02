@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_strings.dart';
 import '../../activity/presentation/activity_log_panel.dart';
 import '../../workspace/data/project_dto.dart';
 import '../../workspace/data/project_repository.dart';
@@ -60,24 +61,25 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
   Future<void> _confirmDeleteProject() async {
+    final s = ref.read(appStringsProvider);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Projeyi sil'),
+        title: Text(s.projectDelete),
         content: Text(
           '"${widget.projectName ?? 'Bu proje'}" arşivlenecek. Devam etmek istiyor musunuz?',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('İptal'),
+            child: Text(s.commonCancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Sil'),
+            child: Text(s.commonDelete),
           ),
         ],
       ),
@@ -110,6 +112,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(appStringsProvider);
     final filter = ref.watch(kanbanFilterProvider(widget.projectId));
     final caps = ref.watch(workspaceCapabilitiesProvider);
 
@@ -124,13 +127,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 onSelected: (value) {
                   if (value == 'delete') _confirmDeleteProject();
                 },
-                itemBuilder: (context) => const [
+                itemBuilder: (context) => [
                   PopupMenuItem(
                     value: 'delete',
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.delete_outline),
-                      title: Text('Projeyi Sil'),
+                      leading: const Icon(Icons.delete_outline),
+                      title: Text(s.projectDelete),
                     ),
                   ),
                 ],
@@ -141,7 +144,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             tabs: [
               for (final status in TaskStatus.values)
                 Tab(text: status.label),
-              const Tab(text: 'Aktivite'),
+              Tab(text: s.projectActivity),
             ],
           ),
         ),
@@ -158,7 +161,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     ScaffoldMessenger.of(context)
                       ..hideCurrentSnackBar()
                       ..showSnackBar(
-                        const SnackBar(content: Text('Görev oluşturuldu.')),
+                        SnackBar(content: Text(s.projectTaskCreated)),
                       );
                   }
                 },
@@ -470,6 +473,7 @@ class _TaskColumn extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(appStringsProvider);
     Future<void> onRefresh() =>
         ref.read(tasksProvider(projectId).notifier).refresh();
 
@@ -498,7 +502,7 @@ class _TaskColumn extends ConsumerWidget {
                 child: TextButton(
                   onPressed: () =>
                       ref.read(tasksProvider(projectId).notifier).loadMore(),
-                  child: const Text('Daha fazla yükle'),
+                  child: Text(s.projectLoadMore),
                 ),
               ),
             ],
@@ -540,7 +544,7 @@ class _TaskColumn extends ConsumerWidget {
                           onPressed: () => ref
                               .read(tasksProvider(projectId).notifier)
                               .loadMore(),
-                          child: const Text('Daha fazla yükle'),
+                          child: Text(s.projectLoadMore),
                         ),
                 ),
               );

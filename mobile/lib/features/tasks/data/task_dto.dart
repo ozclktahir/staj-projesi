@@ -137,6 +137,7 @@ class TaskDto {
     this.createdBy,
     this.createdAt,
     this.updatedAt,
+    this.deletedAt,
     this.assignmentStatus = TaskAssignmentStatus.unknown,
     this.assignmentPendingAt,
     this.deletionStatus,
@@ -158,6 +159,7 @@ class TaskDto {
       createdBy: json['created_by'] as String?,
       createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
+      deletedAt: json['deleted_at'] as String?,
       assignmentStatus: TaskAssignmentStatus.fromApi(
         json['assignment_status'] as String?,
       ),
@@ -180,6 +182,7 @@ class TaskDto {
   final String? createdBy;
   final String? createdAt;
   final String? updatedAt;
+  final String? deletedAt;
   final TaskAssignmentStatus assignmentStatus;
   final String? assignmentPendingAt;
   final String? deletionStatus;
@@ -252,6 +255,7 @@ class TaskDto {
       createdBy: createdBy,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      deletedAt: deletedAt,
       assignmentStatus: assignmentStatus ?? this.assignmentStatus,
       assignmentPendingAt: clearAssignmentPendingAt
           ? null

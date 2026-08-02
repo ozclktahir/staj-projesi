@@ -13,7 +13,7 @@ import { AdminService } from './admin.service';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
-@Roles('Admin')
+@Roles('Admin', 'OWNER')
 @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
 @Controller('workspaces/:workspaceId/admin')
 export class AdminController {

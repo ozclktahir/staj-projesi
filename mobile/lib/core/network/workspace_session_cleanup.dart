@@ -2,10 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/activity/providers/activity_log_provider.dart';
+import '../../features/admin/providers/admin_provider.dart';
 import '../../features/dashboard/providers/dashboard_provider.dart';
 import '../../features/notifications/providers/notification_provider.dart';
 import '../../features/personal/providers/personal_tasks_provider.dart';
+import '../../features/progress/providers/progress_report_provider.dart';
 import '../../features/tasks/providers/task_provider.dart';
+import '../../features/tasks/providers/trash_provider.dart';
 import '../../features/workspace/providers/project_provider.dart';
 import '../../features/workspace/providers/workspace_members_provider.dart';
 
@@ -26,6 +29,9 @@ void invalidateWorkspaceScopedProviders(Ref ref) {
   safe(tasksProvider);
   safe(activityLogProvider);
   safe(workspaceMembersProvider);
+  safe(trashProvider);
+  safe(adminStatsProvider);
+  safe(progressReportsProvider);
 }
 
 /// WidgetRef için aynı temizlik.
@@ -45,4 +51,7 @@ void invalidateWorkspaceScopedProvidersWithWidgetRef(WidgetRef ref) {
   safe(tasksProvider);
   safe(activityLogProvider);
   safe(workspaceMembersProvider);
+  safe(trashProvider);
+  safe(adminStatsProvider);
+  safe(progressReportsProvider);
 }

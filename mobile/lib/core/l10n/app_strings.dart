@@ -145,6 +145,72 @@ class AppStrings {
   String get errorsGeneric => t('errors.generic');
   String get errorsInviteSent => t('errors.inviteSent');
   String get errorsProjectCreated => t('errors.projectCreated');
+  String get errorsLoadFailed => t('errors.loadFailed');
+
+  String get dashboardNoWorkspace => t('dashboard.noWorkspace');
+  String get dashboardTotalTasks => t('dashboard.totalTasks');
+  String get dashboardStatusDist => t('dashboard.statusDist');
+  String get dashboardMemberLoad => t('dashboard.memberLoad');
+  String get dashboardRecentActivity => t('dashboard.recentActivity');
+
+  String get personalTabAssigned => t('personal.tabAssigned');
+  String get personalTabNotes => t('personal.tabNotes');
+  String get personalTabTodos => t('personal.tabTodos');
+  String get personalTabFiles => t('personal.tabFiles');
+  String get personalSearchTasks => t('personal.searchTasks');
+  String get personalTitle => t('personal.title');
+  String get personalEdit => t('personal.edit');
+  String get personalFileUploaded => t('personal.fileUploaded');
+
+  String get membersTitle => t('members.title');
+  String get membersLoadError => t('members.loadError');
+  String get membersEmpty => t('members.empty');
+  String membersCount(int n) => t('members.count', {'n': '$n'});
+
+  String get projectDelete => t('project.delete');
+  String get projectTaskCreated => t('project.taskCreated');
+  String get projectActivity => t('project.activity');
+  String get projectLoadMore => t('project.loadMore');
+
+  String get trashTitle => t('trash.title');
+  String get trashEmptyTitle => t('trash.emptyTitle');
+  String get trashEmptySubtitle => t('trash.emptySubtitle');
+  String get trashLoadError => t('trash.loadError');
+  String get trashRestore => t('trash.restore');
+  String get trashRestored => t('trash.restored');
+  String trashDeletedAt(String at) => t('trash.deletedAt', {'at': at});
+
+  String get adminTitle => t('admin.title');
+  String get adminStatsSection => t('admin.statsSection');
+  String get adminMembersSection => t('admin.membersSection');
+  String get adminTotalUsers => t('admin.totalUsers');
+  String get adminActiveTasks => t('admin.activeTasks');
+  String get adminTotalProjects => t('admin.totalProjects');
+  String get adminRemoveMember => t('admin.removeMember');
+  String adminRemoveMemberBody(String name) =>
+      t('admin.removeMemberBody', {'name': name});
+  String get adminMemberRemoved => t('admin.memberRemoved');
+  String get adminForbiddenTitle => t('admin.forbiddenTitle');
+  String get adminForbiddenSubtitle => t('admin.forbiddenSubtitle');
+
+  String get progressTitle => t('progress.title');
+  String get progressCreate => t('progress.create');
+  String get progressEmptyTitle => t('progress.emptyTitle');
+  String get progressEmptySubtitle => t('progress.emptySubtitle');
+  String get progressLoadError => t('progress.loadError');
+  String get progressType => t('progress.type');
+  String get progressTitleField => t('progress.titleField');
+  String get progressContentField => t('progress.contentField');
+  String get progressCreated => t('progress.created');
+
+  String get settingsTrash => t('settings.trash');
+  String get settingsTrashDesc => t('settings.trashDesc');
+  String get settingsAdmin => t('settings.admin');
+  String get settingsAdminDesc => t('settings.adminDesc');
+  String get settingsProgress => t('settings.progress');
+  String get settingsProgressDesc => t('settings.progressDesc');
+
+  String get splashBrand => t('splash.brand');
 
   String get statusTodo => t('common.statusTodo');
   String get statusInProgress => t('common.statusInProgress');
@@ -264,6 +330,62 @@ class AppStrings {
     'errors.generic': 'Bir hata oluştu.',
     'errors.inviteSent': 'Davet gönderildi.',
     'errors.projectCreated': 'Proje oluşturuldu.',
+    'errors.loadFailed': 'Veriler yüklenemedi.',
+    'dashboard.noWorkspace': 'Workspace seçilmedi',
+    'dashboard.totalTasks': 'Toplam Görev',
+    'dashboard.statusDist': 'Durum Dağılımı',
+    'dashboard.memberLoad': 'Üye İş Yükü',
+    'dashboard.recentActivity': 'Son Aktiviteler',
+    'personal.tabAssigned': 'Atanan',
+    'personal.tabNotes': 'Notlar',
+    'personal.tabTodos': 'Todos',
+    'personal.tabFiles': 'Dosyalar',
+    'personal.searchTasks': 'Görev ara…',
+    'personal.title': 'Başlık',
+    'personal.edit': 'Düzenle',
+    'personal.fileUploaded': 'Dosya yüklendi.',
+    'members.title': 'Üyeler',
+    'members.loadError': 'Üyeler yüklenemedi',
+    'members.empty': 'Üye yok',
+    'members.count': '{n} üye',
+    'project.delete': 'Projeyi sil',
+    'project.taskCreated': 'Görev oluşturuldu.',
+    'project.activity': 'Aktivite',
+    'project.loadMore': 'Daha fazla yükle',
+    'trash.title': 'Çöp kutusu',
+    'trash.emptyTitle': 'Çöp kutusu boş',
+    'trash.emptySubtitle': 'Silinen görevler burada görünür.',
+    'trash.loadError': 'Çöp kutusu yüklenemedi',
+    'trash.restore': 'Geri yükle',
+    'trash.restored': 'Görev geri yüklendi.',
+    'trash.deletedAt': 'Silindi: {at}',
+    'admin.title': 'Yönetim',
+    'admin.statsSection': 'İstatistikler',
+    'admin.membersSection': 'Üye yönetimi',
+    'admin.totalUsers': 'Toplam üye',
+    'admin.activeTasks': 'Aktif görev',
+    'admin.totalProjects': 'Proje',
+    'admin.removeMember': 'Üyeyi kaldır',
+    'admin.removeMemberBody': '"{name}" çalışma alanından kaldırılsın mı?',
+    'admin.memberRemoved': 'Üye kaldırıldı.',
+    'admin.forbiddenTitle': 'Yetki yok',
+    'admin.forbiddenSubtitle': 'Bu sayfa yalnızca admin / owner içindir.',
+    'progress.title': 'İlerleme raporları',
+    'progress.create': 'Rapor oluştur',
+    'progress.emptyTitle': 'Henüz rapor yok',
+    'progress.emptySubtitle': 'Günlük / haftalık / aylık rapor ekleyin.',
+    'progress.loadError': 'Raporlar yüklenemedi',
+    'progress.type': 'Tür',
+    'progress.titleField': 'Başlık',
+    'progress.contentField': 'İçerik',
+    'progress.created': 'Rapor oluşturuldu.',
+    'settings.trash': 'Çöp kutusu',
+    'settings.trashDesc': 'Silinen görevleri geri yükle',
+    'settings.admin': 'Yönetim paneli',
+    'settings.adminDesc': 'İstatistikler ve üye kaldırma',
+    'settings.progress': 'İlerleme raporları',
+    'settings.progressDesc': 'Günlük / haftalık / aylık raporlar',
+    'splash.brand': 'Workspace',
   };
 
   static const Map<String, String> _en = {
@@ -363,6 +485,62 @@ class AppStrings {
     'errors.generic': 'Something went wrong.',
     'errors.inviteSent': 'Invite sent.',
     'errors.projectCreated': 'Project created.',
+    'errors.loadFailed': 'Could not load data.',
+    'dashboard.noWorkspace': 'No workspace selected',
+    'dashboard.totalTasks': 'Total tasks',
+    'dashboard.statusDist': 'Status distribution',
+    'dashboard.memberLoad': 'Member workload',
+    'dashboard.recentActivity': 'Recent activity',
+    'personal.tabAssigned': 'Assigned',
+    'personal.tabNotes': 'Notes',
+    'personal.tabTodos': 'Todos',
+    'personal.tabFiles': 'Files',
+    'personal.searchTasks': 'Search tasks…',
+    'personal.title': 'Title',
+    'personal.edit': 'Edit',
+    'personal.fileUploaded': 'File uploaded.',
+    'members.title': 'Members',
+    'members.loadError': 'Could not load members',
+    'members.empty': 'No members',
+    'members.count': '{n} members',
+    'project.delete': 'Delete project',
+    'project.taskCreated': 'Task created.',
+    'project.activity': 'Activity',
+    'project.loadMore': 'Load more',
+    'trash.title': 'Trash',
+    'trash.emptyTitle': 'Trash is empty',
+    'trash.emptySubtitle': 'Deleted tasks appear here.',
+    'trash.loadError': 'Could not load trash',
+    'trash.restore': 'Restore',
+    'trash.restored': 'Task restored.',
+    'trash.deletedAt': 'Deleted: {at}',
+    'admin.title': 'Admin',
+    'admin.statsSection': 'Statistics',
+    'admin.membersSection': 'Member management',
+    'admin.totalUsers': 'Total members',
+    'admin.activeTasks': 'Active tasks',
+    'admin.totalProjects': 'Projects',
+    'admin.removeMember': 'Remove member',
+    'admin.removeMemberBody': 'Remove "{name}" from this workspace?',
+    'admin.memberRemoved': 'Member removed.',
+    'admin.forbiddenTitle': 'No access',
+    'admin.forbiddenSubtitle': 'This page is for admins / owners only.',
+    'progress.title': 'Progress reports',
+    'progress.create': 'Create report',
+    'progress.emptyTitle': 'No reports yet',
+    'progress.emptySubtitle': 'Add daily / weekly / monthly reports.',
+    'progress.loadError': 'Could not load reports',
+    'progress.type': 'Type',
+    'progress.titleField': 'Title',
+    'progress.contentField': 'Content',
+    'progress.created': 'Report created.',
+    'settings.trash': 'Trash',
+    'settings.trashDesc': 'Restore deleted tasks',
+    'settings.admin': 'Admin panel',
+    'settings.adminDesc': 'Stats and remove members',
+    'settings.progress': 'Progress reports',
+    'settings.progressDesc': 'Daily / weekly / monthly reports',
+    'splash.brand': 'Workspace',
   };
 }
 

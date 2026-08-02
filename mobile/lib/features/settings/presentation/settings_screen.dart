@@ -160,6 +160,31 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoutes.members),
           ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.delete_outline),
+            title: Text(s.settingsTrash),
+            subtitle: Text(s.settingsTrashDesc),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(AppRoutes.trash),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.assignment_outlined),
+            title: Text(s.settingsProgress),
+            subtitle: Text(s.settingsProgressDesc),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(AppRoutes.progress),
+          ),
+          if (ref.watch(workspaceCapabilitiesProvider).isAdmin)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.admin_panel_settings_outlined),
+              title: Text(s.settingsAdmin),
+              subtitle: Text(s.settingsAdminDesc),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(AppRoutes.admin),
+            ),
           if (canDeleteWorkspace) ...[
             const SizedBox(height: 36),
             Text(

@@ -588,6 +588,24 @@ export class TaskService {
     };
   }
 
+  /** Soft-delete edilmiş görevleri listeler (çöp kutusu). */
+  async findDeleted(workspaceId: string) {
+    const client = this.supabaseService.getClient();
+
+    const { data, error } = await client
+      .from('tasks')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false });
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    return data ?? [];
+  }
+
   /**
    * Soft-delete edilmiş görevi geri getirir (deleted_at = null).
    */

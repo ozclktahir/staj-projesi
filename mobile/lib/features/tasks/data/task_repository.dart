@@ -222,6 +222,45 @@ class TaskRepository {
     }
   }
 
+  Future<List<TaskDto>> fetchDeletedTasks({
+    required String workspaceId,
+  }) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        ApiConstants.workspaceDeletedTasks(workspaceId),
+      );
+      final data = response.data;
+      final raw = data is List
+          ? data
+          : (data is Map ? data['data'] ?? data['tasks'] : null);
+      if (raw is! List) return const [];
+      return raw
+          .whereType<Map>()
+          .map((item) => TaskDto.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } on DioException catch (error) {
+      throw TaskException(_messageFromDio(error));
+    }
+  }
+
+  Future<TaskDto> restoreTask({
+    required String workspaceId,
+    required String taskId,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        ApiConstants.workspaceTaskRestore(workspaceId, taskId),
+      );
+      final data = response.data;
+      if (data == null) {
+        throw TaskException('Sunucu geri yüklenen görevi döndürmedi.');
+      }
+      return TaskDto.fromJson(data);
+    } on DioException catch (error) {
+      throw TaskException(_messageFromDio(error));
+    }
+  }
+
   Future<TaskDto> reassignRejectedTask({
     required String workspaceId,
     required String taskId,

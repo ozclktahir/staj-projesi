@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/storage_keys.dart';
 import '../../../core/network/api_client_provider.dart';
+import '../../../core/storage/local_cache.dart';
 import '../../../core/storage/shared_preferences_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../data/workspace_dto.dart';
@@ -58,6 +60,7 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
 
   Future<void> refresh() async {
     state = state.copyWith(isLoading: true, clearError: true);
+    final cache = LocalCache(prefs);
     try {
       final list = await repository.fetchWorkspaces();
       final savedId = prefs.getString(StorageKeys.activeWorkspaceId);
@@ -67,22 +70,54 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
       } else {
         await prefs.remove(StorageKeys.activeWorkspaceId);
       }
+      await cache.saveWorkspacesJson(
+        jsonEncode(list.map((w) => w.toJson()).toList()),
+      );
       state = WorkspaceState(
         workspaces: list,
         activeWorkspace: active,
         isLoading: false,
       );
     } on WorkspaceException catch (error) {
+      final cached = _workspacesFromCache(cache);
+      if (cached.isNotEmpty) {
+        final savedId = prefs.getString(StorageKeys.activeWorkspaceId);
+        state = WorkspaceState(
+          workspaces: cached,
+          activeWorkspace: _resolveActive(cached, savedId),
+          isLoading: false,
+          errorMessage: error.message,
+        );
+        return;
+      }
       state = state.copyWith(
         isLoading: false,
         errorMessage: error.message,
       );
     } catch (_) {
+      final cached = _workspacesFromCache(cache);
+      if (cached.isNotEmpty) {
+        final savedId = prefs.getString(StorageKeys.activeWorkspaceId);
+        state = WorkspaceState(
+          workspaces: cached,
+          activeWorkspace: _resolveActive(cached, savedId),
+          isLoading: false,
+          errorMessage: 'Çalışma alanları yüklenemedi (önbellek gösteriliyor).',
+        );
+        return;
+      }
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Çalışma alanları yüklenemedi.',
       );
     }
+  }
+
+  List<WorkspaceDto> _workspacesFromCache(LocalCache cache) {
+    return [
+      for (final map in cache.readWorkspaceMaps())
+        WorkspaceDto.fromJson(map),
+    ];
   }
 
   Future<void> selectWorkspace(String workspaceId) async {

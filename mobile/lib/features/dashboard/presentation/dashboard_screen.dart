@@ -26,13 +26,14 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(appStringsProvider);
     final hasWorkspace = ref.watch(
-      workspaceProvider.select((s) => s.activeWorkspace != null),
+      workspaceProvider.select((ws) => ws.activeWorkspace != null),
     );
     if (!hasWorkspace) {
-      return const AppEmptyState(
+      return AppEmptyState(
         icon: Icons.dashboard_outlined,
-        title: 'Workspace seçilmedi',
+        title: s.dashboardNoWorkspace,
         subtitle: 'Özet metrikleri görmek için bir çalışma alanı seçin.',
       );
     }
@@ -52,7 +53,7 @@ class DashboardScreen extends ConsumerWidget {
               FilledButton(
                 onPressed: () =>
                     ref.read(dashboardProvider.notifier).refresh(),
-                child: const Text('Tekrar dene'),
+                child: Text(s.commonRetry),
               ),
             ],
           ),
@@ -84,7 +85,7 @@ class DashboardScreen extends ConsumerWidget {
                   ),
             ),
             const SizedBox(height: 16),
-            _KpiGrid(data: data),
+            _KpiGrid(data: data, totalTasksLabel: s.dashboardTotalTasks),
             const SizedBox(height: 20),
             Text(
               'Grafikler',
@@ -93,11 +94,14 @@ class DashboardScreen extends ConsumerWidget {
                   ),
             ),
             const SizedBox(height: 10),
-            _StatusPieChart(data: data),
+            _StatusPieChart(data: data, title: s.dashboardStatusDist),
             const SizedBox(height: 12),
             _PriorityBarChart(slices: data.byPriority),
             const SizedBox(height: 12),
-            _WorkloadBarChart(workload: data.workload),
+            _WorkloadBarChart(
+              workload: data.workload,
+              title: s.dashboardMemberLoad,
+            ),
             const SizedBox(height: 20),
             Text(
               'Yaklaşan görevler',
@@ -117,9 +121,10 @@ class DashboardScreen extends ConsumerWidget {
 }
 
 class _KpiGrid extends StatelessWidget {
-  const _KpiGrid({required this.data});
+  const _KpiGrid({required this.data, required this.totalTasksLabel});
 
   final DashboardData data;
+  final String totalTasksLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +141,7 @@ class _KpiGrid extends StatelessWidget {
       childAspectRatio: 1.95,
       children: [
         _KpiCard(
-          label: 'Toplam Görev',
+          label: totalTasksLabel,
           value: '${data.totalTasks}',
           hint: 'Workspace / proje kapsamı',
           icon: Icons.assignment_outlined,
@@ -399,9 +404,10 @@ class _ColorBadges extends StatelessWidget {
 }
 
 class _StatusPieChart extends StatelessWidget {
-  const _StatusPieChart({required this.data});
+  const _StatusPieChart({required this.data, required this.title});
 
   final DashboardData data;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -425,7 +431,7 @@ class _StatusPieChart extends StatelessWidget {
     final total = slices.fold<int>(0, (sum, s) => sum + s.count);
 
     return _ChartCardShell(
-      title: 'Durum Dağılımı',
+      title: title,
       subtitle: 'Yapılacak · Devam ediyor · Tamamlandı',
       footer: total == 0
           ? null
@@ -585,9 +591,10 @@ class _PriorityBarChart extends StatelessWidget {
 }
 
 class _WorkloadBarChart extends StatelessWidget {
-  const _WorkloadBarChart({required this.workload});
+  const _WorkloadBarChart({required this.workload, required this.title});
 
   final List<DashboardWorkloadItem> workload;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -596,7 +603,7 @@ class _WorkloadBarChart extends StatelessWidget {
     final maxY = items.fold<int>(0, (m, s) => s.total > m ? s.total : m);
 
     return _ChartCardShell(
-      title: 'Üye İş Yükü',
+      title: title,
       subtitle: 'Üye başına atanan görev sayısı',
       footer: items.isEmpty
           ? null
@@ -779,6 +786,7 @@ class _QuickActivityFeed extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(appStringsProvider);
     final async = ref.watch(activityLogProvider(null));
     final scheme = Theme.of(context).colorScheme;
 
@@ -794,7 +802,7 @@ class _QuickActivityFeed extends ConsumerWidget {
                 Icon(Icons.history, size: 18, color: scheme.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'Son Aktiviteler',
+                  s.dashboardRecentActivity,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),

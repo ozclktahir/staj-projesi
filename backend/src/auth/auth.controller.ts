@@ -10,6 +10,7 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 
 @ApiTags('Auth')
@@ -41,6 +42,18 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Geçersiz kimlik bilgileri.' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh token ile access token yeniler' })
+  @ApiResponse({
+    status: 200,
+    description: 'Yeni access_token ve refresh_token döner.',
+  })
+  @ApiResponse({ status: 401, description: 'Refresh token geçersiz veya süresi dolmuş.' })
+  refresh(@Body() dto: RefreshDto) {
+    return this.authService.refresh(dto.refresh_token);
   }
 
   @Post('logout')

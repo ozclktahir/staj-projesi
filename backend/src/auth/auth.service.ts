@@ -226,4 +226,23 @@ export class AuthService {
 
     return { message: 'Çıkış işlemi başarıyla tamamlandı.' };
   }
+
+  /** Access token yenileme — Supabase refreshSession. */
+  async refresh(refreshToken: string) {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .auth.refreshSession({ refresh_token: refreshToken });
+
+    if (error || !data.session?.access_token) {
+      throw new UnauthorizedException(
+        error?.message || 'Oturum yenilenemedi. Lütfen tekrar giriş yapın.',
+      );
+    }
+
+    return {
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      user: data.user ?? data.session.user,
+    };
+  }
 }

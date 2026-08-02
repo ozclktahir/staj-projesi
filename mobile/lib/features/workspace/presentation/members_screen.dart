@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_strings.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../providers/workspace_members_provider.dart';
 import '../providers/workspace_provider.dart';
@@ -11,14 +12,15 @@ class MembersScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(appStringsProvider);
     final workspaceName = ref.watch(
-      workspaceProvider.select((s) => s.activeWorkspace?.name),
+      workspaceProvider.select((ws) => ws.activeWorkspace?.name),
     );
     final membersAsync = ref.watch(workspaceMembersProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Üyeler'),
+        title: Text(s.membersTitle),
         actions: [
           IconButton(
             tooltip: 'Yenile',
@@ -31,11 +33,11 @@ class MembersScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => AppEmptyState(
           icon: Icons.error_outline,
-          title: 'Üyeler yüklenemedi',
+          title: s.membersLoadError,
           subtitle: error.toString(),
           action: FilledButton(
             onPressed: () => ref.invalidate(workspaceMembersProvider),
-            child: const Text('Tekrar dene'),
+            child: Text(s.commonRetry),
           ),
         ),
         data: (members) {
@@ -58,7 +60,7 @@ class MembersScreen extends ConsumerWidget {
               if (index == 0) {
                 return AppSectionHeader(
                   eyebrow: workspaceName ?? 'Çalışma alanı',
-                  title: '${members.length} üye',
+                  title: s.membersCount(members.length),
                   padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
                 );
               }

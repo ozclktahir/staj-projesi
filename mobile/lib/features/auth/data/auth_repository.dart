@@ -80,6 +80,18 @@ class AuthRepository {
     }
   }
 
+  Future<AuthSession> refresh(String refreshToken) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiConstants.authRefresh,
+        data: {'refresh_token': refreshToken},
+      );
+      return _sessionFromResponse(response.data);
+    } on DioException catch (error) {
+      throw AuthException(_messageFromDio(error));
+    }
+  }
+
   AuthSession _sessionFromResponse(Map<String, dynamic>? data) {
     final token = _tryReadAccessToken(data);
     if (token == null) {
@@ -140,7 +152,14 @@ class AuthRepository {
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout ||
         error.type == DioExceptionType.connectionError) {
-      return 'Sunucuya bağlanılamadı. NestJS çalışıyor mu?';
+      // localhost: adb reverse gerekir; aksi halde LAN IP kullan.
+      if (ApiConstants.baseUrl.contains('localhost') ||
+          ApiConstants.baseUrl.contains('127.0.0.1')) {
+        return 'Sunucuya bağlanılamadı. NestJS (:3000) çalışıyor mu? '
+            'USB ile `adb reverse tcp:3000 tcp:3000` aktif mi?';
+      }
+      return 'Sunucuya bağlanılamadı. NestJS çalışıyor mu? '
+          'Telefon ve PC aynı Wi‑Fi’de mi?';
     }
     return 'Bir hata oluştu. Lütfen tekrar deneyin.';
   }

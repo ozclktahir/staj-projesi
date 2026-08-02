@@ -35,6 +35,16 @@ class WorkspaceDto {
   bool get isOwner => isOwnerRole(role);
 
   bool get isAdmin => isAdminRole(role);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'description': description,
+        'owner_id': ownerId,
+        'role': role,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
 }
 
 class CreateWorkspaceDto {

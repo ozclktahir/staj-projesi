@@ -78,6 +78,15 @@ export class TaskController {
     );
   }
 
+  @Get('deleted')
+  @Roles('OWNER', 'Admin', 'Member')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
+  @ApiOperation({ summary: 'Soft-delete edilmiş (çöp kutusu) görevleri listeler' })
+  @ApiResponse({ status: 200, description: 'Arşivlenmiş görevler listelendi.' })
+  listDeleted(@Param('workspaceId') workspaceId: string) {
+    return this.taskService.findDeleted(workspaceId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Belirtilen görevin detayını getirir' })
   @ApiResponse({ status: 200, description: 'Görev bulundu.' })

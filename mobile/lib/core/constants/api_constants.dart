@@ -1,6 +1,12 @@
 /// NestJS API sabitleri.
 abstract final class ApiConstants {
-  /// Android emülatör → host makinedeki NestJS (port 3000).
+  /// Derleme zamanı API adresi (`--dart-define=API_BASE_URL=...`).
+  ///
+  /// - Chrome / Windows / `adb reverse`: `http://localhost:3000`
+  /// - Fiziksel telefon (Wi‑Fi): `http://<LAN_IP>:3000`
+  /// - Android emülatör: `http://10.0.2.2:3000`
+  ///
+  /// Tanımsızsa localhost kullanılır (USB + `adb reverse tcp:3000 tcp:3000`).
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://localhost:3000',
@@ -11,6 +17,7 @@ abstract final class ApiConstants {
 
   static const String authLogin = '/auth/login';
   static const String authRegister = '/auth/register';
+  static const String authRefresh = '/auth/refresh';
   static const String authLogout = '/auth/logout';
   static const String workspaces = '/workspace';
 
@@ -95,8 +102,32 @@ abstract final class ApiConstants {
   static String workspaceRejectedTasks(String workspaceId) =>
       '/workspaces/$workspaceId/tasks/rejected';
 
+  static String workspaceDeletedTasks(String workspaceId) =>
+      '/workspaces/$workspaceId/tasks/deleted';
+
+  static String workspaceTaskRestore(String workspaceId, String taskId) =>
+      '/workspaces/$workspaceId/tasks/$taskId/restore';
+
   static String workspaceTaskReassign(String workspaceId, String taskId) =>
       '/workspaces/$workspaceId/tasks/$taskId/reassign';
+
+  static String workspaceAdminStats(String workspaceId) =>
+      '/workspaces/$workspaceId/admin/stats';
+
+  static String workspaceAdminRemoveUser(
+    String workspaceId,
+    String userId,
+  ) =>
+      '/workspaces/$workspaceId/admin/users/$userId/remove';
+
+  static String workspaceProgressReports(String workspaceId) =>
+      '/workspaces/$workspaceId/progress-reports';
+
+  static String workspaceProgressReport(
+    String workspaceId,
+    String reportId,
+  ) =>
+      '/workspaces/$workspaceId/progress-reports/$reportId';
 
   static const String personalNotes = '/personal/notes';
   static String personalNote(String noteId) => '/personal/notes/$noteId';

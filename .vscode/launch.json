@@ -15,11 +15,26 @@
       ]
     },
     {
+      "name": "Flutter Android (telefon)",
+      "request": "launch",
+      "type": "dart",
+      "program": "mobile/lib/main.dart",
+      "cwd": "${workspaceFolder}/mobile",
+      "args": [
+        "-d",
+        "OVSCCI8TSCZD9PXW",
+        "--dart-define=API_BASE_URL=http://192.168.84.232:3000"
+      ]
+    },
+    {
       "name": "mobile",
       "request": "launch",
       "type": "dart",
       "program": "mobile/lib/main.dart",
-      "cwd": "${workspaceFolder}/mobile"
+      "cwd": "${workspaceFolder}/mobile",
+      "args": [
+        "--dart-define=API_BASE_URL=http://192.168.84.232:3000"
+      ]
     }
   ]
 }

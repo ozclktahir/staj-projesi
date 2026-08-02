@@ -17,11 +17,7 @@ class PersonalNotesV2Notifier
     extends AutoDisposeAsyncNotifier<List<PersonalNoteDto>> {
   @override
   Future<List<PersonalNoteDto>> build() async {
-    try {
-      return await ref.read(personalRepositoryProvider).fetchNotes();
-    } on PersonalException {
-      return const [];
-    }
+    return ref.read(personalRepositoryProvider).fetchNotes();
   }
 
   Future<void> refresh() async {
@@ -82,11 +78,7 @@ class PersonalTodosNotifier
     extends AutoDisposeAsyncNotifier<List<PersonalTodoDto>> {
   @override
   Future<List<PersonalTodoDto>> build() async {
-    try {
-      return await ref.read(personalRepositoryProvider).fetchTodos();
-    } on PersonalException {
-      return const [];
-    }
+    return ref.read(personalRepositoryProvider).fetchTodos();
   }
 
   Future<void> refresh() async {
@@ -130,11 +122,7 @@ class PersonalFilesNotifier
     extends AutoDisposeAsyncNotifier<List<PersonalFileDto>> {
   @override
   Future<List<PersonalFileDto>> build() async {
-    try {
-      return await ref.read(personalRepositoryProvider).fetchFiles();
-    } on PersonalException {
-      return const [];
-    }
+    return ref.read(personalRepositoryProvider).fetchFiles();
   }
 
   Future<void> refresh() async {

@@ -607,3 +607,8 @@
 - Personal not: “İlgili Görev” dropdown (`personalTasksProvider`); create/update `taskId`; listede görev rozeti.
 - Ayarlar: Light/Dark `SwitchListTile` → `themeModeProvider`; dil ikonu `Icons.translate`, üyeler `Icons.people_outline`.
 - `flutter analyze`: No issues found.
+
+### [2 Ağustos 2026] - Mobil eksik kapatma paketi
+- Nest: `POST /auth/refresh`, `GET .../tasks/deleted`; Admin’e `OWNER` rolü.
+- Flutter: silent JWT refresh, trash/restore, admin stats/remove member, progress reports UI, i18n genişletme, ölü notes temizliği, hata UX, splash polish, workspace offline cache, RBAC unit testleri.
+- `flutter_dotenv` kaldırıldı. Günlük: `reports/2026-08-02_DAILY_REPORT.md`.

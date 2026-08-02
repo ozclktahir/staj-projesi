@@ -17,13 +17,9 @@ class NotificationsNotifier
       workspaceProvider.select((s) => s.activeWorkspace?.id),
     );
     if (workspaceId == null) return const [];
-    try {
-      return await ref
-          .read(notificationRepositoryProvider)
-          .fetchNotifications(workspaceId);
-    } on NotificationException {
-      return const [];
-    }
+    return ref
+        .read(notificationRepositoryProvider)
+        .fetchNotifications(workspaceId);
   }
 
   Future<void> refresh() async {
