@@ -122,4 +122,84 @@ export class AdminService {
       workspaceId,
     };
   }
+
+  /**
+   * Üye rolünü Admin ↔ Member olarak günceller.
+   * OWNER satırına dokunulmaz; kendini düşürme / son admin koruması var.
+   */
+  async updateMemberRole(
+    workspaceId: string,
+    targetUserId: string,
+    role: 'Admin' | 'Member',
+    actorUserId: string,
+  ) {
+    if (actorUserId === targetUserId && role === 'Member') {
+      throw new BadRequestException(
+        'Kendi Admin yetkinizi bu ekrandan düşüremezsiniz.',
+      );
+    }
+
+    const client = this.supabaseService.getClient();
+
+    const { data: targetMember, error: targetError } = await client
+      .from('workspace_members')
+      .select('user_id, role')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', targetUserId)
+      .maybeSingle();
+
+    if (targetError) {
+      throw new BadRequestException(targetError.message);
+    }
+    if (!targetMember) {
+      throw new NotFoundException('Kullanıcı bu çalışma alanında bulunamadı.');
+    }
+
+    const currentRole = String(targetMember.role ?? '');
+    if (currentRole.toUpperCase() === 'OWNER') {
+      throw new BadRequestException('Workspace sahibinin rolü değiştirilemez.');
+    }
+
+    if (
+      (currentRole === 'Admin' || currentRole.toUpperCase() === 'ADMIN') &&
+      role === 'Member'
+    ) {
+      const { count, error: adminCountError } = await client
+        .from('workspace_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
+        .eq('role', 'Admin');
+
+      if (adminCountError) {
+        throw new BadRequestException(adminCountError.message);
+      }
+      if ((count ?? 0) <= 1) {
+        throw new BadRequestException(
+          'Workspace\'in tek yöneticisinin rolü düşürülemez.',
+        );
+      }
+    }
+
+    const { data, error } = await client
+      .from('workspace_members')
+      .update({ role })
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', targetUserId)
+      .select('user_id, role')
+      .maybeSingle();
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+    if (!data) {
+      throw new NotFoundException('Kullanıcı bu çalışma alanında bulunamadı.');
+    }
+
+    return {
+      message: 'Üye rolü güncellendi.',
+      userId: targetUserId,
+      workspaceId,
+      role: data.role,
+    };
+  }
 }

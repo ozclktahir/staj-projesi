@@ -635,4 +635,12 @@
 - **Dosya yükleme:** Dio `FormData` isteğinde varsayılan `Content-Type: application/json` kaldırılıyor (boundary kırılıyordu); create kaydında zorunlu `file_type`; Nest `CreateFileDto` `IsUrl` → `IsString` (Storage URL validation).
 - `flutter analyze`: No issues found.
 
+### [2 Ağustos 2026] - Web: 2FA, Global Search, Dashboard swipe, Üye yönetimi
+- **2FA / MFA (Supabase TOTP):** Ayarlar’da Görünüm / Dil / **Güvenlik** sekmeleri; QR enroll + verify + disable (`MfaSecurityPanel`). Girişte AAL kontrolü → `MfaChallengeCard`. JWT → `setSession` köprüsü (`supabase-mfa.ts`).
+- **Global arama:** Navbar “Ara…” + `Cmd/Ctrl+K` Command Palette (`cmdk`); projeler, görevler, üyeler + sayfa kısayolları; `globalSearch` server action.
+- **Dashboard swipe:** Embla Carousel ile 2 sayfa — (1) KPI + grafikler, (2) Yaklaşan teslimler + son aktiviteler; oklar, pagination dots, trackpad/touch swipe.
+- **Üyeler sayfası:** Sidebar’da Ayarlar altına `/members`; Data Table; admin rol güncelleme + workspace’ten çıkarma. Nest: `PATCH .../admin/users/:userId/role`.
+- Bağımlılıklar: `cmdk`, `embla-carousel-react`. `tsc --noEmit` temiz.
+
+
 

@@ -13,6 +13,7 @@ import {
  * Yoksa auth metadata'dan profiles'a yazar ve tekrar okur.
  */
 export async function getCurrentUserDisplayLabel(): Promise<{
+  userId: string | null;
   displayName: string;
   email: string | null;
   firstName: string | null;
@@ -23,6 +24,7 @@ export async function getCurrentUserDisplayLabel(): Promise<{
     if (!auth) {
       console.warn("[getCurrentUserDisplayLabel] oturum yok");
       return {
+        userId: null,
         displayName: "",
         email: null,
         firstName: null,
@@ -107,6 +109,7 @@ export async function getCurrentUserDisplayLabel(): Promise<{
     });
 
     return {
+      userId: user.id,
       displayName,
       email: user.email ?? cleanText(profile?.email) ?? null,
       firstName: cleanText(profile?.first_name) ?? cleanText(meta?.first_name),
@@ -115,6 +118,7 @@ export async function getCurrentUserDisplayLabel(): Promise<{
   } catch (error) {
     console.error("[getCurrentUserDisplayLabel]", error);
     return {
+      userId: null,
       displayName: "",
       email: null,
       firstName: null,

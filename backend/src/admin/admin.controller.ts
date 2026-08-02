@@ -1,15 +1,31 @@
-import { Controller, Delete, Get, Param, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { IsIn, IsString } from 'class-validator';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { WorkspaceRoleGuard } from '../auth/guards/workspace-role.guard';
 import { AdminService } from './admin.service';
+
+class UpdateMemberRoleDto {
+  @IsString()
+  @IsIn(['Admin', 'Member'])
+  role: 'Admin' | 'Member';
+}
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -34,6 +50,26 @@ export class AdminController {
   })
   getStats(@Param('workspaceId') workspaceId: string) {
     return this.adminService.getStats(workspaceId);
+  }
+
+  @Patch('users/:userId/role')
+  @ApiOperation({ summary: 'Workspace üyesinin rolünü günceller' })
+  @ApiResponse({ status: 200, description: 'Rol güncellendi.' })
+  updateMemberRole(
+    @Param('workspaceId') workspaceId: string,
+    @Param('userId') userId: string,
+    @Body() dto: UpdateMemberRoleDto,
+    @GetUser() actor: { id: string },
+  ) {
+    if (!dto?.role) {
+      throw new BadRequestException('role zorunludur (Admin | Member).');
+    }
+    return this.adminService.updateMemberRole(
+      workspaceId,
+      userId,
+      dto.role,
+      actor.id,
+    );
   }
 
   @Delete('users/:userId/remove')

@@ -3,7 +3,8 @@
     "dashboard": "Dashboard",
     "projects": "Projects",
     "personal": "Personal Space",
-    "settings": "Settings"
+    "settings": "Settings",
+    "members": "Members"
   },
   "header": {
     "overview": "Overview",
@@ -37,10 +38,63 @@
     "appearanceDesc": "Choose the app theme. Preference is stored in the browser.",
     "language": "Language",
     "languageDesc": "Choose the interface language. Preference is stored in the browser.",
+    "security": "Security",
+    "securityDesc": "Protect your account with two-factor authentication (Authenticator / TOTP).",
     "turkish": "Turkish",
     "english": "English",
     "otherTitle": "Other account settings",
     "otherDesc": "Profile and notification preferences will be managed here soon."
+  },
+  "security": {
+    "loading": "Loading security settings…",
+    "loadError": "Could not load 2FA status.",
+    "statusOn": "2FA enabled",
+    "statusOff": "2FA disabled",
+    "statusHint": "An authenticator app will ask for a code at sign-in.",
+    "enable": "Enable 2FA",
+    "disable": "Disable 2FA",
+    "enrollError": "Could not create QR code.",
+    "verifyError": "Could not verify code.",
+    "disableError": "Could not disable 2FA.",
+    "enabled": "Two-factor authentication enabled.",
+    "disabled": "Two-factor authentication disabled.",
+    "scanQr": "Scan the QR code with your authenticator app, then enter the code.",
+    "codeLabel": "Verification code",
+    "confirmEnable": "Verify and enable",
+    "disableHint": "Enter your current authenticator code to disable 2FA.",
+    "confirmDisable": "Verify and disable"
+  },
+  "search": {
+    "open": "Search",
+    "placeholder": "Search…",
+    "title": "Global search",
+    "description": "Search projects, tasks and members",
+    "inputPlaceholder": "Search projects, tasks or members…",
+    "searching": "Searching…",
+    "empty": "No results found.",
+    "nav": "Pages",
+    "projects": "Projects",
+    "tasks": "Tasks",
+    "members": "Members"
+  },
+  "dashboard": {
+    "prevPage": "Previous page",
+    "nextPage": "Next page",
+    "page": "Page",
+    "pageMain": "Main view — KPIs and charts",
+    "pageDetails": "Details — deadlines and activity",
+    "swipeHint": "Swipe between pages or use the arrows / dots."
+  },
+  "members": {
+    "filterPlaceholder": "Filter members…",
+    "count": "{n} members",
+    "colName": "Name",
+    "colEmail": "Email",
+    "colRole": "Role",
+    "colActions": "Actions",
+    "empty": "No members found.",
+    "remove": "Remove",
+    "confirmRemove": "Remove this member from the workspace?"
   },
   "deadlines": {
     "title": "Upcoming Deadlines",
@@ -109,6 +163,7 @@
     "statusTodo": "To do",
     "statusInProgress": "In progress",
     "statusDone": "Done",
-    "project": "Project"
+    "project": "Project",
+    "cancel": "Cancel"
   }
 }

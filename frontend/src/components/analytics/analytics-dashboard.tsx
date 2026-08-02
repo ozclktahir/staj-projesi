@@ -1,12 +1,18 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useCallback, useEffect, useState } from "react";
+import useEmblaCarousel from "embla-carousel-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ActivityLogItem } from "@/app/actions/activity-logs";
 import type { AnalyticsData } from "@/app/actions/analytics";
 import type { UpcomingDeadlineItem } from "@/types/personal-workspace";
 import { AnalyticsStatCards } from "@/components/analytics/analytics-stat-cards";
 import { QuickActivityFeed } from "@/components/analytics/quick-activity-feed";
 import { UpcomingDeadlines } from "@/components/analytics/upcoming-deadlines";
+import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/i18n/use-translation";
+import { cn } from "@/lib/utils";
 
 const StatusDonutCard = dynamic(
   () =>
@@ -56,6 +62,30 @@ export function AnalyticsDashboard({
   title = "Workspace Komuta Merkezi",
   description = "Tüm projelerin özet metrikleri, grafikler ve son hareketler.",
 }: AnalyticsDashboardProps) {
+  const { t } = useTranslation();
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: false,
+    align: "start",
+    dragFree: false,
+  });
+  const [page, setPage] = useState(0);
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setPage(emblaApi.selectedScrollSnap());
+  }, [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    onSelect();
+    emblaApi.on("select", onSelect);
+    emblaApi.on("reInit", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+      emblaApi.off("reInit", onSelect);
+    };
+  }, [emblaApi, onSelect]);
+
   const deadlines =
     upcomingItems && upcomingItems.length > 0
       ? upcomingItems
@@ -76,25 +106,80 @@ export function AnalyticsDashboard({
 
   return (
     <div className="flex w-full flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-          {title}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+            {title}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={page === 0}
+            onClick={() => emblaApi?.scrollPrev()}
+            aria-label={t("dashboard.prevPage")}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <div className="flex items-center gap-1.5">
+            {[0, 1].map((i) => (
+              <button
+                key={i}
+                type="button"
+                aria-label={`${t("dashboard.page")} ${i + 1}`}
+                className={cn(
+                  "size-2.5 rounded-full transition-colors",
+                  page === i ? "bg-primary" : "bg-muted-foreground/30",
+                )}
+                onClick={() => emblaApi?.scrollTo(i)}
+              />
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={page === 1}
+            onClick={() => emblaApi?.scrollNext()}
+            aria-label={t("dashboard.nextPage")}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
       </div>
 
-      <AnalyticsStatCards summary={data.summary} />
+      <div className="overflow-hidden" ref={emblaRef}>
+        <div className="flex touch-pan-y">
+          <div className="min-w-0 shrink-0 grow-0 basis-full pr-1">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t("dashboard.pageMain")}
+            </p>
+            <AnalyticsStatCards summary={data.summary} />
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <StatusDonutCard data={data.byStatus} />
+              <PriorityBarCard data={data.byPriority} />
+              <WorkloadBarCard workload={data.workload} />
+            </div>
+          </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <StatusDonutCard data={data.byStatus} />
-        <PriorityBarCard data={data.byPriority} />
-        <WorkloadBarCard workload={data.workload} />
+          <div className="min-w-0 shrink-0 grow-0 basis-full pl-1">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t("dashboard.pageDetails")}
+            </p>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <UpcomingDeadlines items={deadlines} />
+              <QuickActivityFeed logs={recentLogs} />
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <UpcomingDeadlines items={deadlines} />
-        <QuickActivityFeed logs={recentLogs} />
-      </div>
+      <p className="text-center text-xs text-muted-foreground">
+        {t("dashboard.swipeHint")}
+      </p>
     </div>
   );
 }

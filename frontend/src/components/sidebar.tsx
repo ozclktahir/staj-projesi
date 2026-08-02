@@ -15,6 +15,7 @@ import {
   Settings,
   Trash2,
   UserPlus,
+  Users,
 } from "lucide-react";
 import { CreateWorkspaceModal } from "@/components/create-workspace-modal";
 import { DeleteWorkspaceModal } from "@/components/delete-workspace-modal";
@@ -52,6 +53,7 @@ const navItems = [
   { href: "/projects", labelKey: "nav.projects", icon: FolderKanban },
   { href: "/personal", labelKey: "nav.personal", icon: NotebookPen },
   { href: "/settings", labelKey: "nav.settings", icon: Settings },
+  { href: "/members", labelKey: "nav.members", icon: Users },
 ] as const;
 
 type SidebarProps = {

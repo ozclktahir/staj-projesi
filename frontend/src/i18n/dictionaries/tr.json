@@ -3,7 +3,8 @@
     "dashboard": "Dashboard",
     "projects": "Projeler",
     "personal": "Kişisel Alan",
-    "settings": "Ayarlar"
+    "settings": "Ayarlar",
+    "members": "Üyeler"
   },
   "header": {
     "overview": "Genel bakış",
@@ -37,10 +38,63 @@
     "appearanceDesc": "Uygulama temasını seçin. Tercih tarayıcıda saklanır ve yenilemede korunur.",
     "language": "Dil Seçimi",
     "languageDesc": "Arayüz dilini seçin. Tercih tarayıcıda saklanır.",
+    "security": "Güvenlik",
+    "securityDesc": "İki adımlı doğrulama (Authenticator / TOTP) ile hesabınızı koruyun.",
     "turkish": "Türkçe",
     "english": "English",
     "otherTitle": "Diğer hesap ayarları",
     "otherDesc": "Profil ve bildirim tercihleri yakında burada yönetilecek."
+  },
+  "security": {
+    "loading": "Güvenlik ayarları yükleniyor…",
+    "loadError": "2FA durumu yüklenemedi.",
+    "statusOn": "2FA aktif",
+    "statusOff": "2FA kapalı",
+    "statusHint": "Authenticator uygulaması ile girişte ek doğrulama kodu istenir.",
+    "enable": "2FA’yı etkinleştir",
+    "disable": "2FA’yı kapat",
+    "enrollError": "QR oluşturulamadı.",
+    "verifyError": "Kod doğrulanamadı.",
+    "disableError": "2FA kapatılamadı.",
+    "enabled": "İki adımlı doğrulama açıldı.",
+    "disabled": "İki adımlı doğrulama kapatıldı.",
+    "scanQr": "Authenticator uygulamanızla QR kodu tarayın, ardından kodu girin.",
+    "codeLabel": "Doğrulama kodu",
+    "confirmEnable": "Doğrula ve etkinleştir",
+    "disableHint": "2FA’yı kapatmak için mevcut authenticator kodunu girin.",
+    "confirmDisable": "Doğrula ve kapat"
+  },
+  "search": {
+    "open": "Ara",
+    "placeholder": "Ara…",
+    "title": "Global arama",
+    "description": "Proje, görev ve üye ara",
+    "inputPlaceholder": "Proje, görev veya üye ara…",
+    "searching": "Aranıyor…",
+    "empty": "Sonuç bulunamadı.",
+    "nav": "Sayfalar",
+    "projects": "Projeler",
+    "tasks": "Görevler",
+    "members": "Üyeler"
+  },
+  "dashboard": {
+    "prevPage": "Önceki sayfa",
+    "nextPage": "Sonraki sayfa",
+    "page": "Sayfa",
+    "pageMain": "Ana görünüm — KPI ve grafikler",
+    "pageDetails": "Detay — teslim tarihleri ve aktiviteler",
+    "swipeHint": "Sayfalar arasında kaydırın veya ok / noktaları kullanın."
+  },
+  "members": {
+    "filterPlaceholder": "Üye ara…",
+    "count": "{n} üye",
+    "colName": "Ad",
+    "colEmail": "E-posta",
+    "colRole": "Rol",
+    "colActions": "İşlemler",
+    "empty": "Üye bulunamadı.",
+    "remove": "Çıkar",
+    "confirmRemove": "Bu üyeyi çalışma alanından çıkarmak istiyor musunuz?"
   },
   "deadlines": {
     "title": "Yaklaşan Teslim Tarihleri",
@@ -109,6 +163,7 @@
     "statusTodo": "Yapılacak",
     "statusInProgress": "Devam ediyor",
     "statusDone": "Tamamlandı",
-    "project": "Proje"
+    "project": "Proje",
+    "cancel": "İptal"
   }
 }

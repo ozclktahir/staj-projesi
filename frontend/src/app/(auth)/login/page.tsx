@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { resolvePostLoginRedirect } from "@/app/actions/notifications";
 import { setActiveWorkspaceCookie } from "@/app/actions/set-active-workspace";
 import { AuthSplitShell } from "@/components/auth/auth-split-shell";
+import { MfaChallengeCard } from "@/components/auth/mfa-challenge-card";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,13 +22,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import apiClient from "@/lib/api-client";
-import { persistAuthSession } from "@/lib/auth-session";
+import { clearAuthSession, persistAuthSession } from "@/lib/auth-session";
 import { writeActiveWorkspaceId } from "@/hooks/use-workspaces";
 import {
   loginSchema,
   formatAuthApiError,
   type LoginFormValues,
 } from "@/lib/validations/auth";
+import {
+  ensureSupabaseAuthSession,
+  needsMfaChallenge,
+} from "@/lib/supabase-mfa";
 
 type LoginTokens = {
   access_token: string;
@@ -37,6 +42,7 @@ type LoginTokens = {
 
 export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mfaPending, setMfaPending] = useState(false);
 
   const {
     register,
@@ -46,10 +52,37 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  async function finishLoginRedirect() {
+    let href = "/";
+    try {
+      const redirect = await resolvePostLoginRedirect();
+      href =
+        !redirect.href ||
+        redirect.href === "/login" ||
+        redirect.href.startsWith("/login?")
+          ? "/"
+          : redirect.href;
+
+      if (redirect.workspaceId) {
+        writeActiveWorkspaceId(redirect.workspaceId);
+        try {
+          await setActiveWorkspaceCookie(redirect.workspaceId);
+        } catch (cookieError) {
+          console.warn("[login] setActiveWorkspaceCookie:", cookieError);
+        }
+      }
+    } catch (redirectError) {
+      console.error("[login] post-login redirect:", redirectError);
+      href = "/";
+    }
+
+    toast.success("Giriş başarılı");
+    window.location.assign(href);
+  }
+
   const onSubmit = async (values: LoginFormValues) => {
     setIsSubmitting(true);
 
-    // ── 1) Sadece kimlik doğrulama (şifre/e-posta hatası yalnızca burada) ──
     let tokens: LoginTokens;
     try {
       const { data } = await apiClient.post<{
@@ -82,44 +115,39 @@ export default function LoginPage() {
       return;
     }
 
-    // ── 2) Oturum kalıcılığı (auth başarılı sayılır) ──
     try {
       await persistAuthSession(
         tokens.access_token,
         tokens.user,
         tokens.refresh_token,
       );
-    } catch (persistError) {
-      console.error("[login] persistAuthSession:", persistError);
-      // Token client'ta kısmen yazılmış olabilir; yönlendirmeyi yine dene
-    }
+      await ensureSupabaseAuthSession();
 
-    // ── 3) Workspace / profil yönlendirme — hata auth başarısızlığı değildir ──
-    let href = "/";
-    try {
-      const redirect = await resolvePostLoginRedirect();
-      // Cookie race: sunucu henüz oturumu görmezse /login dönmesin
-      href =
-        !redirect.href || redirect.href === "/login" || redirect.href.startsWith("/login?")
-          ? "/"
-          : redirect.href;
-
-      if (redirect.workspaceId) {
-        writeActiveWorkspaceId(redirect.workspaceId);
-        try {
-          await setActiveWorkspaceCookie(redirect.workspaceId);
-        } catch (cookieError) {
-          console.warn("[login] setActiveWorkspaceCookie:", cookieError);
-        }
+      if (await needsMfaChallenge()) {
+        setMfaPending(true);
+        setIsSubmitting(false);
+        return;
       }
-    } catch (redirectError) {
-      console.error("[login] post-login redirect:", redirectError);
-      href = "/";
+    } catch (persistError) {
+      console.error("[login] persist/MFA check:", persistError);
     }
 
-    toast.success("Giriş başarılı");
-    window.location.assign(href);
+    await finishLoginRedirect();
   };
+
+  if (mfaPending) {
+    return (
+      <AuthSplitShell>
+        <MfaChallengeCard
+          onVerified={() => finishLoginRedirect()}
+          onCancel={async () => {
+            await clearAuthSession();
+            setMfaPending(false);
+          }}
+        />
+      </AuthSplitShell>
+    );
+  }
 
   return (
     <AuthSplitShell>

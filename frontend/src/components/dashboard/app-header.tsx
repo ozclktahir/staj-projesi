@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { LogOut, Menu, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { InviteNotificationsMenu } from "@/components/invite-notifications-menu";
+import { GlobalSearchCommand } from "@/components/global-search-command";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n/use-translation";
 import { useWorkspaces } from "@/hooks/use-workspaces";
@@ -82,6 +83,8 @@ function AppHeaderInner({
       </div>
 
       <div className="flex items-center gap-2">
+        <GlobalSearchCommand />
+
         <InviteNotificationsMenu
           onAccepted={() => {
             void refresh();
