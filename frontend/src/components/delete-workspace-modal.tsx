@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useTranslation } from "@/i18n/use-translation";
 
 type DeleteWorkspaceModalProps = {
   open: boolean;
@@ -32,6 +33,7 @@ export function DeleteWorkspaceModal({
   workspace,
   onDeleted,
 }: DeleteWorkspaceModalProps) {
+  const { t } = useTranslation();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const onConfirm = async () => {
@@ -46,7 +48,7 @@ export function DeleteWorkspaceModal({
         return;
       }
 
-      toast.success(`"${workspace.name}" silindi`);
+      toast.success(t("workspaceModal.deleted", { name: workspace.name }));
       onOpenChange(false);
       onDeleted?.({
         deletedId: workspace.id,
@@ -56,7 +58,7 @@ export function DeleteWorkspaceModal({
       const message =
         error instanceof Error
           ? error.message
-          : "Workspace silinirken bir hata oluştu.";
+          : t("workspaceModal.deleteFailed");
       console.error("[DeleteWorkspaceModal] catch:", error);
       toast.error(message);
     } finally {
@@ -69,14 +71,13 @@ export function DeleteWorkspaceModal({
       <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-destructive">
-            Workspace&apos;i Sil
+            {t("workspaceModal.deleteTitle")}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             <span className="font-medium text-foreground">
-              {workspace?.name ?? "Bu workspace"}
+              {workspace?.name ?? t("workspaceModal.thisWorkspace")}
             </span>{" "}
-            kalıcı olarak silinecek. İlişkili projeler ve görevler de
-            kaldırılabilir. Bu işlem geri alınamaz.
+            {t("workspaceModal.deleteDesc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -88,7 +89,7 @@ export function DeleteWorkspaceModal({
             disabled={isDeleting}
             onClick={() => onOpenChange(false)}
           >
-            İptal
+            {t("workspaceModal.cancel")}
           </Button>
           <Button
             type="button"
@@ -96,7 +97,9 @@ export function DeleteWorkspaceModal({
             onClick={() => void onConfirm()}
             className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isDeleting ? "Siliniyor..." : "Evet, Sil"}
+            {isDeleting
+              ? t("workspaceModal.deleting")
+              : t("workspaceModal.deleteConfirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

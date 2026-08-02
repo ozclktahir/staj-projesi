@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/i18n/use-translation";
 import {
   ensureSupabaseAuthSession,
   listTotpFactors,
@@ -25,6 +26,7 @@ type MfaChallengeCardProps = {
 };
 
 export function MfaChallengeCard({ onVerified, onCancel }: MfaChallengeCardProps) {
+  const { t } = useTranslation();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -36,7 +38,7 @@ export function MfaChallengeCard({ onVerified, onCancel }: MfaChallengeCardProps
       const factors = await listTotpFactors();
       const factor = factors.find((f) => f.status === "verified");
       if (!factor) {
-        throw new Error("Doğrulanmış authenticator bulunamadı.");
+        throw new Error(t("auth.mfaNoFactor"));
       }
 
       const challenge = await supabase.auth.mfa.challenge({
@@ -52,11 +54,11 @@ export function MfaChallengeCard({ onVerified, onCancel }: MfaChallengeCardProps
       if (verified.error) throw new Error(verified.error.message);
 
       await persistSupabaseSessionToApp();
-      toast.success("2FA doğrulandı");
+      toast.success(t("auth.mfaSuccess"));
       await onVerified();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Doğrulama kodu hatalı.",
+        error instanceof Error ? error.message : t("auth.mfaFail"),
       );
     } finally {
       setBusy(false);
@@ -69,15 +71,17 @@ export function MfaChallengeCard({ onVerified, onCancel }: MfaChallengeCardProps
         <div className="flex size-10 items-center justify-center rounded-lg bg-primary/20 text-primary">
           <ShieldCheck className="size-5" />
         </div>
-        <CardTitle className="text-2xl text-zinc-50">İki adımlı doğrulama</CardTitle>
+        <CardTitle className="text-2xl text-zinc-50">
+          {t("auth.mfaTitle")}
+        </CardTitle>
         <CardDescription className="text-zinc-400">
-          Authenticator uygulamanızdaki 6 haneli kodu girin.
+          {t("auth.mfaSubtitle")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="mfa-login-code" className="text-zinc-200">
-            Doğrulama kodu
+            {t("auth.mfaCode")}
           </Label>
           <Input
             id="mfa-login-code"
@@ -102,7 +106,7 @@ export function MfaChallengeCard({ onVerified, onCancel }: MfaChallengeCardProps
           onClick={() => void submit()}
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-          Doğrula ve devam et
+          {t("auth.mfaVerify")}
         </Button>
         <Button
           type="button"
@@ -111,7 +115,7 @@ export function MfaChallengeCard({ onVerified, onCancel }: MfaChallengeCardProps
           disabled={busy}
           onClick={onCancel}
         >
-          İptal
+          {t("auth.mfaCancel")}
         </Button>
       </CardContent>
     </Card>

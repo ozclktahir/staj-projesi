@@ -53,6 +53,7 @@ import {
   decodeAccessTokenClaims,
   resolveRealtimeUserId,
 } from "@/lib/supabase/realtime";
+import { useTranslation } from "@/i18n/use-translation";
 import { cn } from "@/lib/utils";
 
 type InviteNotificationsMenuProps = {
@@ -94,7 +95,7 @@ function mapRealtimeRow(row: Record<string, unknown>): NotificationItem {
     id: String(row.id),
     workspaceId: (row.workspace_id as string | null) ?? null,
     type: String(row.type ?? ""),
-    title: String(row.title ?? "Bildirim"),
+    title: String(row.title ?? "Notification"),
     message: String(row.message ?? ""),
     isRead: Boolean(row.is_read),
     createdAt: (row.created_at as string | null) ?? null,
@@ -113,6 +114,7 @@ function sortByDateDesc(a: FeedItem, b: FeedItem): number {
 export function InviteNotificationsMenu({
   onAccepted,
 }: InviteNotificationsMenuProps) {
+  const { t, locale } = useTranslation();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [invitations, setInvitations] = useState<PendingInvitationItem[]>([]);
@@ -218,8 +220,8 @@ export function InviteNotificationsMenu({
               const isInvite = isWorkspaceInviteNotification(item);
               toast.info(
                 isInvite
-                  ? "Yeni bir Workspace daveti aldınız!"
-                  : "Yeni bir bildirim aldınız!",
+                  ? t("notifications.newInvite")
+                  : t("notifications.newNotification"),
                 { description: item.message || item.title },
               );
 
@@ -266,7 +268,7 @@ export function InviteNotificationsMenu({
               void getMyPendingInvitations().then((result) => {
                 if (result.success) setInvitations(result.invitations);
               });
-              toast.info("Yeni bir Workspace daveti aldınız!");
+              toast.info(t("notifications.newInvite"));
             },
           )
           .subscribe();
@@ -368,7 +370,7 @@ export function InviteNotificationsMenu({
     try {
       const result = await respondToWorkspaceInvite(invitationId, action);
       if (!result.success) {
-        toast.error(result.error ?? "İşlem başarısız");
+        toast.error(result.error ?? t("notifications.actionFailed"));
         return;
       }
 
@@ -394,7 +396,7 @@ export function InviteNotificationsMenu({
       }
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Davet işlemi başarısız.",
+        error instanceof Error ? error.message : t("notifications.inviteFailed"),
       );
     } finally {
       setBusyId(null);
@@ -472,7 +474,7 @@ export function InviteNotificationsMenu({
         try {
           const result = await getMyNotifications(20, notifications.length);
           if (!result.success) {
-            toast.error(result.error ?? "Bildirimler yüklenemedi");
+            toast.error(result.error ?? t("notifications.loadFailed"));
             return;
           }
           setNotifications((prev) => {
@@ -502,11 +504,11 @@ export function InviteNotificationsMenu({
         try {
           const result = await markAllNotificationsRead();
           if (!result.success) {
-            toast.error(result.error ?? "İşlem başarısız");
+            toast.error(result.error ?? t("notifications.actionFailed"));
             return;
           }
           setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-          toast.success("Tüm bildirimler okundu");
+          toast.success(t("notifications.markedAllRead"));
         } finally {
           setMarkingAll(false);
         }
@@ -545,7 +547,7 @@ export function InviteNotificationsMenu({
     const confirmed =
       typeof window !== "undefined"
         ? window.confirm(
-            "Tüm bildirimler kalıcı olarak silinecek. Devam edilsin mi?",
+            t("notifications.clearConfirm"),
           )
         : true;
     if (!confirmed) return;
@@ -562,7 +564,7 @@ export function InviteNotificationsMenu({
             return;
           }
           setNotifications([]);
-          toast.success("Tüm bildirimler temizlendi");
+          toast.success(t("notifications.clearedAll"));
         } catch (error) {
           toast.error(
             error instanceof Error
@@ -584,7 +586,7 @@ export function InviteNotificationsMenu({
           try {
             const result = await markNotificationRead(n.id);
             if (!result.success) {
-              toast.error(result.error ?? "Bildirim güncellenemedi");
+              toast.error(result.error ?? t("notifications.updateFailed"));
               return;
             }
             setNotifications((prev) =>
@@ -594,7 +596,7 @@ export function InviteNotificationsMenu({
             );
           } catch (error) {
             console.error("[handleNotificationClick]", error);
-            toast.error("Bildirim güncellenirken bir hata oluştu");
+            toast.error(t("notifications.updateFailed"));
           }
         })();
       });
@@ -617,8 +619,8 @@ export function InviteNotificationsMenu({
           className="relative rounded-[var(--radius)] text-muted-foreground hover:text-foreground"
           aria-label={
             unreadCount > 0
-              ? `Bildirimler (${unreadCount} okunmamış)`
-              : "Bildirimler"
+              ? t("notifications.ariaUnread", { n: unreadCount })
+              : t("notifications.title")
           }
         >
           <Bell className="size-5" />
@@ -637,14 +639,14 @@ export function InviteNotificationsMenu({
         <div className="flex items-start justify-between gap-2 px-3 py-2.5">
           <div>
             <DropdownMenuLabel className="p-0 text-sm font-semibold">
-              Bildirimler
+              {t("notifications.title")}
             </DropdownMenuLabel>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               {unreadCount > 0
-                ? `${unreadCount} okunmamış bildirim`
+                ? t("notifications.unreadLong", { n: unreadCount })
                 : notifications.length > 0
-                  ? "Tümü okundu"
-                  : "Liste boş"}
+                  ? t("notifications.allRead")
+                  : t("notifications.listEmpty")}
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
@@ -657,7 +659,7 @@ export function InviteNotificationsMenu({
               onClick={() => void handleMarkAllRead()}
             >
               <CheckCheck className="size-3.5" />
-              Tümünü Okundu İşaretle
+              {t("notifications.markAll")}
             </Button>
             <Button
               type="button"
@@ -668,7 +670,9 @@ export function InviteNotificationsMenu({
               onClick={() => void handleClearAllNotifications()}
             >
               <Trash2 className="size-3.5" />
-              {clearingAll ? "Temizleniyor…" : "Tümünü Temizle"}
+              {clearingAll
+                ? t("notifications.clearing")
+                : t("notifications.clearAll")}
             </Button>
           </div>
         </div>
@@ -677,7 +681,7 @@ export function InviteNotificationsMenu({
         <div className="max-h-[28rem] overflow-y-auto">
           {loading && feed.length === 0 ? (
             <p className="px-3 py-8 text-center text-xs text-muted-foreground">
-              Yükleniyor…
+              {t("notifications.loading")}
             </p>
           ) : null}
 
@@ -687,10 +691,10 @@ export function InviteNotificationsMenu({
                 <BellOff className="size-5" />
               </span>
               <p className="text-sm font-medium text-foreground">
-                Hiç bildiriminiz yok 🎉
+                {t("notifications.emptyTitle")}
               </p>
               <p className="text-xs text-muted-foreground">
-                Davetler, görev atamaları ve hatırlatmalar burada görünür.
+                {t("notifications.emptyHint")}
               </p>
             </div>
           ) : null}
@@ -718,7 +722,7 @@ export function InviteNotificationsMenu({
                           {entry.message}
                         </p>
                         <p className="mt-1 text-[10px] text-muted-foreground/80">
-                          {formatRelativeTime(entry.createdAt)}
+                          {formatRelativeTime(entry.createdAt, locale)}
                         </p>
                         <div className="mt-2.5 flex gap-2">
                           <Button
@@ -828,7 +832,7 @@ export function InviteNotificationsMenu({
                           {n.message}
                         </p>
                         <p className="mt-1 text-[10px] text-muted-foreground/80">
-                          {formatRelativeTime(n.createdAt)}
+                          {formatRelativeTime(n.createdAt, locale)}
                         </p>
                         <div className="mt-2.5 flex gap-2">
                           <Button
@@ -898,7 +902,7 @@ export function InviteNotificationsMenu({
                         {n.message}
                       </p>
                       <p className="mt-1 text-[10px] text-muted-foreground/80">
-                        {formatRelativeTime(n.createdAt)}
+                        {formatRelativeTime(n.createdAt, locale)}
                       </p>
                     </div>
                   </button>
@@ -930,7 +934,9 @@ export function InviteNotificationsMenu({
                 disabled={loadingMoreNotifs}
                 onClick={handleLoadMoreNotifications}
               >
-                {loadingMoreNotifs ? "Yükleniyor…" : "Daha fazla yükle"}
+                {loadingMoreNotifs
+                  ? t("notifications.loading")
+                  : t("notifications.loadMore")}
               </Button>
             </div>
           ) : null}

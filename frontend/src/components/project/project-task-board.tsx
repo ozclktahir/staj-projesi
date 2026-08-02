@@ -44,14 +44,14 @@ import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { PAGE_SIZE } from "@/lib/query-limits";
 import {
-  TASK_PRIORITY_LABELS,
   TASK_STATUSES,
-  TASK_STATUS_LABELS,
   type ProjectTask,
   type TaskAssignee,
   type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
+import { localizedPriority, localizedStatus } from "@/lib/localized-labels";
+import { useTranslation } from "@/i18n/use-translation";
 import { cleanText, emailLocalPart } from "@/lib/member-labels";
 import {
   isTaskSoftDeleted,
@@ -92,18 +92,18 @@ const columnAccent: Record<TaskStatus, string> = {
   DONE: "border-t-emerald-500",
 };
 
-const SORT_OPTIONS: { value: ColumnSort; label: string }[] = [
-  { value: "priority_desc", label: "Öncelik: Yüksek → Düşük" },
-  { value: "priority_asc", label: "Öncelik: Düşük → Yüksek" },
-  { value: "date_newest", label: "Tarih: En Yeni" },
-  { value: "date_oldest", label: "Tarih: En Eski" },
+const SORT_OPTIONS: { value: ColumnSort; labelKey: string }[] = [
+  { value: "priority_desc", labelKey: "projectBoard.sortPriorityDesc" },
+  { value: "priority_asc", labelKey: "projectBoard.sortPriorityAsc" },
+  { value: "date_newest", labelKey: "projectBoard.sortDateNewest" },
+  { value: "date_oldest", labelKey: "projectBoard.sortDateOldest" },
 ];
 
-const FILTER_OPTIONS: { value: ColumnFilter; label: string }[] = [
-  { value: "ALL", label: "Tümü" },
-  { value: "HIGH", label: "Sadece Yüksek" },
-  { value: "MEDIUM", label: "Sadece Orta" },
-  { value: "LOW", label: "Sadece Düşük" },
+const FILTER_OPTIONS: { value: ColumnFilter; labelKey: string }[] = [
+  { value: "ALL", labelKey: "projectBoard.filterAll" },
+  { value: "HIGH", labelKey: "projectBoard.filterHighOnly" },
+  { value: "MEDIUM", labelKey: "projectBoard.filterMediumOnly" },
+  { value: "LOW", labelKey: "projectBoard.filterLowOnly" },
 ];
 
 /** Yüksek=3, Orta=2, Düşük=1, Önceliksiz=0 */
@@ -181,16 +181,17 @@ const AssigneeBadge = memo(function AssigneeBadge({
 }: {
   assignee?: TaskAssignee | null;
 }) {
+  const { t } = useTranslation();
   if (!assignee) {
     return (
       <span
         className="inline-flex max-w-[120px] items-center gap-1.5 truncate text-xs text-muted-foreground/70"
-        title="Atanmadı"
+        title={t("projectBoard.unassigned")}
       >
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted">
           <UserRound className="size-3.5 text-muted-foreground/60" />
         </span>
-        <span className="truncate">Atanmadı</span>
+        <span className="truncate">{t("projectBoard.unassigned")}</span>
       </span>
     );
   }
@@ -207,7 +208,7 @@ const AssigneeBadge = memo(function AssigneeBadge({
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted">
           <UserRound className="size-3.5 text-muted-foreground/60" />
         </span>
-        Atanmadı
+        {t("projectBoard.unassigned")}
       </span>
     );
   }
@@ -245,6 +246,7 @@ const ColumnSortFilterMenu = memo(function ColumnSortFilterMenu({
   prefs: ColumnPrefs;
   onChange: (next: ColumnPrefs) => void;
 }) {
+  const { t } = useTranslation();
   const isDefault =
     prefs.sort === DEFAULT_COLUMN_PREFS.sort &&
     prefs.filter === DEFAULT_COLUMN_PREFS.filter;
@@ -254,8 +256,8 @@ const ColumnSortFilterMenu = memo(function ColumnSortFilterMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label="Sıralama ve filtre"
-          title="Sıralama / Filtre"
+          aria-label={t("projectBoard.sortFilter")}
+          title={t("projectBoard.sortFilter")}
           className={cn(
             "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card hover:text-foreground",
             !isDefault && "bg-primary/10 text-primary",
@@ -265,7 +267,7 @@ const ColumnSortFilterMenu = memo(function ColumnSortFilterMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Sıralama</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("projectBoard.sort")}</DropdownMenuLabel>
         {SORT_OPTIONS.map((option) => (
           <DropdownMenuItem
             key={option.value}
@@ -274,14 +276,14 @@ const ColumnSortFilterMenu = memo(function ColumnSortFilterMenu({
               onChange({ ...prefs, sort: option.value });
             }}
           >
-            <span className="flex-1">{option.label}</span>
+            <span className="flex-1">{t(option.labelKey)}</span>
             {prefs.sort === option.value ? (
               <Check className="size-3.5 text-primary" />
             ) : null}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Filtre (öncelik)</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("projectBoard.filterPriority")}</DropdownMenuLabel>
         {FILTER_OPTIONS.map((option) => (
           <DropdownMenuItem
             key={option.value}
@@ -290,7 +292,7 @@ const ColumnSortFilterMenu = memo(function ColumnSortFilterMenu({
               onChange({ ...prefs, filter: option.value });
             }}
           >
-            <span className="flex-1">{option.label}</span>
+            <span className="flex-1">{t(option.labelKey)}</span>
             {prefs.filter === option.value ? (
               <Check className="size-3.5 text-primary" />
             ) : null}
@@ -316,6 +318,7 @@ const TaskCard = memo(function TaskCard({
   onStatusChange,
   onDeleteRequest,
 }: TaskCardProps) {
+  const { t } = useTranslation();
   const claimPending = task.assignment_status === "pending";
   const claimOverdue =
     claimPending &&
@@ -346,13 +349,13 @@ const TaskCard = memo(function TaskCard({
             )}
           >
             {claimOverdue
-              ? "Kullanıcı henüz görevi kabul etmedi! (SLA)"
-              : "Onay bekliyor"}
+              ? t("projectBoard.claimSla")
+              : t("projectBoard.claimPending")}
           </span>
         ) : null}
         {deletionPending ? (
           <span className="rounded-md border border-orange-300 bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-800 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-300">
-            Silme onayı bekleniyor
+            {t("projectBoard.deletionPending")}
           </span>
         ) : null}
       </div>
@@ -372,7 +375,10 @@ const TaskCard = memo(function TaskCard({
           ) : null}
           {(task.subtask_total ?? 0) > 0 ? (
             <p className="mt-2 text-xs font-medium text-muted-foreground">
-              {task.subtask_done ?? 0}/{task.subtask_total} Alt Görev
+              {t("projectBoard.subtasks", {
+                done: task.subtask_done ?? 0,
+                total: task.subtask_total ?? 0,
+              })}
             </p>
           ) : null}
         </button>
@@ -382,7 +388,7 @@ const TaskCard = memo(function TaskCard({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                aria-label="Görev menüsü"
+                aria-label={t("projectBoard.taskMenu")}
                 onClick={(event: MouseEvent) => event.stopPropagation()}
                 className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
               >
@@ -398,7 +404,7 @@ const TaskCard = memo(function TaskCard({
                 }}
               >
                 <Trash2 className="size-3.5" />
-                Görevi Sil
+                {t("projectBoard.deleteTask")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -412,10 +418,10 @@ const TaskCard = memo(function TaskCard({
             priorityClass(task.priority),
           )}
         >
-          {TASK_PRIORITY_LABELS[task.priority] ?? TASK_PRIORITY_LABELS.MEDIUM}
+          {localizedPriority(t, task.priority ?? "MEDIUM")}
         </span>
         <select
-          aria-label="Görev durumu"
+          aria-label={t("projectBoard.taskStatus")}
           value={task.status}
           disabled={updating || claimPending}
           onClick={(event) => event.stopPropagation()}
@@ -426,7 +432,7 @@ const TaskCard = memo(function TaskCard({
         >
           {TASK_STATUSES.map((value) => (
             <option key={value} value={value}>
-              {TASK_STATUS_LABELS[value]}
+              {localizedStatus(t, value)}
             </option>
           ))}
         </select>
@@ -458,6 +464,7 @@ const KanbanColumn = memo(function KanbanColumn({
   onStatusChange,
   onDeleteRequest,
 }: KanbanColumnProps) {
+  const { t } = useTranslation();
   return (
     <section
       className={cn(
@@ -467,7 +474,7 @@ const KanbanColumn = memo(function KanbanColumn({
     >
       <div className="mb-3 flex items-center justify-between gap-2 px-1">
         <h3 className="text-sm font-semibold text-foreground">
-          {TASK_STATUS_LABELS[status]}
+          {localizedStatus(t, status)}
         </h3>
         <div className="flex items-center gap-1">
           <span className="rounded-md bg-card px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm">
@@ -486,8 +493,8 @@ const KanbanColumn = memo(function KanbanColumn({
         {visible.length === 0 ? (
           <p className="px-1 py-8 text-center text-xs text-muted-foreground">
             {rawCount === 0
-              ? "Bu kolonda görev yok"
-              : "Filtreye uyan görev yok"}
+              ? t("projectBoard.emptyColumn")
+              : t("projectBoard.emptyFilter")}
           </p>
         ) : (
           visible.map((task) => (
@@ -512,6 +519,7 @@ export function ProjectTaskBoard({
   workspaceId = null,
   initialHasMore = false,
 }: ProjectTaskBoardProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
@@ -687,7 +695,7 @@ export function ProjectTaskBoard({
             tasks.length,
           );
           if (!result.success) {
-            toast.error(result.error ?? "Daha fazla görev yüklenemedi");
+            toast.error(result.error ?? t("projectBoard.loadMoreFailed"));
             return;
           }
           setTasks((prev) => {
@@ -776,7 +784,7 @@ export function ProjectTaskBoard({
               task.id === taskId ? { ...task, status } : task,
             ),
           );
-          toast.success("Durum güncellendi");
+          toast.success(t("projectBoard.statusUpdated"));
         })();
       });
     },
@@ -822,12 +830,10 @@ export function ProjectTaskBoard({
               <ListTodo className="size-6" />
             </div>
             <CardTitle className="text-lg text-foreground">
-              Henüz görev yok
+              {t("projectBoard.emptyTitle")}
             </CardTitle>
             <CardDescription className="max-w-md">
-              Bu projeye ilk görevini eklemek için &quot;Yeni Görev Ekle&quot;
-              butonunu kullan. Başka bir kullanıcı eklerse kart burada anında
-              görünür.
+              {t("projectBoard.emptyHint")}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -841,9 +847,9 @@ export function ProjectTaskBoard({
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Görev ara…"
+          placeholder={t("projectBoard.searchPlaceholder")}
           className="h-9 max-w-sm"
-          aria-label="Görev ara"
+          aria-label={t("projectBoard.searchAria")}
         />
         {hasMore ? (
           <Button
@@ -853,12 +859,13 @@ export function ProjectTaskBoard({
             disabled={loadingMore}
             onClick={handleLoadMore}
           >
-            {loadingMore ? "Yükleniyor…" : "Daha fazla yükle"}
+            {loadingMore
+              ? t("projectBoard.loadingMore")
+              : t("projectBoard.loadMore")}
           </Button>
         ) : null}
         <span className="text-xs text-muted-foreground">
-          {optimisticTasks.length} görev
-          {PAGE_SIZE.tasks ? ` · sayfa ${PAGE_SIZE.tasks}` : ""}
+          {t("projectBoard.taskCount", { n: optimisticTasks.length })}
         </span>
       </div>
       <div className="grid min-w-[720px] grid-cols-1 gap-4 md:grid-cols-3">

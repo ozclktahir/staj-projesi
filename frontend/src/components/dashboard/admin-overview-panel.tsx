@@ -9,20 +9,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/i18n/use-translation";
 
 type AdminOverviewPanelProps = {
   members: AdminMemberOverview[];
 };
 
 export function AdminOverviewPanel({ members }: AdminOverviewPanelProps) {
+  const { t } = useTranslation();
+
   return (
     <section className="space-y-4">
       <div>
         <h2 className="text-xl font-semibold tracking-tight text-foreground">
-          Ekip ve Proje Durumu Takip
+          {t("adminOverview.title")}
         </h2>
         <p className="text-sm text-muted-foreground">
-          Admin görünümü — üyeler, projeler ve görev durumları
+          {t("adminOverview.subtitle")}
         </p>
       </div>
 
@@ -33,27 +36,37 @@ export function AdminOverviewPanel({ members }: AdminOverviewPanelProps) {
           </span>
           <div>
             <CardTitle className="text-base text-foreground">
-              Workspace Üyeleri
+              {t("adminOverview.membersTitle")}
             </CardTitle>
             <CardDescription>
-              {members.length} üye listeleniyor
+              {t("adminOverview.membersCount", { n: members.length })}
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {members.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Henüz üye kaydı yok.
+              {t("adminOverview.empty")}
             </p>
           ) : (
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-2 py-2 font-medium">Üye</th>
-                  <th className="px-2 py-2 font-medium">Rol</th>
-                  <th className="px-2 py-2 font-medium">Projeler</th>
-                  <th className="px-2 py-2 font-medium">Devam</th>
-                  <th className="px-2 py-2 font-medium">Tamamlanan</th>
+                  <th className="px-2 py-2 font-medium">
+                    {t("adminOverview.colMember")}
+                  </th>
+                  <th className="px-2 py-2 font-medium">
+                    {t("adminOverview.colRole")}
+                  </th>
+                  <th className="px-2 py-2 font-medium">
+                    {t("adminOverview.colProjects")}
+                  </th>
+                  <th className="px-2 py-2 font-medium">
+                    {t("adminOverview.colInProgress")}
+                  </th>
+                  <th className="px-2 py-2 font-medium">
+                    {t("adminOverview.colDone")}
+                  </th>
                 </tr>
               </thead>
               <tbody>

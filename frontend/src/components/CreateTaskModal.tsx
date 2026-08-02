@@ -31,12 +31,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   TASK_PRIORITIES,
-  TASK_PRIORITY_LABELS,
   TASK_STATUSES,
-  TASK_STATUS_LABELS,
   type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
+import { localizedPriority, localizedStatus } from "@/lib/localized-labels";
+import { useTranslation } from "@/i18n/use-translation";
 import { cn } from "@/lib/utils";
 
 type CreateTaskModalProps = {
@@ -67,6 +67,7 @@ export function CreateTaskModal({
   projectId,
   workspaceId = null,
 }: CreateTaskModalProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -151,7 +152,7 @@ export function CreateTaskModal({
     setDueDate(toDateInputValue(task.due_date));
     setAssigneeId("");
     setRejectedNote(
-      `Bu görev daha önce ${task.rejected_by_name} tarafından reddedildi`,
+      t("taskModal.rejectedBy", { name: task.rejected_by_name }),
     );
   };
 
@@ -162,7 +163,7 @@ export function CreateTaskModal({
     try {
       if (selectedRejectedId) {
         if (!assigneeId) {
-          toast.error("Yeniden atama için yeni bir kişi seçin.");
+          toast.error(t("taskModal.needAssignee"));
           return;
         }
         const result = await reassignRejectedTask({
@@ -172,10 +173,10 @@ export function CreateTaskModal({
           dueDate: dueDate || null,
         });
         if (!result.success) {
-          toast.error(result.error ?? "Yeniden atama başarısız");
+          toast.error(result.error ?? t("taskModal.reassignFailed"));
           return;
         }
-        toast.success(result.message ?? "Görev yeniden atandı");
+        toast.success(result.message ?? t("taskModal.reassigned"));
       } else {
         const result = await createTask({
           projectId,
@@ -191,7 +192,7 @@ export function CreateTaskModal({
           return;
         }
 
-        toast.success("Görev oluşturuldu");
+        toast.success(t("taskModal.created"));
       }
 
       resetForm();
@@ -201,7 +202,7 @@ export function CreateTaskModal({
       toast.error(
         error instanceof Error
           ? error.message
-          : "Görev işlemi sırasında bir hata oluştu.",
+          : t("taskModal.failed"),
       );
     } finally {
       setIsSubmitting(false);
@@ -224,7 +225,7 @@ export function CreateTaskModal({
           className="rounded-lg bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
         >
           <Plus className="size-4" />
-          Yeni Görev Ekle
+          {t("taskModal.add")}
         </Button>
       </DialogTrigger>
 
@@ -232,12 +233,14 @@ export function CreateTaskModal({
         <DialogContent className="max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-foreground">
-              {isReassignMode ? "Görevi Yeniden Ata" : "Yeni Görev"}
+              {isReassignMode
+                ? t("taskModal.titleReassign")
+                : t("taskModal.titleNew")}
             </DialogTitle>
             <DialogDescription>
               {isReassignMode
-                ? "Başlık ve öncelik dolduruldu. Yeni atanan kişi ve bitiş tarihini seçin."
-                : "Başlık zorunludur. İsterseniz bir üyeye atayın."}
+                ? t("taskModal.descReassign")
+                : t("taskModal.descNew")}
             </DialogDescription>
           </DialogHeader>
 
@@ -250,16 +253,20 @@ export function CreateTaskModal({
               >
                 <span className="inline-flex items-center gap-2">
                   <ArchiveRestore className="size-4 text-primary" />
-                  Reddedilen Görevlerden Seç
+                  {t("taskModal.pickRejected")}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {showRejectedPicker ? "Gizle" : `${rejectedTasks.length} adet`}
+                  {showRejectedPicker
+                    ? t("taskModal.hide")
+                    : t("taskModal.countItems", { n: rejectedTasks.length })}
                 </span>
               </button>
 
               {showRejectedPicker ? (
                 <div className="mt-3 space-y-2">
-                  <Label htmlFor="rejected-task-pick">Arşivlenmiş görev</Label>
+                  <Label htmlFor="rejected-task-pick">
+                    {t("taskModal.archivedTask")}
+                  </Label>
                   <select
                     id="rejected-task-pick"
                     value={selectedRejectedId}
@@ -267,7 +274,7 @@ export function CreateTaskModal({
                     disabled={isSubmitting}
                     className={fieldClassName}
                   >
-                    <option value="">— Yeni boş görev —</option>
+                    <option value="">{t("taskModal.blankTask")}</option>
                     {rejectedTasks.map((task) => (
                       <option key={task.id} value={task.id}>
                         {task.title}
@@ -290,12 +297,12 @@ export function CreateTaskModal({
 
           <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="task-title">Başlık</Label>
+              <Label htmlFor="task-title">{t("taskModal.title")}</Label>
               <Input
                 id="task-title"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder="Örn: API entegrasyonunu tamamla"
+                placeholder={t("taskModal.titlePlaceholder")}
                 required
                 className={fieldClassName}
                 disabled={isSubmitting || isReassignMode}
@@ -303,12 +310,14 @@ export function CreateTaskModal({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="task-description">Açıklama</Label>
+              <Label htmlFor="task-description">
+                {t("taskModal.description")}
+              </Label>
               <textarea
                 id="task-description"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                placeholder="İsteğe bağlı açıklama"
+                placeholder={t("taskModal.descriptionPlaceholder")}
                 rows={3}
                 disabled={isSubmitting || isReassignMode}
                 className={textareaClassName}
@@ -318,7 +327,7 @@ export function CreateTaskModal({
             {!isReassignMode ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="task-status">Durum</Label>
+                  <Label htmlFor="task-status">{t("taskModal.status")}</Label>
                   <select
                     id="task-status"
                     value={status}
@@ -330,14 +339,14 @@ export function CreateTaskModal({
                   >
                     {TASK_STATUSES.map((value) => (
                       <option key={value} value={value}>
-                        {TASK_STATUS_LABELS[value]}
+                        {localizedStatus(t, value)}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="task-priority">Öncelik</Label>
+                  <Label htmlFor="task-priority">{t("taskModal.priority")}</Label>
                   <select
                     id="task-priority"
                     value={priority}
@@ -349,7 +358,7 @@ export function CreateTaskModal({
                   >
                     {TASK_PRIORITIES.map((value) => (
                       <option key={value} value={value}>
-                        {TASK_PRIORITY_LABELS[value]}
+                        {localizedPriority(t, value)}
                       </option>
                     ))}
                   </select>
@@ -357,16 +366,18 @@ export function CreateTaskModal({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label>Öncelik</Label>
+                <Label>{t("taskModal.priority")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  {TASK_PRIORITY_LABELS[priority]}
+                  {localizedPriority(t, priority)}
                 </p>
               </div>
             )}
 
             <div className="space-y-2">
               <Label htmlFor="task-assignee">
-                {isReassignMode ? "Yeni Atanan Kişi" : "Atanan Kişi"}
+                {isReassignMode
+                  ? t("taskModal.newAssignee")
+                  : t("taskModal.assignee")}
               </Label>
               <select
                 id="task-assignee"
@@ -377,7 +388,9 @@ export function CreateTaskModal({
                 required={isReassignMode}
               >
                 <option value="">
-                  {isReassignMode ? "Kişi seçin…" : "Atanmamış"}
+                  {isReassignMode
+                    ? t("taskModal.pickPerson")
+                    : t("taskModal.unassigned")}
                 </option>
                 {members.map((member) => {
                   const label =
@@ -398,7 +411,7 @@ export function CreateTaskModal({
 
             {isReassignMode ? (
               <div className="space-y-2">
-                <Label htmlFor="task-due-date">Yeni Bitiş Tarihi</Label>
+                <Label htmlFor="task-due-date">{t("taskModal.newDueDate")}</Label>
                 <Input
                   id="task-due-date"
                   type="date"
@@ -418,7 +431,7 @@ export function CreateTaskModal({
                 disabled={isSubmitting}
                 onClick={() => setOpen(false)}
               >
-                İptal
+                {t("taskModal.cancel")}
               </Button>
               <Button
                 type="submit"
@@ -430,10 +443,10 @@ export function CreateTaskModal({
                 className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {isSubmitting
-                  ? "İşleniyor..."
+                  ? t("taskModal.processing")
                   : isReassignMode
-                    ? "Yeniden Atayarak Oluştur"
-                    : "Oluştur"}
+                    ? t("taskModal.reassignCreate")
+                    : t("taskModal.create")}
               </Button>
             </DialogFooter>
           </form>

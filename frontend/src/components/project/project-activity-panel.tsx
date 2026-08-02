@@ -18,6 +18,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { useTranslation } from "@/i18n/use-translation";
 import { cn } from "@/lib/utils";
 
 type ProjectActivityDrawerProps = {
@@ -32,10 +33,12 @@ function ActivityFeedList({
   logs: ActivityLogItem[];
   loading: boolean;
 }) {
+  const { t, locale } = useTranslation();
+
   if (loading) {
     return (
       <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-        Yükleniyor…
+        {t("activity.loading")}
       </p>
     );
   }
@@ -43,7 +46,7 @@ function ActivityFeedList({
   if (logs.length === 0) {
     return (
       <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-        Bu projede henüz aktivite yok.
+        {t("activity.projectEmpty")}
       </p>
     );
   }
@@ -78,15 +81,15 @@ function ActivityFeedList({
                 {log.actorName}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {formatActivityMessage(log)}
+                {formatActivityMessage(log, locale)}
               </p>
               {title && log.taskId ? (
                 <p className="mt-1 truncate text-[11px] text-primary">
-                  Görev: {title}
+                  {t("activity.taskLabel", { title })}
                 </p>
               ) : null}
               <p className="mt-1 text-[10px] text-muted-foreground/80">
-                {formatRelativeTime(log.createdAt)}
+                {formatRelativeTime(log.createdAt, locale)}
               </p>
             </div>
           </li>
@@ -96,13 +99,10 @@ function ActivityFeedList({
   );
 }
 
-/**
- * Toolbar butonu + sağdan açılan aktivite çekmecesi.
- * Realtime aboneliği drawer kapalıyken de canlı kalır.
- */
 export function ProjectActivityDrawer({
   projectId,
 }: ProjectActivityDrawerProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [logs, setLogs] = useState<ActivityLogItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,7 +125,6 @@ export function ProjectActivityDrawer({
     void refresh();
   }, [refresh]);
 
-  // Realtime: kapalı/açık fark etmez — abonelik sürer
   useEffect(() => {
     const client = createAuthedRealtimeClient();
     if (!client || !projectId) return;
@@ -170,10 +169,10 @@ export function ProjectActivityDrawer({
         className="relative rounded-lg border-border"
       >
         <History className="size-4" />
-        Aktivite
+        {t("activity.button")}
         {hasUnread ? (
           <span
-            aria-label="Yeni aktivite"
+            aria-label={t("activity.newBadge")}
             className="absolute -top-1 -right-1 size-2.5 rounded-full bg-orange-500 ring-2 ring-card"
           />
         ) : null}
@@ -190,11 +189,9 @@ export function ProjectActivityDrawer({
           <SheetHeader className="shrink-0 space-y-1 border-b border-border px-4 py-4 pr-12 text-left">
             <SheetTitle className="flex items-center gap-2 text-base">
               <History className="size-4 text-primary" />
-              Proje Aktivite Geçmişi
+              {t("activity.drawerTitle")}
             </SheetTitle>
-            <SheetDescription>
-              Bu projedeki kullanıcı hareketleri kronolojik sırayla listelenir.
-            </SheetDescription>
+            <SheetDescription>{t("activity.drawerDesc")}</SheetDescription>
           </SheetHeader>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -206,5 +203,4 @@ export function ProjectActivityDrawer({
   );
 }
 
-/** Geriye dönük alias */
 export const ProjectActivityPanel = ProjectActivityDrawer;

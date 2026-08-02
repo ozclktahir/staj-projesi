@@ -4,9 +4,11 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { CreateTaskModalLazy } from "@/components/CreateTaskModal.lazy";
 import { DeleteProjectButton } from "@/components/delete-project-button";
+import { I18nText } from "@/components/i18n-text";
 import { KanbanSkeleton } from "@/components/loading/page-skeletons";
 import { ProjectActivityDrawer } from "@/components/project/project-activity-panel";
 import { ProjectTaskBoard } from "@/components/project/project-task-board";
+import { LocalizedDate } from "@/components/localized-date";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
 import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
 import {
@@ -84,7 +86,7 @@ export default async function ProjectDetailPage({
             className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
           >
             <ArrowLeft className="size-4" />
-            Projelere dön
+            <I18nText k="projectPage.back" />
           </Link>
           {canDeleteProject ? (
             <DeleteProjectButton
@@ -98,19 +100,23 @@ export default async function ProjectDetailPage({
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Proje detayı</p>
+          <p className="text-sm text-muted-foreground">
+            <I18nText k="projectPage.detail" />
+          </p>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             {project.name}
           </h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            {project.description?.trim()
-              ? project.description
-              : "Bu proje için henüz bir açıklama eklenmemiş."}
+            {project.description?.trim() ? (
+              project.description
+            ) : (
+              <I18nText k="projectPage.noDescription" />
+            )}
           </p>
           {project.created_at ? (
             <p className="text-xs text-muted-foreground">
-              Oluşturulma:{" "}
-              {new Date(project.created_at).toLocaleDateString("tr-TR")}
+              <I18nText k="projectPage.created" />:{" "}
+              <LocalizedDate iso={project.created_at} />
             </p>
           ) : null}
         </div>
@@ -119,9 +125,11 @@ export default async function ProjectDetailPage({
       <section className="space-y-4">
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">Görevler</h2>
+            <h2 className="text-sm font-semibold text-foreground">
+              <I18nText k="projectPage.tasks" />
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Kartlara tıklayarak detay panelini aç. Durumu hızlıca değiştir.
+              <I18nText k="projectPage.tasksHint" />
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

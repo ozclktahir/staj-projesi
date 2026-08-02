@@ -42,9 +42,7 @@ import {
 } from "@/components/ui/sheet";
 import {
   TASK_PRIORITIES,
-  TASK_PRIORITY_LABELS,
   TASK_STATUSES,
-  TASK_STATUS_LABELS,
   type ProjectTask,
   type Subtask,
   type TaskAttachment,
@@ -52,6 +50,8 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
+import { localizedPriority, localizedStatus } from "@/lib/localized-labels";
+import { useTranslation } from "@/i18n/use-translation";
 import { cn } from "@/lib/utils";
 
 type TaskDetailSheetProps = {
@@ -79,6 +79,7 @@ export function TaskDetailSheet({
   onTaskUpdated,
   onTaskDeleted,
 }: TaskDetailSheetProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const [task, setTask] = useState<ProjectTask | null>(null);
   const [title, setTitle] = useState("");
@@ -629,7 +630,7 @@ export function TaskDetailSheet({
                   >
                     {TASK_STATUSES.map((value) => (
                       <option key={value} value={value}>
-                        {TASK_STATUS_LABELS[value]}
+                        {localizedStatus(t, value)}
                       </option>
                     ))}
                   </select>
@@ -662,7 +663,7 @@ export function TaskDetailSheet({
                   >
                     {TASK_PRIORITIES.map((value) => (
                       <option key={value} value={value}>
-                        {TASK_PRIORITY_LABELS[value]}
+                        {localizedPriority(t, value)}
                       </option>
                     ))}
                   </select>

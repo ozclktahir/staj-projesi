@@ -1,65 +1,104 @@
+import { translate, type Locale } from "@/i18n/config";
 import {
-  TASK_PRIORITY_LABELS,
-  TASK_STATUS_LABELS,
-  type TaskPriority,
-  type TaskStatus,
-} from "@/lib/supabase/types";
+  localizedPriority,
+  localizedStatus,
+} from "@/lib/localized-labels";
+import type { TaskPriority, TaskStatus } from "@/lib/supabase/types";
 import type { ActivityLogItem } from "@/app/actions/activity-logs";
 
-function labelStatus(value: unknown): string {
-  if (typeof value !== "string") return String(value ?? "");
-  const key = value.toUpperCase() as TaskStatus;
-  return TASK_STATUS_LABELS[key] ?? value;
+type Translate = (
+  key: string,
+  vars?: Record<string, string | number>,
+) => string;
+
+function makeT(locale: Locale): Translate {
+  return (key, vars) => translate(locale, key, vars);
 }
 
-function labelPriority(value: unknown): string {
+function labelStatus(value: unknown, t: Translate): string {
+  if (typeof value !== "string") return String(value ?? "");
+  const key = value.toUpperCase() as TaskStatus;
+  if (key === "TODO" || key === "IN_PROGRESS" || key === "DONE") {
+    return localizedStatus(t, key);
+  }
+  return value;
+}
+
+function labelPriority(value: unknown, t: Translate): string {
   if (typeof value !== "string") return String(value ?? "");
   const key = value.toUpperCase() as TaskPriority;
-  return TASK_PRIORITY_LABELS[key] ?? value;
+  if (key === "HIGH" || key === "MEDIUM" || key === "LOW") {
+    return localizedPriority(t, key);
+  }
+  return value;
 }
 
 /** Avatar satırı için insan okunur açıklama */
-export function formatActivityMessage(log: ActivityLogItem): string {
+export function formatActivityMessage(
+  log: ActivityLogItem,
+  locale: Locale = "tr",
+): string {
+  const t = makeT(locale);
   const d = log.details;
   const taskTitle =
-    (typeof d.task_title === "string" && d.task_title) || "görev";
-  const name = log.actorName || "Bilinmeyen Kullanıcı";
+    (typeof d.task_title === "string" && d.task_title) ||
+    t("activity.fallbackTask");
+  const name = log.actorName || t("activity.unknownUser");
 
   switch (log.actionType) {
     case "task_created":
-      return `${name} "${taskTitle}" görevini oluşturdu`;
+      return t("activity.taskCreated", { name, task: taskTitle });
     case "task_deleted":
-      return `${name} "${taskTitle}" görevini sildi`;
+      return t("activity.taskDeleted", { name, task: taskTitle });
     case "status_changed":
-      return `${name} "${taskTitle}" görevini "${labelStatus(d.new_value)}" olarak işaretledi`;
+      return t("activity.statusChanged", {
+        name,
+        task: taskTitle,
+        value: labelStatus(d.new_value, t),
+      });
     case "priority_changed":
-      return `${name} "${taskTitle}" önceliğini "${labelPriority(d.new_value)}" yaptı`;
+      return t("activity.priorityChanged", {
+        name,
+        task: taskTitle,
+        value: labelPriority(d.new_value, t),
+      });
     case "assignee_changed":
-      return `${name} "${taskTitle}" görevini ${
-        typeof d.new_assignee_name === "string" && d.new_assignee_name
-          ? d.new_assignee_name
-          : "birine"
-      } atadı`;
+      return t("activity.assigneeChanged", {
+        name,
+        task: taskTitle,
+        assignee:
+          typeof d.new_assignee_name === "string" && d.new_assignee_name
+            ? d.new_assignee_name
+            : t("activity.someone"),
+      });
     case "comment_added":
-      return `${name} "${taskTitle}" görevine yorum ekledi`;
+      return t("activity.commentAdded", { name, task: taskTitle });
     case "attachment_added": {
       const fileName =
-        typeof d.file_name === "string" ? d.file_name : "bir dosya";
-      return `${name} "${taskTitle}" görevine ${fileName} ekledi`;
+        typeof d.file_name === "string" ? d.file_name : t("activity.aFile");
+      return t("activity.attachmentAdded", {
+        name,
+        task: taskTitle,
+        file: fileName,
+      });
     }
     case "task_updated":
-      return `${name} "${taskTitle}" görevini güncelledi`;
+      return t("activity.taskUpdated", { name, task: taskTitle });
     case "task_claim_accepted":
-      return `${name}, '${taskTitle}' görevini kabul etti ve üzerinde çalışmaya başladı.`;
+      return t("activity.claimAccepted", { name, task: taskTitle });
     case "task_claim_rejected":
-      return `${name}, kendisine atanan '${taskTitle}' görevini reddetti.`;
+      return t("activity.claimRejected", { name, task: taskTitle });
     case "task_reassigned": {
       const assignee =
         (typeof d.new_assignee_name === "string" && d.new_assignee_name) ||
-        "bir kullanıcı";
-      return `${name}, reddedilen '${taskTitle}' görevini ${assignee}'na yeniden atadı.`;
+        t("activity.aUser");
+      return t("activity.taskReassigned", {
+        name,
+        task: taskTitle,
+        assignee,
+      });
     }
     default:
-      return `${name} bir işlem yaptı`;
+      return t("activity.defaultAction", { name });
   }
 }

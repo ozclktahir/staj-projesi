@@ -31,10 +31,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "@/i18n/use-translation";
 import {
-  TASK_PRIORITY_LABELS,
-  TASK_STATUS_LABELS,
-  type TaskPriority,
-} from "@/lib/supabase/types";
+  localizedPriority,
+  localizedStatus,
+} from "@/lib/localized-labels";
+import type { TaskPriority, TaskStatus } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 
 type KindFilter = "all" | "task" | "subtask" | "todo";
@@ -153,13 +153,13 @@ export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) 
                   {t("deadlines.filterPriorityAll")}
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="HIGH">
-                  {TASK_PRIORITY_LABELS.HIGH}
+                  {localizedPriority(t, "HIGH")}
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="MEDIUM">
-                  {TASK_PRIORITY_LABELS.MEDIUM}
+                  {localizedPriority(t, "MEDIUM")}
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="LOW">
-                  {TASK_PRIORITY_LABELS.LOW}
+                  {localizedPriority(t, "LOW")}
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
               <DropdownMenuSeparator />
@@ -226,7 +226,7 @@ export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) 
                           </Badge>
                           {item.priority ? (
                             <Badge variant="secondary" className="text-[10px]">
-                              {TASK_PRIORITY_LABELS[item.priority]}
+                              {localizedPriority(t, item.priority)}
                             </Badge>
                           ) : null}
                         </div>
@@ -243,7 +243,7 @@ export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) 
                             ? item.completed
                               ? t("common.statusDone")
                               : t("common.statusTodo")
-                            : TASK_STATUS_LABELS[item.status]}
+                            : localizedStatus(t, item.status as TaskStatus)}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
@@ -302,7 +302,7 @@ export function UpcomingDeadlines({ items }: { items: UpcomingDeadlineItem[] }) 
                                 {sub.title}
                               </span>
                               <Badge variant="outline" className="text-[10px]">
-                                {TASK_STATUS_LABELS[sub.status]}
+                                {localizedStatus(t, sub.status as TaskStatus)}
                               </Badge>
                             </li>
                           ))}

@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatRelativeTime } from "@/lib/format-relative-time";
+import { useTranslation } from "@/i18n/use-translation";
 import type { TaskComment } from "@/lib/supabase/types";
 
 type TaskCommentsProps = {
@@ -25,6 +26,7 @@ export function TaskComments({
   comments,
   onChange,
 }: TaskCommentsProps) {
+  const { locale } = useTranslation();
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -151,7 +153,7 @@ export function TaskComments({
                             : undefined
                         }
                       >
-                        {formatRelativeTime(comment.created_at)}
+                        {formatRelativeTime(comment.created_at, locale)}
                       </p>
                     </div>
                   </div>

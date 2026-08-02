@@ -76,11 +76,13 @@ import {
 } from "@/components/ui/card";
 import { useTranslation } from "@/i18n/use-translation";
 import {
-  TASK_PRIORITY_LABELS,
-  TASK_STATUS_LABELS,
-  type ProjectTask,
-  type TaskPriority,
-  type TaskStatus,
+  localizedPriority,
+  localizedStatus,
+} from "@/lib/localized-labels";
+import type {
+  ProjectTask,
+  TaskPriority,
+  TaskStatus,
 } from "@/lib/supabase/types";
 import type {
   AssignedTaskWithSubtasks,
@@ -92,11 +94,11 @@ import { cn } from "@/lib/utils";
 
 type TabId = "assigned" | "notes" | "todos" | "files";
 
-const TABS: { id: TabId; label: string; icon: typeof StickyNote }[] = [
-  { id: "assigned", label: "Atanan Görevler", icon: ListTodo },
-  { id: "notes", label: "Not Defteri", icon: NotebookPen },
-  { id: "todos", label: "Yapılacaklar", icon: CheckSquare },
-  { id: "files", label: "Dosyalar", icon: Upload },
+const TABS: { id: TabId; labelKey: string; icon: typeof StickyNote }[] = [
+  { id: "assigned", labelKey: "personalPage.tabAssigned", icon: ListTodo },
+  { id: "notes", labelKey: "personalPage.tabNotes", icon: NotebookPen },
+  { id: "todos", labelKey: "personalPage.tabTodos", icon: CheckSquare },
+  { id: "files", labelKey: "personalPage.tabFiles", icon: Upload },
 ];
 
 const PROJECT_BADGE_COLORS = [
@@ -684,7 +686,7 @@ export function PersonalWorkspace({
         className="flex flex-wrap gap-2 rounded-lg border border-border bg-card p-1.5 shadow-sm"
         role="tablist"
       >
-        {TABS.map(({ id, label, icon: Icon }) => (
+        {TABS.map(({ id, labelKey, icon: Icon }) => (
           <button
             key={id}
             type="button"
@@ -699,7 +701,7 @@ export function PersonalWorkspace({
             )}
           >
             <Icon className="size-4" />
-            {label}
+            {t(labelKey)}
           </button>
         ))}
       </div>
@@ -733,11 +735,11 @@ export function PersonalWorkspace({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t("assigned.allPriorities")}</SelectItem>
-                  <SelectItem value="HIGH">{TASK_PRIORITY_LABELS.HIGH}</SelectItem>
+                  <SelectItem value="HIGH">{localizedPriority(t, "HIGH")}</SelectItem>
                   <SelectItem value="MEDIUM">
-                    {TASK_PRIORITY_LABELS.MEDIUM}
+                    {localizedPriority(t, "MEDIUM")}
                   </SelectItem>
-                  <SelectItem value="LOW">{TASK_PRIORITY_LABELS.LOW}</SelectItem>
+                  <SelectItem value="LOW">{localizedPriority(t, "LOW")}</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -752,11 +754,11 @@ export function PersonalWorkspace({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t("assigned.allStatuses")}</SelectItem>
-                  <SelectItem value="TODO">{TASK_STATUS_LABELS.TODO}</SelectItem>
+                  <SelectItem value="TODO">{localizedStatus(t, "TODO")}</SelectItem>
                   <SelectItem value="IN_PROGRESS">
-                    {TASK_STATUS_LABELS.IN_PROGRESS}
+                    {localizedStatus(t, "IN_PROGRESS")}
                   </SelectItem>
-                  <SelectItem value="DONE">{TASK_STATUS_LABELS.DONE}</SelectItem>
+                  <SelectItem value="DONE">{localizedStatus(t, "DONE")}</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -820,7 +822,7 @@ export function PersonalWorkspace({
                               statusClass(task.status),
                             )}
                           >
-                            {TASK_STATUS_LABELS[task.status]}
+                            {localizedStatus(t, task.status)}
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -831,8 +833,10 @@ export function PersonalWorkspace({
                             )}
                           >
                             <Flag className="size-3.5" />
-                            {TASK_PRIORITY_LABELS[task.priority] ??
-                              TASK_PRIORITY_LABELS.MEDIUM}
+                            {localizedPriority(
+                              t,
+                              task.priority ?? "MEDIUM",
+                            )}
                           </span>
                           {dueLabel ? (
                             <span className="inline-flex items-center gap-1">
@@ -878,13 +882,13 @@ export function PersonalWorkspace({
                                       variant="secondary"
                                       className="text-[10px]"
                                     >
-                                      {TASK_PRIORITY_LABELS[sub.priority]}
+                                      {localizedPriority(t, sub.priority)}
                                     </Badge>
                                     <Badge
                                       variant="outline"
                                       className="text-[10px]"
                                     >
-                                      {TASK_STATUS_LABELS[sub.status]}
+                                      {localizedStatus(t, sub.status)}
                                     </Badge>
                                   </div>
                                 </li>

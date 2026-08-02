@@ -23,42 +23,12 @@ import { useWorkspaces } from "@/hooks/use-workspaces";
 import { useTranslation } from "@/i18n/use-translation";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
 
-const NAV_HITS: GlobalSearchHit[] = [
-  {
-    id: "nav-dashboard",
-    type: "project",
-    title: "Dashboard",
-    href: "/",
-    subtitle: "nav",
-  },
-  {
-    id: "nav-projects",
-    type: "project",
-    title: "Projeler",
-    href: "/projects",
-    subtitle: "nav",
-  },
-  {
-    id: "nav-personal",
-    type: "project",
-    title: "Kişisel Alan",
-    href: "/personal",
-    subtitle: "nav",
-  },
-  {
-    id: "nav-members",
-    type: "member",
-    title: "Üyeler",
-    href: "/members",
-    subtitle: "nav",
-  },
-  {
-    id: "nav-settings",
-    type: "project",
-    title: "Ayarlar",
-    href: "/settings",
-    subtitle: "nav",
-  },
+const NAV_DEFS = [
+  { id: "nav-dashboard", type: "project" as const, titleKey: "searchNav.dashboard", href: "/" },
+  { id: "nav-projects", type: "project" as const, titleKey: "searchNav.projects", href: "/projects" },
+  { id: "nav-personal", type: "project" as const, titleKey: "searchNav.personal", href: "/personal" },
+  { id: "nav-members", type: "member" as const, titleKey: "searchNav.members", href: "/members" },
+  { id: "nav-settings", type: "project" as const, titleKey: "searchNav.settings", href: "/settings" },
 ];
 
 export function GlobalSearchCommand() {
@@ -69,6 +39,18 @@ export function GlobalSearchCommand() {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<GlobalSearchHit[]>([]);
   const [pending, startTransition] = useTransition();
+
+  const navHits = useMemo(
+    (): GlobalSearchHit[] =>
+      NAV_DEFS.map((n) => ({
+        id: n.id,
+        type: n.type,
+        title: t(n.titleKey),
+        href: n.href,
+        subtitle: "nav",
+      })),
+    [t],
+  );
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -113,9 +95,9 @@ export function GlobalSearchCommand() {
 
   const filteredNav = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return NAV_HITS;
-    return NAV_HITS.filter((h) => h.title.toLowerCase().includes(q));
-  }, [query]);
+    if (!q) return navHits;
+    return navHits.filter((h) => h.title.toLowerCase().includes(q));
+  }, [query, navHits]);
 
   const projects = hits.filter((h) => h.type === "project");
   const tasks = hits.filter((h) => h.type === "task");

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTranslation } from "@/i18n/use-translation";
 
 type InviteMemberModalProps = {
   open: boolean;
@@ -28,13 +29,14 @@ export function InviteMemberModal({
   workspaceId,
   workspaceName,
 }: InviteMemberModalProps) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!workspaceId) {
-      toast.error("Önce bir workspace seçin.");
+      toast.error(t("invite.needWorkspace"));
       return;
     }
 
@@ -50,12 +52,14 @@ export function InviteMemberModal({
         toast.error(result.error);
         return;
       }
-      toast.success(`Davet gönderildi: ${email.trim()}`);
+      toast.success(
+        t("invite.successNamed", { email: email.trim() }),
+      );
       setEmail("");
       onOpenChange(false);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Davet oluşturulamadı.",
+        error instanceof Error ? error.message : t("invite.failed"),
       );
     } finally {
       setIsSubmitting(false);
@@ -72,24 +76,26 @@ export function InviteMemberModal({
     >
       <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-foreground">Üye Davet Et</DialogTitle>
+          <DialogTitle className="text-foreground">
+            {t("invite.title")}
+          </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {workspaceName
-              ? `"${workspaceName}" çalışma alanına e-posta ile davet gönder.`
-              : "Çalışma alanına e-posta ile davet gönder."}
+              ? t("invite.hintNamed", { name: workspaceName })
+              : t("invite.hint")}
           </DialogDescription>
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={(e) => void onSubmit(e)}>
           <div className="space-y-2">
-            <Label htmlFor="invite-email">E-posta</Label>
+            <Label htmlFor="invite-email">{t("invite.emailLabel")}</Label>
             <Input
               id="invite-email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="uye@sirket.com"
+              placeholder={t("invite.emailPlaceholder")}
               disabled={isSubmitting}
               className="rounded-lg"
             />
@@ -102,14 +108,14 @@ export function InviteMemberModal({
               onClick={() => onOpenChange(false)}
               className="rounded-lg"
             >
-              İptal
+              {t("invite.cancel")}
             </Button>
             <Button
               type="submit"
               disabled={isSubmitting || !email.trim()}
               className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              {isSubmitting ? "Gönderiliyor…" : "Davet Gönder"}
+              {isSubmitting ? t("invite.sending") : t("invite.send")}
             </Button>
           </DialogFooter>
         </form>

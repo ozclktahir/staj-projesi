@@ -59,10 +59,13 @@ export function AnalyticsDashboard({
   data,
   upcomingItems,
   recentLogs = [],
-  title = "Workspace Komuta Merkezi",
-  description = "Tüm projelerin özet metrikleri, grafikler ve son hareketler.",
+  title,
+  description,
 }: AnalyticsDashboardProps) {
   const { t } = useTranslation();
+  const resolvedTitle = title ?? t("dashboardPage.commandCenter");
+  const resolvedDescription =
+    description ?? t("dashboardPage.commandCenterDesc");
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
     align: "start",
@@ -109,9 +112,11 @@ export function AnalyticsDashboard({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-            {title}
+            {resolvedTitle}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {resolvedDescription}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button

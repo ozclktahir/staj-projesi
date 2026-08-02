@@ -19,6 +19,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/i18n/use-translation";
+import {
+  localizedPriority,
+  localizedStatus,
+} from "@/lib/localized-labels";
+import type { TaskPriority, TaskStatus } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 
 const CHART_H = 220;
@@ -57,12 +63,27 @@ function ColorBadges({
 }
 
 function EmptyChartHint() {
+  const { t } = useTranslation();
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
       <div className="size-16 rounded-full border-4 border-dashed border-muted-foreground/30" />
-      <p className="text-sm">Henüz veri yok</p>
+      <p className="text-sm">{t("analytics.noData")}</p>
     </div>
   );
+}
+
+function localizeSliceLabel(
+  t: (key: string) => string,
+  key: string,
+  fallback: string,
+): string {
+  if (key === "TODO" || key === "IN_PROGRESS" || key === "DONE") {
+    return localizedStatus(t, key as TaskStatus);
+  }
+  if (key === "HIGH" || key === "MEDIUM" || key === "LOW") {
+    return localizedPriority(t, key as TaskPriority);
+  }
+  return fallback;
 }
 
 /** Durum dağılımı — Donut */
@@ -73,6 +94,7 @@ export function StatusDonutCard({
   data: ChartSlice[];
   className?: string;
 }) {
+  const { t } = useTranslation();
   const palette: Record<string, string> = {
     TODO: "#f59e0b",
     IN_PROGRESS: "#6366f1",
@@ -80,6 +102,7 @@ export function StatusDonutCard({
   };
   const chartData = data.map((d) => ({
     ...d,
+    label: localizeSliceLabel(t, d.key, d.label),
     fill: palette[d.key] ?? d.fill,
   }));
   const hasData = chartData.some((d) => d.count > 0);
@@ -92,9 +115,11 @@ export function StatusDonutCard({
       )}
     >
       <CardHeader className="space-y-1 px-4 pt-4 pb-1">
-        <CardTitle className="text-sm font-semibold">Durum Dağılımı</CardTitle>
+        <CardTitle className="text-sm font-semibold">
+          {t("analytics.statusDistribution")}
+        </CardTitle>
         <CardDescription className="text-xs">
-          Yapılacak · Devam ediyor · Tamamlandı
+          {t("analytics.statusDesc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="px-2 pb-3">
@@ -144,6 +169,7 @@ export function PriorityBarCard({
   data: ChartSlice[];
   className?: string;
 }) {
+  const { t } = useTranslation();
   const palette: Record<string, string> = {
     HIGH: "#f43f5e",
     MEDIUM: "#f59e0b",
@@ -151,6 +177,7 @@ export function PriorityBarCard({
   };
   const chartData = data.map((d) => ({
     ...d,
+    label: localizeSliceLabel(t, d.key, d.label),
     fill: palette[d.key] ?? d.fill,
   }));
   const hasData = chartData.some((d) => d.count > 0);
@@ -163,9 +190,11 @@ export function PriorityBarCard({
       )}
     >
       <CardHeader className="space-y-1 px-4 pt-4 pb-1">
-        <CardTitle className="text-sm font-semibold">Öncelik Yoğunluğu</CardTitle>
+        <CardTitle className="text-sm font-semibold">
+          {t("analytics.priorityDensity")}
+        </CardTitle>
         <CardDescription className="text-xs">
-          Yüksek · Orta · Düşük
+          {t("analytics.priorityDesc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="px-2 pb-3">
@@ -196,7 +225,11 @@ export function PriorityBarCard({
                   tickLine={false}
                   width={28}
                 />
-                <Bar dataKey="count" name="Görev" radius={[4, 4, 0, 0]}>
+                <Bar
+                  dataKey="count"
+                  name={t("analytics.taskSeries")}
+                  radius={[4, 4, 0, 0]}
+                >
                   {chartData.map((entry) => (
                     <Cell key={entry.key} fill={entry.fill} />
                   ))}
@@ -226,6 +259,7 @@ export function WorkloadBarCard({
   workload: WorkloadItem[];
   className?: string;
 }) {
+  const { t } = useTranslation();
   const chartData = workload.map((w, index) => ({
     name: w.name.length > 10 ? `${w.name.slice(0, 8)}…` : w.name,
     fullName: w.name,
@@ -241,9 +275,11 @@ export function WorkloadBarCard({
       )}
     >
       <CardHeader className="space-y-1 px-4 pt-4 pb-1">
-        <CardTitle className="text-sm font-semibold">Üye İş Yükü</CardTitle>
+        <CardTitle className="text-sm font-semibold">
+          {t("analytics.memberWorkload")}
+        </CardTitle>
         <CardDescription className="text-xs">
-          Üye başına atanan görev sayısı
+          {t("analytics.workloadDesc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="px-2 pb-3">
@@ -274,8 +310,12 @@ export function WorkloadBarCard({
                   tickLine={false}
                   width={28}
                 />
-                <Bar dataKey="total" name="Görev" radius={[4, 4, 0, 0]}>
-                  {chartData.map((entry, index) => (
+                <Bar
+                  dataKey="total"
+                  name={t("analytics.taskSeries")}
+                  radius={[4, 4, 0, 0]}
+                >
+                  {chartData.map((_entry, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={WORKLOAD_COLORS[index % WORKLOAD_COLORS.length]}

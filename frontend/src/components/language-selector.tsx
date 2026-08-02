@@ -11,12 +11,12 @@ export function LanguageSelector() {
     {
       value: "tr",
       label: t("settings.turkish"),
-      description: "Türkçe arayüz",
+      description: t("language.trDesc"),
     },
     {
       value: "en",
       label: t("settings.english"),
-      description: "English interface",
+      description: t("language.enDesc"),
     },
   ];
 
@@ -41,7 +41,7 @@ export function LanguageSelector() {
             <span className="text-xs text-muted-foreground">{description}</span>
             {selected ? (
               <span className="mt-1 text-[10px] font-medium uppercase tracking-wide text-primary">
-                Aktif / Active
+                {t("language.active")}
               </span>
             ) : null}
           </button>

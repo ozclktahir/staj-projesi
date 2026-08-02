@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { writeActiveWorkspaceId } from "@/hooks/use-workspaces";
+import { useTranslation } from "@/i18n/use-translation";
 
 type CreateWorkspaceModalProps = {
   open: boolean;
@@ -35,6 +36,7 @@ export function CreateWorkspaceModal({
   onOpenChange,
   onCreated,
 }: CreateWorkspaceModalProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,16 +58,15 @@ export function CreateWorkspaceModal({
       }
 
       writeActiveWorkspaceId(result.workspace.id);
-      toast.success("Workspace oluşturuldu");
+      toast.success(t("workspaceModal.created"));
       resetForm();
       onOpenChange(false);
-      // State tetikleme: parent upsertWorkspace + refresh
       onCreated?.(result.workspace);
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Workspace oluşturulurken bir hata oluştu.",
+          : t("workspaceModal.createFailed"),
       );
     } finally {
       setIsSubmitting(false);
@@ -83,23 +84,23 @@ export function CreateWorkspaceModal({
       <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-foreground">
-            Create New Workspace
+            {t("workspaceModal.createTitle")}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Yeni bir çalışma alanı oluştur. Ad zorunludur.
+            {t("workspaceModal.createDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="space-y-2">
             <Label htmlFor="workspace-name" className="text-foreground">
-              Workspace Name
+              {t("workspaceModal.nameLabel")}
             </Label>
             <Input
               id="workspace-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Örn: Pazarlama Ekibi"
+              placeholder={t("workspaceModal.namePlaceholder")}
               required
               disabled={isSubmitting}
               className="rounded-lg border-border bg-background"
@@ -111,13 +112,13 @@ export function CreateWorkspaceModal({
               htmlFor="workspace-description"
               className="text-foreground"
             >
-              Description
+              {t("workspaceModal.descriptionLabel")}
             </Label>
             <textarea
               id="workspace-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="İsteğe bağlı açıklama"
+              placeholder={t("workspaceModal.descriptionPlaceholder")}
               rows={3}
               disabled={isSubmitting}
               className="flex w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
@@ -132,14 +133,16 @@ export function CreateWorkspaceModal({
               disabled={isSubmitting}
               onClick={() => onOpenChange(false)}
             >
-              İptal
+              {t("workspaceModal.cancel")}
             </Button>
             <Button
               type="submit"
               disabled={isSubmitting || !name.trim()}
               className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              {isSubmitting ? "Oluşturuluyor..." : "Oluştur"}
+              {isSubmitting
+                ? t("workspaceModal.creating")
+                : t("workspaceModal.create")}
             </Button>
           </DialogFooter>
         </form>

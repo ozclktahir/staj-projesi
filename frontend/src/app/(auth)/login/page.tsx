@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isAxiosError } from "axios";
@@ -21,11 +21,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTranslation } from "@/i18n/use-translation";
 import apiClient from "@/lib/api-client";
 import { clearAuthSession, persistAuthSession } from "@/lib/auth-session";
 import { writeActiveWorkspaceId } from "@/hooks/use-workspaces";
 import {
-  loginSchema,
+  createLoginSchema,
   formatAuthApiError,
   type LoginFormValues,
 } from "@/lib/validations/auth";
@@ -41,15 +42,17 @@ type LoginTokens = {
 };
 
 export default function LoginPage() {
+  const { t, locale } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mfaPending, setMfaPending] = useState(false);
+  const schema = useMemo(() => createLoginSchema(locale), [locale]);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(schema),
   });
 
   async function finishLoginRedirect() {
@@ -76,7 +79,7 @@ export default function LoginPage() {
       href = "/";
     }
 
-    toast.success("Giriş başarılı");
+    toast.success(t("auth.success"));
     window.location.assign(href);
   }
 
@@ -95,7 +98,7 @@ export default function LoginPage() {
       });
 
       if (!data.access_token) {
-        toast.error("Giriş başarısız: access_token alınamadı.");
+        toast.error(t("auth.tokenMissing"));
         setIsSubmitting(false);
         return;
       }
@@ -107,10 +110,12 @@ export default function LoginPage() {
       };
     } catch (error) {
       const message = isAxiosError(error)
-        ? (error.response?.data?.message ?? "E-posta veya şifre hatalı")
-        : "E-posta veya şifre hatalı";
+        ? (error.response?.data?.message ?? t("auth.badCredentials"))
+        : t("auth.badCredentials");
 
-      toast.error(formatAuthApiError(message, "E-posta veya şifre hatalı"));
+      toast.error(
+        formatAuthApiError(message, t("auth.badCredentials"), locale),
+      );
       setIsSubmitting(false);
       return;
     }
@@ -153,22 +158,24 @@ export default function LoginPage() {
     <AuthSplitShell>
       <Card className="rounded-[var(--radius)] border border-zinc-800 bg-zinc-900 text-zinc-50 shadow-xl">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl text-zinc-50">Giriş Yap</CardTitle>
+          <CardTitle className="text-2xl text-zinc-50">
+            {t("auth.loginTitle")}
+          </CardTitle>
           <CardDescription className="text-zinc-400">
-            Hesabınıza giriş yapmak için e-posta ve şifrenizi girin.
+            {t("auth.loginSubtitle")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-zinc-200">
-                Email
+                {t("auth.email")}
               </Label>
               <Input
                 id="email"
                 type="email"
                 autoComplete="email"
-                placeholder="ornek@email.com"
+                placeholder={t("auth.emailPlaceholder")}
                 className="rounded-[var(--radius)] border-zinc-800 bg-zinc-950 text-zinc-50 placeholder:text-zinc-500"
                 aria-invalid={Boolean(errors.email)}
                 {...register("email")}
@@ -180,13 +187,13 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <Label htmlFor="password" className="text-zinc-200">
-                  Şifre
+                  {t("auth.password")}
                 </Label>
                 <Link
                   href="#"
                   className="text-sm font-medium text-primary transition-colors hover:text-primary/80"
                 >
-                  Şifremi Unuttum
+                  {t("auth.forgotPassword")}
                 </Link>
               </div>
               <Input
@@ -209,18 +216,18 @@ export default function LoginPage() {
               disabled={isSubmitting}
               className="w-full rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              {isSubmitting ? "Giriş yapılıyor..." : "Giriş Yap"}
+              {isSubmitting ? t("auth.submitting") : t("auth.submit")}
             </Button>
           </form>
         </CardContent>
         <CardFooter className="justify-center">
           <p className="text-sm text-zinc-400">
-            Hesabın yok mu?{" "}
+            {t("auth.noAccount")}{" "}
             <Link
               href="/register"
               className="font-medium text-primary transition-colors hover:text-primary/80"
             >
-              Kayıt Ol
+              {t("auth.registerLink")}
             </Link>
           </p>
         </CardFooter>

@@ -11,23 +11,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/i18n/use-translation";
 
 export function QuickActivityFeed({ logs }: { logs: ActivityLogItem[] }) {
+  const { t, locale } = useTranslation();
+
   return (
     <Card className="rounded-lg border-border shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <History className="size-4 text-primary" />
-          Son Aktiviteler
+          {t("activity.recentTitle")}
         </CardTitle>
-        <CardDescription>
-          Workspace genelindeki en son kullanıcı hareketleri
-        </CardDescription>
+        <CardDescription>{t("activity.recentDesc")}</CardDescription>
       </CardHeader>
       <CardContent>
         {logs.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            Henüz aktivite yok.
+            {t("activity.empty")}
           </p>
         ) : (
           <ul className="space-y-2.5">
@@ -50,10 +51,10 @@ export function QuickActivityFeed({ logs }: { logs: ActivityLogItem[] }) {
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-foreground">
-                    {formatActivityMessage(log)}
+                    {formatActivityMessage(log, locale)}
                   </p>
                   <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    {formatRelativeTime(log.createdAt)}
+                    {formatRelativeTime(log.createdAt, locale)}
                   </p>
                 </div>
               </li>

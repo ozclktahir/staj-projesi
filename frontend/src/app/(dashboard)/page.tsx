@@ -4,6 +4,7 @@ import { getWorkspaceAnalytics } from "@/app/actions/analytics";
 import { getWorkspaceActivityLogs } from "@/app/actions/activity-logs";
 import { getUpcomingDeadlinesItems } from "@/app/actions/upcoming-deadlines";
 import { DashboardSkeleton } from "@/components/loading/page-skeletons";
+import { I18nText } from "@/components/i18n-text";
 import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
 
 type DashboardPageProps = {
@@ -24,7 +25,7 @@ async function DashboardContent({
     return (
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <div className="rounded-lg border border-dashed border-border bg-card/60 px-4 py-10 text-center text-sm text-muted-foreground">
-          Dashboard’u görmek için bir workspace seçin.
+          <I18nText k="dashboardPage.needWorkspace" />
         </div>
       </div>
     );
@@ -40,7 +41,11 @@ async function DashboardContent({
     return (
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <div className="rounded-lg border border-rose-300/50 bg-rose-50 px-4 py-6 text-sm text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
-          {analyticsResult.error ?? "Dashboard verileri yüklenemedi."}
+          {analyticsResult.error ? (
+            analyticsResult.error
+          ) : (
+            <I18nText k="dashboardPage.loadError" />
+          )}
         </div>
       </div>
     );
@@ -52,8 +57,6 @@ async function DashboardContent({
         data={analyticsResult.data}
         upcomingItems={deadlinesResult.success ? deadlinesResult.items : []}
         recentLogs={activityResult.success ? activityResult.logs : []}
-        title="Dashboard"
-        description="Workspace genel bakış: KPI’lar, görev grafikleri, iş yükü ve son aktiviteler."
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { getWorkspaceMembers } from "@/app/actions/workspace-members";
 import { getCurrentUserDisplayLabel } from "@/app/actions/current-user";
 import { MembersTable } from "@/components/members/members-table";
 import { DashboardSkeleton } from "@/components/loading/page-skeletons";
+import { I18nText } from "@/components/i18n-text";
 import { resolveActiveWorkspaceId } from "@/lib/active-workspace-server";
 
 type MembersPageProps = {
@@ -23,7 +24,7 @@ async function MembersContent({
     return (
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
         <div className="rounded-lg border border-dashed border-border bg-card/60 px-4 py-10 text-center text-sm text-muted-foreground">
-          Üyeleri görmek için bir workspace seçin.
+          <I18nText k="membersPage.needWorkspace" />
         </div>
       </div>
     );
@@ -47,15 +48,20 @@ async function MembersContent({
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
-        <p className="text-sm text-muted-foreground">Workspace</p>
+        <p className="text-sm text-muted-foreground">
+          <I18nText k="membersPage.eyebrow" />
+        </p>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Üyeler
+          <I18nText k="membersPage.title" as="span" />
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Çalışma alanı üyelerini görüntüleyin
-          {membersResult.isAdmin
-            ? "; adminler rol değiştirebilir veya üye çıkarabilir."
-            : "."}
+          <I18nText
+            k={
+              membersResult.isAdmin
+                ? "membersPage.subtitleAdmin"
+                : "membersPage.subtitle"
+            }
+          />
         </p>
       </div>
       <MembersTable

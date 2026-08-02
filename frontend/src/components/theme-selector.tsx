@@ -3,28 +3,8 @@
 import { useEffect, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useTranslation } from "@/i18n/use-translation";
 import { cn } from "@/lib/utils";
-
-const themes = [
-  {
-    value: "light" as const,
-    label: "Açık Mod",
-    description: "Beyaz arka plan, turuncu ve mavi vurgular",
-    icon: Sun,
-  },
-  {
-    value: "dark" as const,
-    label: "Koyu Mod",
-    description: "Koyu arka plan, turuncu vurgu",
-    icon: Moon,
-  },
-  {
-    value: "system" as const,
-    label: "Sistem Teması",
-    description: "Cihaz / tarayıcı tercihine uyum",
-    icon: Monitor,
-  },
-];
 
 function applyHtmlThemeClass(next: "light" | "dark" | "system") {
   if (typeof document === "undefined") return;
@@ -37,17 +17,37 @@ function applyHtmlThemeClass(next: "light" | "dark" | "system") {
   } else {
     root.classList.add(next);
   }
-
-  console.info("[ThemeSelector] html.className =", root.className);
 }
 
 export function ThemeSelector() {
+  const { t } = useTranslation();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const themes = [
+    {
+      value: "light" as const,
+      label: t("theme.light"),
+      description: t("theme.lightDesc"),
+      icon: Sun,
+    },
+    {
+      value: "dark" as const,
+      label: t("theme.dark"),
+      description: t("theme.darkDesc"),
+      icon: Moon,
+    },
+    {
+      value: "system" as const,
+      label: t("theme.system"),
+      description: t("theme.systemDesc"),
+      icon: Monitor,
+    },
+  ];
 
   if (!mounted) {
     return (
@@ -98,12 +98,17 @@ export function ThemeSelector() {
             <span className="text-xs text-muted-foreground">{description}</span>
             {value !== "system" && resolvedTheme === value ? (
               <span className="text-[10px] font-medium uppercase tracking-wide text-primary">
-                Aktif
+                {t("theme.active")}
               </span>
             ) : null}
             {value === "system" && selected ? (
               <span className="text-[10px] font-medium uppercase tracking-wide text-primary">
-                Şu an: {resolvedTheme === "dark" ? "Koyu" : "Açık"}
+                {t("theme.currently", {
+                  mode:
+                    resolvedTheme === "dark"
+                      ? t("theme.modeDark")
+                      : t("theme.modeLight"),
+                })}
               </span>
             ) : null}
           </button>

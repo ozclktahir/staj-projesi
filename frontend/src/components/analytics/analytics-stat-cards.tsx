@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { AnalyticsSummary } from "@/app/actions/analytics";
 import { Card, CardContent } from "@/components/ui/card";
+import { useTranslation } from "@/i18n/use-translation";
 import { cn } from "@/lib/utils";
 
 type StatCard = {
@@ -21,37 +22,39 @@ type StatCard = {
 };
 
 export function AnalyticsStatCards({ summary }: { summary: AnalyticsSummary }) {
+  const { t } = useTranslation();
+
   const cards: StatCard[] = [
     {
-      label: "Toplam Görev",
+      label: t("analytics.totalTasks"),
       value: String(summary.totalTasks),
-      hint: "Workspace / proje kapsamı",
+      hint: t("analytics.totalTasksHint"),
       icon: ListTodo,
       accent: "border-indigo-300/80 dark:border-indigo-500/30",
       iconWrap:
         "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400",
     },
     {
-      label: "Tamamlanma Oranı",
+      label: t("analytics.completionRate"),
       value: `%${summary.completionRate}`,
-      hint: `${summary.completedTasks} tamamlandı`,
+      hint: t("analytics.completedHint", { n: summary.completedTasks }),
       icon: CheckCircle2,
       accent: "border-emerald-300/80 dark:border-emerald-500/30",
       iconWrap:
         "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
     },
     {
-      label: "Geciken Görevler",
+      label: t("analytics.overdueTasks"),
       value: String(summary.overdueTasks),
-      hint: "Teslim tarihi geçmiş",
+      hint: t("analytics.overdueHint"),
       icon: AlertTriangle,
       accent: "border-rose-300/80 dark:border-rose-500/30",
       iconWrap: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400",
     },
     {
-      label: "Aktif Üyeler",
+      label: t("analytics.activeMembers"),
       value: String(summary.activeMembers),
-      hint: "Çalışma alanındaki kişiler",
+      hint: t("analytics.activeMembersHint"),
       icon: Users,
       accent: "border-amber-300/80 dark:border-amber-500/30",
       iconWrap:
@@ -79,12 +82,17 @@ export function AnalyticsStatCards({ summary }: { summary: AnalyticsSummary }) {
               <card.icon className="size-4" />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-[11px] font-medium text-muted-foreground">
+              <p className="truncate text-xs text-muted-foreground">
                 {card.label}
               </p>
-              <p className="text-xl font-semibold tracking-tight text-foreground">
+              <p className="text-lg font-semibold tracking-tight text-foreground">
                 {card.value}
               </p>
+              {card.hint ? (
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {card.hint}
+                </p>
+              ) : null}
             </div>
           </CardContent>
         </Card>

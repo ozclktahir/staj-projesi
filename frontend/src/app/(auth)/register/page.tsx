@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isAxiosError } from "axios";
@@ -19,24 +19,27 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTranslation } from "@/i18n/use-translation";
 import apiClient from "@/lib/api-client";
 import { persistAuthSession } from "@/lib/auth-session";
 import { writeActiveWorkspaceId } from "@/hooks/use-workspaces";
 import {
+  createRegisterSchema,
   formatAuthApiError,
-  registerSchema,
   type RegisterFormValues,
 } from "@/lib/validations/auth";
 
 export default function RegisterPage() {
+  const { t, locale } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const schema = useMemo(() => createRegisterSchema(locale), [locale]);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
+    resolver: zodResolver(schema),
   });
 
   const onSubmit = async (values: RegisterFormValues) => {
@@ -54,13 +57,14 @@ export default function RegisterPage() {
         });
       } catch (error) {
         const message = isAxiosError(error)
-          ? (error.response?.data?.message ?? "Kayıt işlemi başarısız oldu")
-          : "Kayıt işlemi başarısız oldu";
-        toast.error(formatAuthApiError(message, "Kayıt işlemi başarısız oldu"));
+          ? (error.response?.data?.message ?? t("auth.registerFailed"))
+          : t("auth.registerFailed");
+        toast.error(
+          formatAuthApiError(message, t("auth.registerFailed"), locale),
+        );
         return;
       }
 
-      // Anlık oturum: kayıt sonrası otomatik giriş
       let accessToken: string;
       let refreshToken: string | null | undefined;
       let user: unknown;
@@ -72,7 +76,7 @@ export default function RegisterPage() {
         }>("/auth/login", { email, password });
 
         if (!data.access_token) {
-          toast.success("Kayıt başarılı. Giriş yapabilirsiniz.");
+          toast.success(t("auth.registerSuccessLogin"));
           window.location.assign("/login");
           return;
         }
@@ -81,9 +85,11 @@ export default function RegisterPage() {
         user = data.user;
       } catch (error) {
         const message = isAxiosError(error)
-          ? (error.response?.data?.message ?? "Kayıt başarılı; otomatik giriş başarısız")
-          : "Kayıt başarılı; otomatik giriş başarısız";
-        toast.error(formatAuthApiError(message, "Kayıt başarılı; lütfen giriş yapın."));
+          ? (error.response?.data?.message ?? t("auth.registerSuccessLogin"))
+          : t("auth.registerSuccessLogin");
+        toast.error(
+          formatAuthApiError(message, t("auth.registerSuccessLogin"), locale),
+        );
         window.location.assign("/login");
         return;
       }
@@ -111,7 +117,7 @@ export default function RegisterPage() {
         href = "/onboarding";
       }
 
-      toast.success("Kayıt başarılı — çalışma alanına yönlendiriliyorsun");
+      toast.success(t("auth.registerSuccessLogin"));
       window.location.assign(href);
     } finally {
       setIsSubmitting(false);
@@ -122,9 +128,11 @@ export default function RegisterPage() {
     <AuthSplitShell>
       <Card className="rounded-[var(--radius)] border border-zinc-800 bg-zinc-900 text-zinc-50 shadow-xl">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl text-zinc-50">Kayıt Ol</CardTitle>
+          <CardTitle className="text-2xl text-zinc-50">
+            {t("auth.registerTitle")}
+          </CardTitle>
           <CardDescription className="text-zinc-400">
-            Yeni bir hesap oluşturmak için bilgilerini doldur.
+            {t("auth.registerSubtitle")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -132,13 +140,13 @@ export default function RegisterPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="firstName" className="text-zinc-200">
-                  Ad
+                  {t("auth.firstName")}
                 </Label>
                 <Input
                   id="firstName"
                   type="text"
                   autoComplete="given-name"
-                  placeholder="Adınız"
+                  placeholder={t("auth.firstNamePlaceholder")}
                   className="rounded-[var(--radius)] border-zinc-800 bg-zinc-950 text-zinc-50 placeholder:text-zinc-500"
                   aria-invalid={Boolean(errors.firstName)}
                   {...register("firstName")}
@@ -151,13 +159,13 @@ export default function RegisterPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName" className="text-zinc-200">
-                  Soyad
+                  {t("auth.lastName")}
                 </Label>
                 <Input
                   id="lastName"
                   type="text"
                   autoComplete="family-name"
-                  placeholder="Soyadınız"
+                  placeholder={t("auth.lastNamePlaceholder")}
                   className="rounded-[var(--radius)] border-zinc-800 bg-zinc-950 text-zinc-50 placeholder:text-zinc-500"
                   aria-invalid={Boolean(errors.lastName)}
                   {...register("lastName")}
@@ -171,13 +179,13 @@ export default function RegisterPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-zinc-200">
-                Email
+                {t("auth.email")}
               </Label>
               <Input
                 id="email"
                 type="email"
                 autoComplete="email"
-                placeholder="ornek@email.com"
+                placeholder={t("auth.emailPlaceholder")}
                 className="rounded-[var(--radius)] border-zinc-800 bg-zinc-950 text-zinc-50 placeholder:text-zinc-500"
                 aria-invalid={Boolean(errors.email)}
                 {...register("email")}
@@ -188,13 +196,13 @@ export default function RegisterPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password" className="text-zinc-200">
-                Şifre
+                {t("auth.password")}
               </Label>
               <Input
                 id="password"
                 type="password"
                 autoComplete="new-password"
-                placeholder="En az 6 karakter"
+                placeholder={t("auth.passwordMin")}
                 className="rounded-[var(--radius)] border-zinc-800 bg-zinc-950 text-zinc-50 placeholder:text-zinc-500"
                 aria-invalid={Boolean(errors.password)}
                 {...register("password")}
@@ -210,18 +218,20 @@ export default function RegisterPage() {
               disabled={isSubmitting}
               className="w-full rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              {isSubmitting ? "Kayıt yapılıyor..." : "Kayıt Ol"}
+              {isSubmitting
+                ? t("auth.registerSubmitting")
+                : t("auth.registerSubmit")}
             </Button>
           </form>
         </CardContent>
         <CardFooter className="justify-center">
           <p className="text-sm text-zinc-400">
-            Zaten hesabın var mı?{" "}
+            {t("auth.haveAccount")}{" "}
             <Link
               href="/login"
               className="font-medium text-primary transition-colors hover:text-primary/80"
             >
-              Giriş Yap
+              {t("auth.loginLink")}
             </Link>
           </p>
         </CardFooter>

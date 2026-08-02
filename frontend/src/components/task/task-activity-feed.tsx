@@ -10,6 +10,7 @@ import { formatActivityMessage } from "@/lib/activity-format";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import { createAuthedRealtimeClient } from "@/lib/supabase/client";
 import { mapRealtimeActivityRow } from "@/lib/supabase/realtime";
+import { useTranslation } from "@/i18n/use-translation";
 
 type TaskActivityFeedProps = {
   taskId: string;
@@ -17,6 +18,7 @@ type TaskActivityFeedProps = {
 };
 
 export function TaskActivityFeed({ taskId, refreshKey = 0 }: TaskActivityFeedProps) {
+  const { locale } = useTranslation();
   const [logs, setLogs] = useState<ActivityLogItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -96,10 +98,10 @@ export function TaskActivityFeed({ taskId, refreshKey = 0 }: TaskActivityFeedPro
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-foreground">
-                  {formatActivityMessage(log)}
+                  {formatActivityMessage(log, locale)}
                 </p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {formatRelativeTime(log.createdAt)}
+                  {formatRelativeTime(log.createdAt, locale)}
                 </p>
               </div>
             </li>

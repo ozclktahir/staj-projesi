@@ -12,6 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/i18n/use-translation";
+import { formatAppDate } from "@/lib/date-locale";
 import type { DashboardProject, DashboardTaskStats } from "@/lib/supabase/types";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
 
@@ -40,27 +42,31 @@ export function DashboardHome({
   adminMembers = [],
   canCreateProject = false,
 }: DashboardHomeProps) {
+  const { t, locale } = useTranslation();
   const hasProjects = projects.length > 0;
   const welcomeName = userName?.trim() || "";
 
   const summary = [
     {
-      label: "Toplam Görev",
+      label: t("projectsHome.totalTasks"),
       value: stats.total,
       icon: ListTodo,
-      accent: "border border-primary/40 bg-primary/10 text-primary dark:border-transparent dark:bg-primary/15",
+      accent:
+        "border border-primary/40 bg-primary/10 text-primary dark:border-transparent dark:bg-primary/15",
     },
     {
-      label: "Devam Eden",
+      label: t("projectsHome.inProgress"),
       value: stats.inProgress,
       icon: CircleDashed,
-      accent: "border border-sky-300 bg-sky-100 text-sky-700 dark:border-transparent dark:bg-sky-500/15 dark:text-sky-400",
+      accent:
+        "border border-sky-300 bg-sky-100 text-sky-700 dark:border-transparent dark:bg-sky-500/15 dark:text-sky-400",
     },
     {
-      label: "Tamamlanan",
+      label: t("projectsHome.done"),
       value: stats.done,
       icon: CheckCircle2,
-      accent: "border border-emerald-300 bg-emerald-100 text-emerald-700 dark:border-transparent dark:bg-emerald-500/15 dark:text-emerald-400",
+      accent:
+        "border border-emerald-300 bg-emerald-100 text-emerald-700 dark:border-transparent dark:bg-emerald-500/15 dark:text-emerald-400",
     },
   ] as const;
 
@@ -69,10 +75,10 @@ export function DashboardHome({
       <Card className="overflow-hidden rounded-[var(--radius)] border-border bg-gradient-to-br from-card via-card to-primary/10 shadow-sm">
         <CardHeader className="gap-2">
           <CardDescription className="text-sm text-muted-foreground">
-            Dashboard
+            {t("projectsHome.eyebrow")}
           </CardDescription>
           <CardTitle className="text-3xl font-semibold tracking-tight text-foreground">
-            Hoş geldin
+            {t("projectsHome.welcome")}
             {welcomeName ? (
               <>
                 , <span className="text-primary">{welcomeName}</span>
@@ -80,8 +86,7 @@ export function DashboardHome({
             ) : null}
           </CardTitle>
           <p className="max-w-xl text-sm text-muted-foreground">
-            Projelerini buradan yönet, ilerlemeyi takip et ve ekibinle
-            senkron kal.
+            {t("projectsHome.subtitle")}
           </p>
         </CardHeader>
       </Card>
@@ -119,15 +124,15 @@ export function DashboardHome({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-foreground">
-              Projelerim
+              {t("projectsHome.myProjects")}
             </h2>
             <p className="text-sm text-muted-foreground">
-              Aktif çalışma alanların ve projelerin
+              {t("projectsHome.myProjectsHint")}
             </p>
           </div>
           {canCreateProject ? (
             <CreateProjectModal
-              triggerLabel="Yeni Proje"
+              triggerLabel={t("projectModal.newProject")}
               workspaceId={workspaceId}
             />
           ) : null}
@@ -155,16 +160,14 @@ export function DashboardHome({
                     <CardDescription>
                       {project.description?.trim()
                         ? project.description
-                        : "Açıklama eklenmemiş"}
+                        : t("projectsHome.noDescription")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <p className="text-xs text-muted-foreground">
                       {project.created_at
-                        ? new Date(project.created_at).toLocaleDateString(
-                            "tr-TR",
-                          )
-                        : "Tarih yok"}
+                        ? formatAppDate(project.created_at, locale)
+                        : t("projectsHome.noDate")}
                     </p>
                   </CardContent>
                 </Card>
@@ -178,21 +181,21 @@ export function DashboardHome({
                 <FolderKanban className="size-6" />
               </div>
               <CardTitle className="text-xl text-foreground">
-                Henüz bir proje yok
+                {t("projectsHome.emptyTitle")}
               </CardTitle>
               <CardDescription className="max-w-md">
-                Henüz bir proje yok, bir tane oluştur
+                {t("projectsHome.emptyHint")}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center pb-8">
               {canCreateProject ? (
                 <CreateProjectModal
-                  triggerLabel="İlk Projeyi Oluştur"
+                  triggerLabel={t("projectModal.firstProject")}
                   workspaceId={workspaceId}
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Size atanan projeler burada görünecek.
+                  {t("projectsHome.assignedHint")}
                 </p>
               )}
             </CardContent>

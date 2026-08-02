@@ -18,28 +18,30 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { readActiveWorkspaceId } from "@/hooks/use-workspaces";
+import { useTranslation } from "@/i18n/use-translation";
 
 type CreateProjectModalProps = {
   triggerLabel?: string;
   triggerVariant?: "default" | "outline" | "secondary" | "ghost";
   triggerClassName?: string;
   trigger?: ReactNode;
-  /** Aktif workspace — Dashboard'dan geçirilmeli */
   workspaceId?: string | null;
 };
 
 export function CreateProjectModal({
-  triggerLabel = "Yeni Proje",
+  triggerLabel,
   triggerVariant = "default",
   triggerClassName,
   trigger,
   workspaceId: workspaceIdProp = null,
 }: CreateProjectModalProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const resolvedTriggerLabel = triggerLabel ?? t("projectModal.newProject");
 
   const resolveWorkspaceId = (): string | null => {
     const fromProp =
@@ -60,11 +62,6 @@ export function CreateProjectModal({
 
     try {
       const activeWorkspaceId = resolveWorkspaceId();
-      console.log("[CreateProjectModal] submit", {
-        name,
-        workspaceIdProp,
-        activeWorkspaceId,
-      });
 
       if (
         activeWorkspaceId == null ||
@@ -72,26 +69,22 @@ export function CreateProjectModal({
         activeWorkspaceId === "undefined" ||
         activeWorkspaceId === "null"
       ) {
-        toast.error("Lütfen önce bir çalışma alanı seçin.");
+        toast.error(t("projectModal.needWorkspace"));
         return;
       }
 
-      const payload = {
+      const result = await createProject({
         name,
         description,
         workspaceId: activeWorkspaceId,
-      };
-      console.log("[CreateProjectModal] createProject payload", payload);
-
-      const result = await createProject(payload);
+      });
 
       if (!result.success) {
-        console.error("[CreateProjectModal] createProject failed:", result.error);
-        toast.error(result.error || "Proje oluşturulamadı.");
+        toast.error(result.error || t("projectModal.createFailed"));
         return;
       }
 
-      toast.success("Proje oluşturuldu");
+      toast.success(t("projectModal.created"));
       resetForm();
       setOpen(false);
       router.refresh();
@@ -99,8 +92,7 @@ export function CreateProjectModal({
       const message =
         error instanceof Error
           ? error.message
-          : "Proje oluşturulurken bir hata oluştu.";
-      console.error("[CreateProjectModal] catch:", error);
+          : t("projectModal.createFailed");
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -128,28 +120,25 @@ export function CreateProjectModal({
             }
           >
             <Plus className="size-4" />
-            {triggerLabel}
+            {resolvedTriggerLabel}
           </Button>
         )}
       </DialogTrigger>
 
       <DialogContent className="rounded-[var(--radius)] border-border bg-card sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Yeni Proje</DialogTitle>
-          <DialogDescription>
-            Proje adı ve isteğe bağlı bir açıklama girin. Proje aktif çalışma
-            alanına kaydedilir.
-          </DialogDescription>
+          <DialogTitle>{t("projectModal.createTitle")}</DialogTitle>
+          <DialogDescription>{t("projectModal.createDesc")}</DialogDescription>
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="space-y-2">
-            <Label htmlFor="project-name">Proje Adı</Label>
+            <Label htmlFor="project-name">{t("projectModal.nameLabel")}</Label>
             <Input
               id="project-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Örn: Ürün Lansmanı"
+              placeholder={t("projectModal.namePlaceholder")}
               required
               className="rounded-[var(--radius)]"
               disabled={isSubmitting}
@@ -157,12 +146,14 @@ export function CreateProjectModal({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="project-description">Açıklama</Label>
+            <Label htmlFor="project-description">
+              {t("projectModal.descriptionLabel")}
+            </Label>
             <textarea
               id="project-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="Kısa bir açıklama (opsiyonel)"
+              placeholder={t("projectModal.descriptionPlaceholder")}
               rows={4}
               disabled={isSubmitting}
               className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-[var(--radius)] border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -177,14 +168,16 @@ export function CreateProjectModal({
               disabled={isSubmitting}
               onClick={() => setOpen(false)}
             >
-              İptal
+              {t("projectModal.cancel")}
             </Button>
             <Button
               type="submit"
               disabled={isSubmitting || !name.trim()}
               className="rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              {isSubmitting ? "Oluşturuluyor..." : "Oluştur"}
+              {isSubmitting
+                ? t("projectModal.creating")
+                : t("projectModal.create")}
             </Button>
           </DialogFooter>
         </form>
