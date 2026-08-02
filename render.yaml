@@ -1,0 +1,41 @@
+# Render Blueprint — NestJS API + Redis-compatible Key Value (Valkey)
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploy: Render Dashboard → New → Blueprint → this repo (main)
+# Secrets (SUPABASE_*) are prompted on first deploy (sync: false).
+
+services:
+  - type: web
+    name: staj-projesi-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: staj-projesi-redis
+          property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Frontend production origin(s); Adım 3'te sıkılaştırılacak
+      - key: CORS_ORIGIN
+        sync: false
+
+  - type: keyvalue
+    name: staj-projesi-redis
+    plan: starter
+    region: frankfurt
+    maxmemoryPolicy: allkeys-lru
+    # Boş liste = yalnızca aynı Render hesabındaki internal erişim
+    ipAllowList: []
