@@ -9,3 +9,8 @@ npm-debug.log*
 # Staj defteri günlük raporları (yerelde kalsın, GitHub'a push edilmesin)
 STAJ_RAPORU_*.md
 **/STAJ_RAPORU_*.md
+
+# Flutter/Android build artifacts
+mobile/android/build/
+mobile/build/
+
