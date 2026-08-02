@@ -11,9 +11,10 @@ Started production rollout to **Render with Redis**. Step 1 completed: committed
 ## Step 2 — Render Blueprint (done)
 - Added root `render.yaml`:
   - Web service `staj-projesi-api` (Docker from `backend/`), health check `/health`, Frankfurt
-  - Key Value `staj-projesi-redis` (Valkey/Redis-compatible), wired as `REDIS_URL`
+  - Key Value `staj-projesi-redis` (Valkey/Redis-compatible), wired as `REDIS_URL`, **plan: free**
+  - Web service also **plan: free**
   - `SUPABASE_*` / `CORS_ORIGIN` as `sync: false` (enter on first deploy)
-- Pushed to `origin/main` (`4d9eea5`).
+- Pushed to `origin/main` (`4d9eea5`; free Redis follow-up commit).
 
 ## Step 3 — Env / CORS (done)
 - Nest reads `CORS_ORIGIN` (comma-separated; empty/`*` → allow all).

@@ -34,7 +34,7 @@ services:
 
   - type: keyvalue
     name: staj-projesi-redis
-    plan: starter
+    plan: free
     region: frankfurt
     maxmemoryPolicy: allkeys-lru
     # Boş liste = yalnızca aynı Render hesabındaki internal erişim
