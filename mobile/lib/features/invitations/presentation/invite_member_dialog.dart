@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/invitation_repository.dart';
 import '../providers/invitation_provider.dart';
 
-const _inviteRoles = ['Admin', 'Member', 'Guest'];
+const _inviteRoles = ['Admin', 'Member'];
 
 Future<bool?> showInviteMemberDialog(
   BuildContext context,

@@ -138,91 +138,116 @@ class _AssignedTasksTabState extends ConsumerState<_AssignedTasksTab> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: TextField(
-            controller: _search,
-            decoration: InputDecoration(
-              hintText: s.personalSearchTasks,
-              prefixIcon: const Icon(Icons.search),
-              isDense: true,
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-        ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.fromLTRB(12, 8, 4, 4),
           child: Row(
             children: [
-              FilterChip(
-                label: Text(_priority?.label ?? 'Öncelik'),
-                selected: _priority != null,
-                onSelected: (_) async {
-                  final next = await showModalBottomSheet<TaskPriority?>(
-                    context: context,
-                    builder: (ctx) => SafeArea(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ListTile(
-                            title: const Text('Tümü'),
-                            onTap: () => Navigator.pop(ctx, null),
-                          ),
-                          for (final p in TaskPriority.values)
-                            ListTile(
-                              title: Text(p.label),
-                              onTap: () => Navigator.pop(ctx, p),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                  setState(() => _priority = next);
-                },
-              ),
-              const SizedBox(width: 6),
-              FilterChip(
-                label: Text(_status?.label ?? 'Durum'),
-                selected: _status != null,
-                onSelected: (_) async {
-                  final next = await showModalBottomSheet<TaskStatus?>(
-                    context: context,
-                    builder: (ctx) => SafeArea(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ListTile(
-                            title: const Text('Tümü'),
-                            onTap: () => Navigator.pop(ctx, null),
-                          ),
-                          for (final s in TaskStatus.values)
-                            ListTile(
-                              title: Text(s.label),
-                              onTap: () => Navigator.pop(ctx, s),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                  setState(() => _status = next);
-                },
-              ),
-              const SizedBox(width: 6),
-              for (final entry in const [
-                ('all', 'Tarih'),
-                ('hasDue', 'Tarihli'),
-                ('noDue', 'Tarihsiz'),
-                ('overdue', 'Geciken'),
-              ])
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
-                    label: Text(entry.$2),
-                    selected: _dateFilter == entry.$1,
-                    onSelected: (_) =>
-                        setState(() => _dateFilter = entry.$1),
+              Expanded(
+                child: TextField(
+                  controller: _search,
+                  decoration: InputDecoration(
+                    hintText: s.personalSearchTasks,
+                    prefixIcon: const Icon(Icons.search),
+                    isDense: true,
                   ),
+                  onChanged: (_) => setState(() {}),
                 ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'Filtre',
+                icon: Badge(
+                  isLabelVisible: _priority != null ||
+                      _status != null ||
+                      _dateFilter != 'all',
+                  child: const Icon(Icons.filter_list),
+                ),
+                onSelected: (value) {
+                  setState(() {
+                    if (value.startsWith('p:')) {
+                      final key = value.substring(2);
+                      _priority = key == 'all'
+                          ? null
+                          : TaskPriority.values.cast<TaskPriority?>().firstWhere(
+                                (e) => e?.name == key,
+                                orElse: () => null,
+                              );
+                    } else if (value.startsWith('s:')) {
+                      final key = value.substring(2);
+                      _status = key == 'all'
+                          ? null
+                          : TaskStatus.values.cast<TaskStatus?>().firstWhere(
+                                (e) => e?.name == key,
+                                orElse: () => null,
+                              );
+                    } else if (value.startsWith('d:')) {
+                      _dateFilter = value.substring(2);
+                    } else if (value == 'clear') {
+                      _priority = null;
+                      _status = null;
+                      _dateFilter = 'all';
+                    }
+                  });
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    enabled: false,
+                    child: Text('Öncelik',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                  PopupMenuItem(
+                    value: 'p:all',
+                    child: Text(_priority == null ? '✓ Tümü' : 'Tümü'),
+                  ),
+                  for (final p in TaskPriority.values)
+                    PopupMenuItem(
+                      value: 'p:${p.name}',
+                      child: Text(
+                        _priority == p ? '✓ ${p.label}' : p.label,
+                      ),
+                    ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    enabled: false,
+                    child: Text('Durum',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                  PopupMenuItem(
+                    value: 's:all',
+                    child: Text(_status == null ? '✓ Tümü' : 'Tümü'),
+                  ),
+                  for (final st in TaskStatus.values)
+                    PopupMenuItem(
+                      value: 's:${st.name}',
+                      child: Text(
+                        _status == st ? '✓ ${st.label}' : st.label,
+                      ),
+                    ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    enabled: false,
+                    child: Text('Tarih',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                  for (final entry in const [
+                    ('all', 'Tümü'),
+                    ('hasDue', 'Tarihli'),
+                    ('noDue', 'Tarihsiz'),
+                    ('overdue', 'Geciken'),
+                  ])
+                    PopupMenuItem(
+                      value: 'd:${entry.$1}',
+                      child: Text(
+                        _dateFilter == entry.$1
+                            ? '✓ ${entry.$2}'
+                            : entry.$2,
+                      ),
+                    ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'clear',
+                    child: Text('Filtreleri temizle'),
+                  ),
+                ],
+              ),
             ],
           ),
         ),

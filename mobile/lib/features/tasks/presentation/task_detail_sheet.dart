@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../personal/providers/personal_tasks_provider.dart';
 import '../../workspace/providers/workspace_members_provider.dart';
 import '../../workspace/providers/workspace_provider.dart';
 import '../data/task_dto.dart';
 import '../data/task_repository.dart';
 import '../data/task_scope.dart';
+import '../data/update_task_dto.dart';
 import '../providers/comment_provider.dart';
 import '../providers/file_provider.dart';
 import '../providers/subtask_provider.dart';
@@ -108,10 +110,27 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
       _status = status;
     });
     try {
-      await ref.read(tasksProvider(widget.projectId).notifier).updateStatus(
-            _task.id,
-            status,
-          );
+      final workspaceId =
+          ref.read(workspaceProvider).activeWorkspace?.id ??
+              _task.workspaceId;
+      if (workspaceId == null || workspaceId.isEmpty) {
+        throw TaskException('Workspace seçilmedi.');
+      }
+
+      if (widget.projectId.isNotEmpty) {
+        await ref.read(tasksProvider(widget.projectId).notifier).updateStatus(
+              _task.id,
+              status,
+            );
+      } else {
+        final updated = await ref.read(taskRepositoryProvider).updateTask(
+              workspaceId: workspaceId,
+              taskId: _task.id,
+              dto: UpdateTaskDto(status: status),
+            );
+        if (mounted) setState(() => _task = updated);
+        ref.invalidate(personalTasksProvider);
+      }
       if (mounted) {
         setState(() => _task = _task.copyWith(status: status));
         ScaffoldMessenger.of(context)

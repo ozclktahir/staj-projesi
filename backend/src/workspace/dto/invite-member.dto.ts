@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsIn } from 'class-validator';
 
-export type WorkspaceRole = 'Admin' | 'Member' | 'Guest';
+export type WorkspaceRole = 'Admin' | 'Member';
 
-export const WORKSPACE_ROLES: WorkspaceRole[] = ['Admin', 'Member', 'Guest'];
+export const WORKSPACE_ROLES: WorkspaceRole[] = ['Admin', 'Member'];
 
 export class InviteMemberDto {
   @ApiProperty({

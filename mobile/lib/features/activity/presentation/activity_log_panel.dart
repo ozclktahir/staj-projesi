@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../workspace/providers/workspace_members_provider.dart';
 import '../data/activity_log_dto.dart';
 import '../data/activity_log_repository.dart';
 import '../providers/activity_log_provider.dart';
@@ -23,6 +24,7 @@ class ActivityLogPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(activityLogProvider(projectId));
     final formatter = DateFormat('dd.MM.yyyy HH:mm');
+    final memberNames = ref.watch(workspaceMemberLabelMapProvider);
 
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -82,6 +84,7 @@ class ActivityLogPanel extends ConsumerWidget {
               final log = logs[index];
               return _ActivityTimelineTile(
                 log: log,
+                memberNames: memberNames,
                 timeLabel: _formatTime(formatter, log.createdAt),
                 isFirst: index == 0,
                 isLast: index == logs.length - 1,
@@ -97,12 +100,14 @@ class ActivityLogPanel extends ConsumerWidget {
 class _ActivityTimelineTile extends StatelessWidget {
   const _ActivityTimelineTile({
     required this.log,
+    required this.memberNames,
     required this.timeLabel,
     required this.isFirst,
     required this.isLast,
   });
 
   final ActivityLogDto log;
+  final Map<String, String> memberNames;
   final String timeLabel;
   final bool isFirst;
   final bool isLast;
@@ -152,7 +157,7 @@ class _ActivityTimelineTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    log.formatMessage(AppStrings.of(context)),
+                    log.formatMessage(AppStrings.of(context), memberNames),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   if (timeLabel.isNotEmpty) ...[

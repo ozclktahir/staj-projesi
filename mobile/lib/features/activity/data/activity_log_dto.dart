@@ -74,13 +74,20 @@ class ActivityLogDto {
   String get formattedMessage => formatMessage();
 
   /// Locale-aware aktivite mesajı.
-  String formatMessage([AppStrings? strings]) {
+  String formatMessage([
+    AppStrings? strings,
+    Map<String, String>? memberNames,
+  ]) {
     final s = strings ?? AppStrings.ofLocale(AppLocaleOption.tr);
     final name = () {
       final d = details;
-      if (d == null) return s.activityUnknownUser;
-      final n = d['actor_name'] ?? d['actorName'];
-      if (n is String && n.trim().isNotEmpty) return n.trim();
+      final fromDetails = d?['actor_name'] ?? d?['actorName'];
+      if (fromDetails is String && fromDetails.trim().isNotEmpty) {
+        return fromDetails.trim();
+      }
+      final id = userId;
+      final fromMap = id == null ? null : memberNames?[id];
+      if (fromMap != null && fromMap.trim().isNotEmpty) return fromMap.trim();
       return s.activityUnknownUser;
     }();
     final title = () {

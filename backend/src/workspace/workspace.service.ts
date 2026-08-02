@@ -139,15 +139,27 @@ export class WorkspaceService {
     return Array.from(byId.values());
   }
 
-  async invite(workspaceId: string, inviterId: string, dto: InviteMemberDto) {
-    const client = this.supabaseService.getClient();
+  async invite(
+    workspaceId: string,
+    inviterId: string,
+    dto: InviteMemberDto,
+    accessToken: string,
+  ) {
+    if (!accessToken?.trim()) {
+      throw new UnauthorizedException('Bearer token gerekli.');
+    }
+
+    // RLS: invitations_insert_admin → invited_by = auth.uid() + admin/owner
+    const client = this.supabaseService.createUserClient(accessToken);
+
+    const role = dto.role === 'Admin' ? 'Admin' : 'Member';
 
     const { data: invitation, error: invitationError } = await client
       .from('workspace_invitations')
       .insert({
         workspace_id: workspaceId,
         email: dto.email.toLowerCase().trim(),
-        role: dto.role,
+        role,
         invited_by: inviterId,
         status: 'PENDING',
       })
@@ -177,13 +189,13 @@ export class WorkspaceService {
         user_id: profile.id,
         type: 'workspace_invite',
         title: 'Çalışma alanı daveti',
-        message: `"${workspace?.name ?? 'Bir çalışma alanı'}" sizi ${dto.role} olarak davet etti.`,
+        message: `"${workspace?.name ?? 'Bir çalışma alanı'}" sizi ${role} olarak davet etti.`,
         metadata: {
           invitation_id: invitation.id,
           invite_id: invitation.id,
           workspace_id: workspaceId,
           workspace_name: workspace?.name ?? null,
-          role: dto.role,
+          role,
         },
         is_read: false,
       });
@@ -258,8 +270,15 @@ export class WorkspaceService {
    * Workspace üyelerini listeler (profil + rol).
    * Admin/OWNER: tüm üyeler; Member/Guest: yalnızca kendisi (web parity).
    */
-  async listMembers(workspaceId: string, userId: string) {
-    const client = this.supabaseService.getClient();
+  async listMembers(
+    workspaceId: string,
+    userId: string,
+    accessToken: string,
+  ) {
+    if (!accessToken?.trim()) {
+      throw new UnauthorizedException('Bearer token gerekli.');
+    }
+    const client = this.supabaseService.createUserClient(accessToken);
 
     const [{ data: workspace }, { data: membership, error: memberError }] =
       await Promise.all([

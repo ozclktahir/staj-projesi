@@ -612,3 +612,13 @@
 - Nest: `POST /auth/refresh`, `GET .../tasks/deleted`; Admin’e `OWNER` rolü.
 - Flutter: silent JWT refresh, trash/restore, admin stats/remove member, progress reports UI, i18n genişletme, ölü notes temizliği, hata UX, splash polish, workspace offline cache, RBAC unit testleri.
 - `flutter_dotenv` kaldırıldı. Günlük: `reports/2026-08-02_DAILY_REPORT.md`.
+
+### [2 Ağustos 2026] - UI / Cannot GET / RLS / görev etkileşim düzeltmeleri
+- **API 404 kök nedeni:** Eski Docker `nestjs_api` imajı ` /invitations/me` ve `/personal/*` rotalarını taşımıyordu; Docker API durdurulup güncel Nest `start:dev` :3000’de ayağa kaldırıldı (401 auth = rota var).
+- **RLS davet:** `workspace.invite` artık `createUserClient(JWT)` kullanıyor; Guest rolü DTO + mobil dialogdan kaldırıldı (yalnızca Admin/Member).
+- **Üyeler (assignee):** `listMembers` user JWT ile çalışıyor → atanan kişi dropdown’ı doldurulabiliyor.
+- **Activity:** profil adları enrich + üye label map fallback.
+- **Personal:** JWT ile personal_notes/todos/files; atanmış görev filtreleri tek PopupMenu’ye sıkıştırıldı.
+- **Dashboard:** KPI alt yazıları kaldırıldı; grafik başlık/etiketler ortalandı; i18n anahtarları eklendi.
+- **Kanban:** long-press sürükle-bırak ile durum değişimi; detayda boş `projectId` için doğrudan PATCH.
+- `flutter analyze`: No issues found.

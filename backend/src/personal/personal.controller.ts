@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -19,6 +20,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { memoryStorage } from 'multer';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
@@ -30,6 +32,13 @@ import {
 } from './dto/personal.dto';
 import { PersonalService } from './personal.service';
 
+function extractBearerToken(request: Request): string {
+  const raw = request.headers?.authorization;
+  const header = Array.isArray(raw) ? raw[0] : raw;
+  if (!header || typeof header !== 'string') return '';
+  return header.replace(/^Bearer\s+/i, '').trim();
+}
+
 @ApiTags('Personal')
 @ApiBearerAuth()
 @UseGuards(SupabaseAuthGuard)
@@ -37,10 +46,10 @@ import { PersonalService } from './personal.service';
 export class PersonalController {
   constructor(private readonly personalService: PersonalService) {}
 
-  // Notes
   @Get('notes')
   @ApiOperation({ summary: 'Kişisel notları listeler' })
   listNotes(
+    @Req() request: Request,
     @GetUser() user: { id: string },
     @Query('offset') offset?: string,
     @Query('limit') limit?: string,
@@ -49,34 +58,54 @@ export class PersonalController {
       user.id,
       Number(offset) || 0,
       Number(limit) || 30,
+      extractBearerToken(request),
     );
   }
 
   @Post('notes')
   createNote(
+    @Req() request: Request,
     @GetUser() user: { id: string },
     @Body() dto: CreatePersonalNoteDto,
   ) {
-    return this.personalService.createNote(user.id, dto);
+    return this.personalService.createNote(
+      user.id,
+      dto,
+      extractBearerToken(request),
+    );
   }
 
   @Patch('notes/:id')
   updateNote(
+    @Req() request: Request,
     @GetUser() user: { id: string },
     @Param('id') id: string,
     @Body() dto: UpdatePersonalNoteDto,
   ) {
-    return this.personalService.updateNote(user.id, id, dto);
+    return this.personalService.updateNote(
+      user.id,
+      id,
+      dto,
+      extractBearerToken(request),
+    );
   }
 
   @Delete('notes/:id')
-  deleteNote(@GetUser() user: { id: string }, @Param('id') id: string) {
-    return this.personalService.deleteNote(user.id, id);
+  deleteNote(
+    @Req() request: Request,
+    @GetUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.personalService.deleteNote(
+      user.id,
+      id,
+      extractBearerToken(request),
+    );
   }
 
-  // Todos
   @Get('todos')
   listTodos(
+    @Req() request: Request,
     @GetUser() user: { id: string },
     @Query('offset') offset?: string,
     @Query('limit') limit?: string,
@@ -85,34 +114,54 @@ export class PersonalController {
       user.id,
       Number(offset) || 0,
       Number(limit) || 50,
+      extractBearerToken(request),
     );
   }
 
   @Post('todos')
   createTodo(
+    @Req() request: Request,
     @GetUser() user: { id: string },
     @Body() dto: CreatePersonalTodoDto,
   ) {
-    return this.personalService.createTodo(user.id, dto);
+    return this.personalService.createTodo(
+      user.id,
+      dto,
+      extractBearerToken(request),
+    );
   }
 
   @Patch('todos/:id')
   updateTodo(
+    @Req() request: Request,
     @GetUser() user: { id: string },
     @Param('id') id: string,
     @Body() dto: UpdatePersonalTodoDto,
   ) {
-    return this.personalService.updateTodo(user.id, id, dto);
+    return this.personalService.updateTodo(
+      user.id,
+      id,
+      dto,
+      extractBearerToken(request),
+    );
   }
 
   @Delete('todos/:id')
-  deleteTodo(@GetUser() user: { id: string }, @Param('id') id: string) {
-    return this.personalService.deleteTodo(user.id, id);
+  deleteTodo(
+    @Req() request: Request,
+    @GetUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.personalService.deleteTodo(
+      user.id,
+      id,
+      extractBearerToken(request),
+    );
   }
 
-  // Files
   @Get('files')
   listFiles(
+    @Req() request: Request,
     @GetUser() user: { id: string },
     @Query('offset') offset?: string,
     @Query('limit') limit?: string,
@@ -121,6 +170,7 @@ export class PersonalController {
       user.id,
       Number(offset) || 0,
       Number(limit) || 50,
+      extractBearerToken(request),
     );
   }
 
@@ -135,14 +185,27 @@ export class PersonalController {
     },
   })
   uploadFile(
+    @Req() request: Request,
     @GetUser() user: { id: string },
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.personalService.uploadFile(user.id, file);
+    return this.personalService.uploadFile(
+      user.id,
+      file,
+      extractBearerToken(request),
+    );
   }
 
   @Delete('files/:id')
-  deleteFile(@GetUser() user: { id: string }, @Param('id') id: string) {
-    return this.personalService.deleteFile(user.id, id);
+  deleteFile(
+    @Req() request: Request,
+    @GetUser() user: { id: string },
+    @Param('id') id: string,
+  ) {
+    return this.personalService.deleteFile(
+      user.id,
+      id,
+      extractBearerToken(request),
+    );
   }
 }

@@ -29,6 +29,18 @@ enum TaskStatus {
         return 'Tamamlananlar';
     }
   }
+
+  String localizedLabel(dynamic s) {
+    // AppStrings — duck-typed to avoid circular import weight in DTO file.
+    switch (this) {
+      case TaskStatus.todo:
+        return s.statusTodo as String;
+      case TaskStatus.inProgress:
+        return s.statusInProgress as String;
+      case TaskStatus.done:
+        return s.statusDone as String;
+    }
+  }
 }
 
 /// NestJS görev önceliği değerleri.

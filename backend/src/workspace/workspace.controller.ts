@@ -81,11 +81,17 @@ export class WorkspaceController {
   })
   @ApiResponse({ status: 401, description: 'Kimlik doğrulama başarısız.' })
   invite(
+    @Req() request: Request,
     @Param('id') id: string,
     @GetUser() user: { id: string },
     @Body() dto: InviteMemberDto,
   ) {
-    return this.workspaceService.invite(id, user.id, dto);
+    return this.workspaceService.invite(
+      id,
+      user.id,
+      dto,
+      extractBearerToken(request),
+    );
   }
 
   @Delete(':id')

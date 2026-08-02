@@ -143,7 +143,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             isScrollable: true,
             tabs: [
               for (final status in TaskStatus.values)
-                Tab(text: status.label),
+                Tab(text: status.localizedLabel(s)),
               Tab(text: s.projectActivity),
             ],
           ),
@@ -449,6 +449,7 @@ class _StatusColumnBody extends ConsumerWidget {
             .toList();
         return _TaskColumn(
           projectId: projectId,
+          status: status,
           tasks: applyKanbanSort(column, sort),
           hasMore: state.hasMore,
           isLoadingMore: state.isLoadingMore,
@@ -461,12 +462,14 @@ class _StatusColumnBody extends ConsumerWidget {
 class _TaskColumn extends ConsumerWidget {
   const _TaskColumn({
     required this.projectId,
+    required this.status,
     required this.tasks,
     required this.hasMore,
     required this.isLoadingMore,
   });
 
   final String projectId;
+  final TaskStatus status;
   final List<TaskDto> tasks;
   final bool hasMore;
   final bool isLoadingMore;
@@ -477,10 +480,23 @@ class _TaskColumn extends ConsumerWidget {
     Future<void> onRefresh() =>
         ref.read(tasksProvider(projectId).notifier).refresh();
 
-    if (tasks.isEmpty && !isLoadingMore) {
-      return RefreshIndicator(
-        onRefresh: onRefresh,
-        child: ListView(
+    Future<void> acceptDrop(TaskDto task) async {
+      if (task.status == status) return;
+      try {
+        await ref
+            .read(tasksProvider(projectId).notifier)
+            .updateStatus(task.id, status);
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    }
+
+    Widget listBody({required bool highlighted}) {
+      if (tasks.isEmpty && !isLoadingMore) {
+        return ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(24),
           children: [
@@ -507,15 +523,11 @@ class _TaskColumn extends ConsumerWidget {
               ),
             ],
           ],
-        ),
-      );
-    }
+        );
+      }
 
-    final itemCount = tasks.length + (hasMore || isLoadingMore ? 1 : 0);
-
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: NotificationListener<ScrollNotification>(
+      final itemCount = tasks.length + (hasMore || isLoadingMore ? 1 : 0);
+      return NotificationListener<ScrollNotification>(
         onNotification: (notification) {
           if (notification.metrics.pixels >=
                   notification.metrics.maxScrollExtent - 120 &&
@@ -550,18 +562,56 @@ class _TaskColumn extends ConsumerWidget {
               );
             }
             final task = tasks[index];
-            return TaskCard(
-              task: task,
-              onTap: () => showTaskDetailSheet(
-                context: context,
-                ref: ref,
-                projectId: projectId,
+            return LongPressDraggable<TaskDto>(
+              data: task,
+              feedback: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: MediaQuery.sizeOf(context).width * 0.85,
+                  child: Opacity(
+                    opacity: 0.9,
+                    child: TaskCard(task: task, onTap: () {}),
+                  ),
+                ),
+              ),
+              childWhenDragging: Opacity(
+                opacity: 0.35,
+                child: TaskCard(task: task, onTap: () {}),
+              ),
+              child: TaskCard(
                 task: task,
+                onTap: () => showTaskDetailSheet(
+                  context: context,
+                  ref: ref,
+                  projectId: projectId,
+                  task: task,
+                ),
               ),
             );
           },
         ),
-      ),
+      );
+    }
+
+    return DragTarget<TaskDto>(
+      onWillAcceptWithDetails: (details) => details.data.status != status,
+      onAcceptWithDetails: (details) => acceptDrop(details.data),
+      builder: (context, candidate, rejected) {
+        final highlighted = candidate.isNotEmpty;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: highlighted
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.08)
+                : null,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: RefreshIndicator(
+            onRefresh: onRefresh,
+            child: listBody(highlighted: highlighted),
+          ),
+        );
+      },
     );
   }
 }

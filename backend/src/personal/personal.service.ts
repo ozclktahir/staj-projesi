@@ -15,17 +15,25 @@ import {
 export class PersonalService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  private client() {
+  private client(accessToken?: string) {
+    if (accessToken?.trim()) {
+      return this.supabaseService.createUserClient(accessToken);
+    }
     return (
       this.supabaseService.getAdminClient() ??
       this.supabaseService.getClient()
     );
   }
 
-  // ─── Notes ───────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Notes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  async listNotes(userId: string, offset = 0, limit = 30) {
-    const client = this.client();
+  async listNotes(
+    userId: string,
+    offset = 0,
+    limit = 30,
+    accessToken?: string,
+  ) {
+    const client = this.client(accessToken);
     let { data, error } = await client
       .from('personal_notes')
       .select('id, title, content, task_id, is_completed, created_at, updated_at')
@@ -66,7 +74,7 @@ export class PersonalService {
         .in('id', taskIds);
       for (const t of tasks ?? []) {
         if (typeof t.id === 'string') {
-          titles.set(t.id, (t.title as string) || 'Görev');
+          titles.set(t.id, (t.title as string) || 'GÃ¶rev');
         }
       }
     }
@@ -75,11 +83,11 @@ export class PersonalService {
     return { notes, hasMore: notes.length >= limit };
   }
 
-  async createNote(userId: string, dto: CreatePersonalNoteDto) {
-    const client = this.client();
+  async createNote(userId: string, dto: CreatePersonalNoteDto, accessToken?: string) {
+    const client = this.client(accessToken);
     const payload: Record<string, unknown> = {
       user_id: userId,
-      title: dto.title.trim() || 'Başlıksız not',
+      title: dto.title.trim() || 'Basliksiz not',
       content: (dto.content ?? '').trim(),
       updated_at: new Date().toISOString(),
     };
@@ -108,12 +116,13 @@ export class PersonalService {
     userId: string,
     noteId: string,
     dto: UpdatePersonalNoteDto,
+    accessToken?: string,
   ) {
-    const client = this.client();
+    const client = this.client(accessToken);
     const patch: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
-    if (dto.title !== undefined) patch.title = dto.title.trim() || 'Başlıksız not';
+    if (dto.title !== undefined) patch.title = dto.title.trim() || 'Basliksiz not';
     if (dto.content !== undefined) patch.content = dto.content.trim();
     if (dto.taskId !== undefined) patch.task_id = dto.taskId || null;
     if (dto.isCompleted !== undefined) patch.is_completed = dto.isCompleted;
@@ -140,12 +149,12 @@ export class PersonalService {
     }
 
     if (error) throw new BadRequestException(error.message);
-    if (!data) throw new NotFoundException('Not bulunamadı.');
+    if (!data) throw new NotFoundException('Not bulunamadÄ±.');
     return this.mapNote(data, new Map());
   }
 
-  async deleteNote(userId: string, noteId: string) {
-    const client = this.client();
+  async deleteNote(userId: string, noteId: string, accessToken?: string) {
+    const client = this.client(accessToken);
     const { data, error } = await client
       .from('personal_notes')
       .delete()
@@ -155,14 +164,14 @@ export class PersonalService {
       .maybeSingle();
 
     if (error) throw new BadRequestException(error.message);
-    if (!data) throw new NotFoundException('Not bulunamadı.');
+    if (!data) throw new NotFoundException('Not bulunamadÄ±.');
     return { message: 'Not silindi.', id: noteId };
   }
 
-  // ─── Todos ───────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Todos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  async listTodos(userId: string, offset = 0, limit = 50) {
-    const client = this.client();
+  async listTodos(userId: string, offset = 0, limit = 50, accessToken?: string) {
+    const client = this.client(accessToken);
     const { data, error } = await client
       .from('personal_todos')
       .select('id, task, due_date, is_completed, created_at')
@@ -176,8 +185,8 @@ export class PersonalService {
     return { todos, hasMore: todos.length >= limit };
   }
 
-  async createTodo(userId: string, dto: CreatePersonalTodoDto) {
-    const client = this.client();
+  async createTodo(userId: string, dto: CreatePersonalTodoDto, accessToken?: string) {
+    const client = this.client(accessToken);
     const { data, error } = await client
       .from('personal_todos')
       .insert({
@@ -197,8 +206,9 @@ export class PersonalService {
     userId: string,
     todoId: string,
     dto: UpdatePersonalTodoDto,
+    accessToken?: string,
   ) {
-    const client = this.client();
+    const client = this.client(accessToken);
     const patch: Record<string, unknown> = {};
     if (dto.task !== undefined) patch.task = dto.task.trim();
     if (dto.dueDate !== undefined) patch.due_date = dto.dueDate?.trim() || null;
@@ -213,12 +223,12 @@ export class PersonalService {
       .maybeSingle();
 
     if (error) throw new BadRequestException(error.message);
-    if (!data) throw new NotFoundException('Todo bulunamadı.');
+    if (!data) throw new NotFoundException('Todo bulunamadÄ±.');
     return this.mapTodo(data);
   }
 
-  async deleteTodo(userId: string, todoId: string) {
-    const client = this.client();
+  async deleteTodo(userId: string, todoId: string, accessToken?: string) {
+    const client = this.client(accessToken);
     const { data, error } = await client
       .from('personal_todos')
       .delete()
@@ -228,14 +238,14 @@ export class PersonalService {
       .maybeSingle();
 
     if (error) throw new BadRequestException(error.message);
-    if (!data) throw new NotFoundException('Todo bulunamadı.');
+    if (!data) throw new NotFoundException('Todo bulunamadÄ±.');
     return { message: 'Todo silindi.', id: todoId };
   }
 
-  // ─── Files ───────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Files â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  async listFiles(userId: string, offset = 0, limit = 50) {
-    const client = this.client();
+  async listFiles(userId: string, offset = 0, limit = 50, accessToken?: string) {
+    const client = this.client(accessToken);
     const { data, error } = await client
       .from('personal_files')
       .select('id, file_name, file_url, storage_path, file_size, created_at')
@@ -264,13 +274,13 @@ export class PersonalService {
     return { files, hasMore: files.length >= limit };
   }
 
-  async uploadFile(userId: string, file: Express.Multer.File) {
+  async uploadFile(userId: string, file: Express.Multer.File, accessToken?: string) {
     if (!file) throw new BadRequestException('Dosya gerekli.');
     if (file.size > 25 * 1024 * 1024) {
       throw new BadRequestException('Dosya en fazla 25MB olabilir.');
     }
 
-    const client = this.client();
+    const client = this.client(accessToken);
     const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
     const storagePath = `${userId}/${Date.now()}-${safeName}`;
 
@@ -309,8 +319,8 @@ export class PersonalService {
     return this.mapFile(data);
   }
 
-  async deleteFile(userId: string, fileId: string) {
-    const client = this.client();
+  async deleteFile(userId: string, fileId: string, accessToken?: string) {
+    const client = this.client(accessToken);
     const { data: existing, error: fetchError } = await client
       .from('personal_files')
       .select('id, storage_path')
@@ -319,7 +329,7 @@ export class PersonalService {
       .maybeSingle();
 
     if (fetchError) throw new BadRequestException(fetchError.message);
-    if (!existing) throw new NotFoundException('Dosya bulunamadı.');
+    if (!existing) throw new NotFoundException('Dosya bulunamadÄ±.');
 
     if (typeof existing.storage_path === 'string' && existing.storage_path) {
       await client.storage
@@ -375,3 +385,4 @@ export class PersonalService {
     };
   }
 }
+

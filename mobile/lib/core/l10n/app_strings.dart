@@ -149,6 +149,10 @@ class AppStrings {
 
   String get dashboardNoWorkspace => t('dashboard.noWorkspace');
   String get dashboardTotalTasks => t('dashboard.totalTasks');
+  String get dashboardCompletionRate => t('dashboard.completionRate');
+  String get dashboardOverdueTasks => t('dashboard.overdueTasks');
+  String get dashboardActiveMembers => t('dashboard.activeMembers');
+  String get dashboardPriorityDensity => t('dashboard.priorityDensity');
   String get dashboardStatusDist => t('dashboard.statusDist');
   String get dashboardMemberLoad => t('dashboard.memberLoad');
   String get dashboardRecentActivity => t('dashboard.recentActivity');
@@ -333,8 +337,12 @@ class AppStrings {
     'errors.loadFailed': 'Veriler yüklenemedi.',
     'dashboard.noWorkspace': 'Workspace seçilmedi',
     'dashboard.totalTasks': 'Toplam Görev',
+    'dashboard.completionRate': 'Tamamlanma Oranı',
+    'dashboard.overdueTasks': 'Geciken Görevler',
+    'dashboard.activeMembers': 'Aktif Üyeler',
     'dashboard.statusDist': 'Durum Dağılımı',
     'dashboard.memberLoad': 'Üye İş Yükü',
+    'dashboard.priorityDensity': 'Öncelik Yoğunluğu',
     'dashboard.recentActivity': 'Son Aktiviteler',
     'personal.tabAssigned': 'Atanan',
     'personal.tabNotes': 'Notlar',
@@ -488,8 +496,12 @@ class AppStrings {
     'errors.loadFailed': 'Could not load data.',
     'dashboard.noWorkspace': 'No workspace selected',
     'dashboard.totalTasks': 'Total tasks',
+    'dashboard.completionRate': 'Completion rate',
+    'dashboard.overdueTasks': 'Overdue tasks',
+    'dashboard.activeMembers': 'Active members',
     'dashboard.statusDist': 'Status distribution',
     'dashboard.memberLoad': 'Member workload',
+    'dashboard.priorityDensity': 'Priority density',
     'dashboard.recentActivity': 'Recent activity',
     'personal.tabAssigned': 'Assigned',
     'personal.tabNotes': 'Notes',

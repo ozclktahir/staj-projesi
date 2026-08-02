@@ -85,7 +85,13 @@ class DashboardScreen extends ConsumerWidget {
                   ),
             ),
             const SizedBox(height: 16),
-            _KpiGrid(data: data, totalTasksLabel: s.dashboardTotalTasks),
+            _KpiGrid(
+              data: data,
+              totalTasksLabel: s.dashboardTotalTasks,
+              completionRateLabel: s.dashboardCompletionRate,
+              overdueLabel: s.dashboardOverdueTasks,
+              activeMembersLabel: s.dashboardActiveMembers,
+            ),
             const SizedBox(height: 20),
             Text(
               'Grafikler',
@@ -96,7 +102,10 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 10),
             _StatusPieChart(data: data, title: s.dashboardStatusDist),
             const SizedBox(height: 12),
-            _PriorityBarChart(slices: data.byPriority),
+            _PriorityBarChart(
+              slices: data.byPriority,
+              title: s.dashboardPriorityDensity,
+            ),
             const SizedBox(height: 12),
             _WorkloadBarChart(
               workload: data.workload,
@@ -121,10 +130,19 @@ class DashboardScreen extends ConsumerWidget {
 }
 
 class _KpiGrid extends StatelessWidget {
-  const _KpiGrid({required this.data, required this.totalTasksLabel});
+  const _KpiGrid({
+    required this.data,
+    required this.totalTasksLabel,
+    required this.completionRateLabel,
+    required this.overdueLabel,
+    required this.activeMembersLabel,
+  });
 
   final DashboardData data;
   final String totalTasksLabel;
+  final String completionRateLabel;
+  final String overdueLabel;
+  final String activeMembersLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -143,28 +161,24 @@ class _KpiGrid extends StatelessWidget {
         _KpiCard(
           label: totalTasksLabel,
           value: '${data.totalTasks}',
-          hint: 'Workspace / proje kapsamı',
           icon: Icons.assignment_outlined,
           accent: const Color(0xFF6366F1),
         ),
         _KpiCard(
-          label: 'Tamamlanma Oranı',
+          label: completionRateLabel,
           value: '%$rate',
-          hint: '${data.completedTasks} tamamlandı',
           icon: Icons.check_circle_outline,
           accent: const Color(0xFF10B981),
         ),
         _KpiCard(
-          label: 'Geciken Görevler',
+          label: overdueLabel,
           value: '${data.overdueTasks}',
-          hint: 'Teslim tarihi geçmiş',
           icon: Icons.warning_amber_outlined,
           accent: const Color(0xFFF43F5E),
         ),
         _KpiCard(
-          label: 'Aktif Üyeler',
+          label: activeMembersLabel,
           value: '${data.activeMembers}',
-          hint: 'Çalışma alanındaki kişiler',
           icon: Icons.group_outlined,
           accent: const Color(0xFFF59E0B),
         ),
@@ -177,14 +191,12 @@ class _KpiCard extends StatelessWidget {
   const _KpiCard({
     required this.label,
     required this.value,
-    required this.hint,
     required this.icon,
     required this.accent,
   });
 
   final String label;
   final String value;
-  final String hint;
   final IconData icon;
   final Color accent;
 
@@ -240,16 +252,6 @@ class _KpiCard extends StatelessWidget {
                           ),
                     ),
                   ),
-                  Text(
-                    hint,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 10,
-                          height: 1.1,
-                        ),
-                  ),
                 ],
               ),
             ),
@@ -282,10 +284,11 @@ class _ChartCardShell extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
               title,
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -293,6 +296,7 @@ class _ChartCardShell extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               subtitle,
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant,
                     fontSize: 11,
@@ -302,7 +306,7 @@ class _ChartCardShell extends StatelessWidget {
             child,
             if (footer != null) ...[
               const SizedBox(height: 8),
-              footer!,
+              Align(alignment: Alignment.center, child: footer!),
             ],
           ],
         ),
@@ -468,9 +472,10 @@ class _StatusPieChart extends StatelessWidget {
 }
 
 class _PriorityBarChart extends StatelessWidget {
-  const _PriorityBarChart({required this.slices});
+  const _PriorityBarChart({required this.slices, required this.title});
 
   final List<DashboardChartSlice> slices;
+  final String title;
 
   static const _palette = <String, Color>{
     'HIGH': Color(0xFFF43F5E),
@@ -485,8 +490,8 @@ class _PriorityBarChart extends StatelessWidget {
     final maxY = slices.fold<int>(0, (m, s) => s.count > m ? s.count : m);
 
     return _ChartCardShell(
-      title: 'Öncelik Yoğunluğu',
-      subtitle: 'Yüksek · Orta · Düşük',
+      title: title,
+      subtitle: 'HIGH · MEDIUM · LOW',
       footer: !hasData
           ? null
           : _ColorBadges(
