@@ -4,6 +4,21 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
+function resolveCorsOrigin(): boolean | string | string[] {
+  const raw = process.env.CORS_ORIGIN?.trim();
+  if (!raw || raw === '*') {
+    // Deploy sırasında frontend URL henüz yoksa tüm origin'lere izin ver
+    return true;
+  }
+  const list = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (list.length === 0) return true;
+  if (list.length === 1) return list[0];
+  return list;
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -13,7 +28,7 @@ async function bootstrap() {
       crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
-  app.enableCors({ origin: true, credentials: true });
+  app.enableCors({ origin: resolveCorsOrigin(), credentials: true });
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
