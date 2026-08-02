@@ -80,7 +80,7 @@ class SettingsScreen extends ConsumerWidget {
     final locale = ref.watch(localePreferenceProvider);
     final s = ref.watch(appStringsProvider);
     final submitting = ref.watch(
-      workspaceProvider.select((s) => s.isSubmitting),
+      workspaceProvider.select((state) => state.isSubmitting),
     );
     final canDeleteWorkspace =
         ref.watch(workspaceCapabilitiesProvider).canDeleteWorkspace;
@@ -114,9 +114,12 @@ class SettingsScreen extends ConsumerWidget {
             ),
             value: themeMode == ThemeMode.dark,
             onChanged: (enabled) {
-              ref.read(themeModeProvider.notifier).setThemeMode(
-                    enabled ? ThemeMode.dark : ThemeMode.light,
-                  );
+              // Switch animasyonu bitmeden tema rebuild'i crash yaratmasın.
+              Future.microtask(() {
+                ref.read(themeModeProvider.notifier).setThemeMode(
+                      enabled ? ThemeMode.dark : ThemeMode.light,
+                    );
+              });
             },
           ),
           const SizedBox(height: 28),
@@ -132,33 +135,32 @@ class SettingsScreen extends ConsumerWidget {
                 ),
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<AppLocaleOption>(
-            // ignore: deprecated_member_use
-            value: locale,
-            decoration: InputDecoration(
-              labelText: s.settingsAppLanguage,
-              prefixIcon: const Icon(Icons.translate),
-            ),
-            items: [
+          SegmentedButton<AppLocaleOption>(
+            segments: [
               for (final option in AppLocaleOption.values)
-                DropdownMenuItem(
+                ButtonSegment(
                   value: option,
-                  child: Text(option.label),
+                  label: Text(option.label),
+                  icon: const Icon(Icons.translate, size: 16),
                 ),
             ],
-            onChanged: (value) {
-              if (value == null) return;
-              ref.read(localePreferenceProvider.notifier).setLocale(value);
+            selected: {locale},
+            onSelectionChanged: (selected) {
+              if (selected.isEmpty) return;
+              final value = selected.first;
+              Future.microtask(() {
+                ref.read(localePreferenceProvider.notifier).setLocale(value);
+              });
             },
           ),
           const SizedBox(height: 28),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.people_outline),
-            title: Text(s.settingsMembers),
-            subtitle: Text(s.settingsMembersDesc),
+            leading: const Icon(Icons.admin_panel_settings_outlined),
+            title: Text(s.settingsAdmin),
+            subtitle: Text(s.settingsAdminDesc),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(AppRoutes.members),
+            onTap: () => context.push(AppRoutes.admin),
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -176,15 +178,6 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoutes.progress),
           ),
-          if (ref.watch(workspaceCapabilitiesProvider).isAdmin)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.admin_panel_settings_outlined),
-              title: Text(s.settingsAdmin),
-              subtitle: Text(s.settingsAdminDesc),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(AppRoutes.admin),
-            ),
           if (canDeleteWorkspace) ...[
             const SizedBox(height: 36),
             Text(

@@ -9,6 +9,7 @@ import '../../workspace/providers/workspace_provider.dart';
 import '../data/admin_repository.dart';
 import '../providers/admin_provider.dart';
 
+/// Üyeler + (admin ise) yönetim istatistikleri — tek “Yönetim Paneli”.
 class AdminScreen extends ConsumerWidget {
   const AdminScreen({super.key});
 
@@ -16,27 +17,25 @@ class AdminScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(appStringsProvider);
     final caps = ref.watch(workspaceCapabilitiesProvider);
-    if (!caps.isAdmin) {
-      return Scaffold(
-        appBar: AppBar(title: Text(s.adminTitle)),
-        body: AppEmptyState(
-          icon: Icons.lock_outline,
-          title: s.adminForbiddenTitle,
-          subtitle: s.adminForbiddenSubtitle,
-        ),
-      );
-    }
-
-    final statsAsync = ref.watch(adminStatsProvider);
     final membersAsync = ref.watch(workspaceMembersProvider);
     final workspaceId = ref.watch(workspaceProvider).activeWorkspace?.id;
+    final workspaceName = ref.watch(
+      workspaceProvider.select((ws) => ws.activeWorkspace?.name),
+    );
+    final statsAsync =
+        caps.isAdmin ? ref.watch(adminStatsProvider) : null;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(s.adminTitle),
         actions: [
           IconButton(
-            onPressed: () => ref.read(adminStatsProvider.notifier).refresh(),
+            onPressed: () {
+              ref.invalidate(workspaceMembersProvider);
+              if (caps.isAdmin) {
+                ref.read(adminStatsProvider.notifier).refresh();
+              }
+            },
             icon: const Icon(Icons.refresh),
           ),
         ],
@@ -44,43 +43,65 @@ class AdminScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            s.adminStatsSection,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 12),
-          statsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text(e.toString()),
-            data: (stats) => Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _StatChip(label: s.adminTotalUsers, value: '${stats.totalUsers}'),
-                _StatChip(
-                  label: s.adminActiveTasks,
-                  value: '${stats.activeTasks}',
-                ),
-                _StatChip(
-                  label: s.adminTotalProjects,
-                  value: '${stats.totalProjects}',
-                ),
-              ],
+          if (caps.isAdmin) ...[
+            Text(
+              s.adminStatsSection,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
-          ),
-          const SizedBox(height: 28),
+            const SizedBox(height: 12),
+            statsAsync!.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Text(e.toString()),
+              data: (stats) => Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _StatChip(
+                    label: s.adminTotalUsers,
+                    value: '${stats.totalUsers}',
+                  ),
+                  _StatChip(
+                    label: s.adminActiveTasks,
+                    value: '${stats.activeTasks}',
+                  ),
+                  _StatChip(
+                    label: s.adminTotalProjects,
+                    value: '${stats.totalProjects}',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+          ],
           Text(
             s.adminMembersSection,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
           ),
+          if (workspaceName != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              workspaceName,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
           const SizedBox(height: 8),
           membersAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text(e.toString()),
+            error: (e, _) => AppEmptyState(
+              icon: Icons.error_outline,
+              title: s.membersLoadError,
+              subtitle: e.toString(),
+              action: FilledButton(
+                onPressed: () => ref.invalidate(workspaceMembersProvider),
+                child: Text(s.commonRetry),
+              ),
+            ),
             data: (members) {
               if (members.isEmpty) {
                 return Text(s.membersEmpty);
@@ -90,6 +111,19 @@ class AdminScreen extends ConsumerWidget {
                   for (final m in members)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.15),
+                        foregroundColor:
+                            Theme.of(context).colorScheme.primary,
+                        child: Text(
+                          m.displayName.isNotEmpty
+                              ? m.displayName[0].toUpperCase()
+                              : '?',
+                        ),
+                      ),
                       title: Text(m.displayName),
                       subtitle: Text(m.role ?? '—'),
                       trailing: caps.isAdmin

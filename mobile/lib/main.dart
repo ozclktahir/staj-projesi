@@ -61,47 +61,50 @@ class _StajMobileAppState extends ConsumerState<StajMobileApp> {
       AppLocaleOption.en => const Locale('en', 'US'),
     };
 
-    // AppStrings MaterialApp dışında — Localizations ağacını bozmaz.
-    return wrapWithAppStrings(
-      strings: strings,
-      child: MaterialApp.router(
-        title: 'Staj Projesi',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        themeMode: themeMode,
-        locale: appLocale,
-        supportedLocales: const [
-          Locale('tr', 'TR'),
-          Locale('tr'),
-          Locale('en', 'US'),
-          Locale('en'),
-        ],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        localeResolutionCallback: (locale, supported) {
-          if (locale == null) return supported.first;
-          for (final candidate in supported) {
-            if (candidate.languageCode == locale.languageCode &&
-                (candidate.countryCode == null ||
-                    candidate.countryCode!.isEmpty ||
-                    candidate.countryCode == locale.countryCode)) {
-              return candidate;
-            }
+    return MaterialApp.router(
+      title: 'Staj Projesi',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: themeMode,
+      locale: appLocale,
+      supportedLocales: const [
+        Locale('tr', 'TR'),
+        Locale('tr'),
+        Locale('en', 'US'),
+        Locale('en'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      localeResolutionCallback: (locale, supported) {
+        if (locale == null) return supported.first;
+        for (final candidate in supported) {
+          if (candidate.languageCode == locale.languageCode &&
+              (candidate.countryCode == null ||
+                  candidate.countryCode!.isEmpty ||
+                  candidate.countryCode == locale.countryCode)) {
+            return candidate;
           }
-          for (final candidate in supported) {
-            if (candidate.languageCode == locale.languageCode) {
-              return candidate;
-            }
+        }
+        for (final candidate in supported) {
+          if (candidate.languageCode == locale.languageCode) {
+            return candidate;
           }
-          // Material delegate tr desteklemezse en'e düş (AppStrings yine TR kalır).
-          return const Locale('en', 'US');
-        },
-        routerConfig: router,
-      ),
+        }
+        // Material delegate tr desteklemezse en'e düş (AppStrings yine TR kalır).
+        return const Locale('en', 'US');
+      },
+      // Dil/tema değişince tüm ağaç AppStrings ile yeniden bağlanır.
+      builder: (context, child) {
+        return wrapWithAppStrings(
+          strings: strings,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+      routerConfig: router,
     );
   }
 }

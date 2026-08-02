@@ -57,7 +57,7 @@ class TaskCard extends ConsumerWidget {
                         if (claimPending)
                           _StatusBadge(
                             label: claimOverdue
-                                ? 'Kullanıcı henüz görevi kabul etmedi! (SLA)'
+                                ? 'Kullanıcı görevi henüz kabul etmedi'
                                 : 'Onay bekliyor',
                             bg: claimOverdue
                                 ? Colors.red.shade100

@@ -148,6 +148,24 @@ class TaskRepository {
     return result.items;
   }
 
+  Future<TaskDto> getTaskDetails({
+    required String workspaceId,
+    required String taskId,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        ApiConstants.workspaceTask(workspaceId, taskId),
+      );
+      final data = response.data;
+      if (data == null) {
+        throw TaskException('Görev detayı bulunamadı.');
+      }
+      return TaskDto.fromJson(data);
+    } on DioException catch (error) {
+      throw TaskException(_messageFromDio(error));
+    }
+  }
+
   Future<TaskDto> createTask({
     required String workspaceId,
     required CreateTaskDto dto,
@@ -164,6 +182,10 @@ class TaskRepository {
       return TaskDto.fromJson(data);
     } on DioException catch (error) {
       throw TaskException(_messageFromDio(error));
+    } on TaskException {
+      rethrow;
+    } catch (error) {
+      throw TaskException('Görev yanıtı işlenemedi: $error');
     }
   }
 

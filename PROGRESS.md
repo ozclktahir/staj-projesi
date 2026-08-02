@@ -613,12 +613,17 @@
 - Flutter: silent JWT refresh, trash/restore, admin stats/remove member, progress reports UI, i18n genişletme, ölü notes temizliği, hata UX, splash polish, workspace offline cache, RBAC unit testleri.
 - `flutter_dotenv` kaldırıldı. Günlük: `reports/2026-08-02_DAILY_REPORT.md`.
 
-### [2 Ağustos 2026] - UI / Cannot GET / RLS / görev etkileşim düzeltmeleri
-- **API 404 kök nedeni:** Eski Docker `nestjs_api` imajı ` /invitations/me` ve `/personal/*` rotalarını taşımıyordu; Docker API durdurulup güncel Nest `start:dev` :3000’de ayağa kaldırıldı (401 auth = rota var).
-- **RLS davet:** `workspace.invite` artık `createUserClient(JWT)` kullanıyor; Guest rolü DTO + mobil dialogdan kaldırıldı (yalnızca Admin/Member).
-- **Üyeler (assignee):** `listMembers` user JWT ile çalışıyor → atanan kişi dropdown’ı doldurulabiliyor.
-- **Activity:** profil adları enrich + üye label map fallback.
-- **Personal:** JWT ile personal_notes/todos/files; atanmış görev filtreleri tek PopupMenu’ye sıkıştırıldı.
-- **Dashboard:** KPI alt yazıları kaldırıldı; grafik başlık/etiketler ortalandı; i18n anahtarları eklendi.
-- **Kanban:** long-press sürükle-bırak ile durum değişimi; detayda boş `projectId` için doğrudan PATCH.
+### [2 Ağustos 2026] - Dual approval silme, UI/settings düzeltmeleri, upload limiti
+- **Görev detay:** `getTaskDetails` (GET task by id) eklendi; sheet açılışında fresh fetch + Material/SafeArea; TabBarView çocukları sabit 4 slot.
+- **Proje kartları:** `mainAxisExtent` + açıklama `maxLines`/`ellipsis` ile overflow giderildi.
+- **SLA metni:** Rozetten `(SLA)` kaldırıldı; detayda “SLA aşıldı” ifadesi sadeleştirildi.
+- **Görev oluşturma:** Create dialog dropdown’lar controlled `value` ile düzeltildi; boş workspace/project artık anlamlı `TaskException` fırlatıyor.
+- **Durum değiştirme:** Detayda ChoiceChip yerine `DropdownButtonFormField` (açılır menü).
+- **Dosya limiti:** Multer 50MB (`file` + `personal` upload); SQL migration `increase_storage_upload_limits_50mb.sql` (uploads/task-attachments/personal-files).
+- **Dual approval silme:** Mobil silme diyaloğu admin/kullanıcı metinleri; boş `projectId` (personal) için doğrudan repository silme; Nest bildirim metinleri web ile hizalandı (“Görev tamamlandı mı…” / “Görevi silmek istiyorum”).
+- **Tema crash:** Theme/locale deferred state + Switch `microtask`; dil `SegmentedButton` (DropdownFormField theme rebuild crash’i önlendi).
+- **Dil:** `AppStrings` artık `MaterialApp.builder` içinde — locale değişince ağaç yeniden bağlanır.
+- **Ayarlar:** Üyeler + Yönetim Paneli tek **Yönetim Paneli** (`AdminScreen`); drawer da admin’e yönleniyor.
+- **İlerleme raporları:** “Yeni rapor” FAB/dialog kaldırıldı; liste + admin silme kaldı.
 - `flutter analyze`: No issues found.
+

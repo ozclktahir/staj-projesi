@@ -161,7 +161,12 @@ class TasksNotifier
     String? dueDate,
   }) async {
     final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
-    if (workspaceId == null) return false;
+    if (workspaceId == null) {
+      throw TaskException('Aktif çalışma alanı yok.');
+    }
+    if (arg.isEmpty) {
+      throw TaskException('Proje seçilmedi; görev oluşturulamıyor.');
+    }
 
     final created = await ref.read(taskRepositoryProvider).createTask(
           workspaceId: workspaceId,

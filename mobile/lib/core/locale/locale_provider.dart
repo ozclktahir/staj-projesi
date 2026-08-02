@@ -33,8 +33,10 @@ class LocalePreferenceNotifier extends Notifier<AppLocaleOption> {
   }
 
   Future<void> setLocale(AppLocaleOption locale) async {
-    state = locale;
+    if (state == locale) return;
     await _prefs.setString(StorageKeys.localeCode, locale.code);
+    await Future<void>.delayed(Duration.zero);
+    state = locale;
   }
 }
 

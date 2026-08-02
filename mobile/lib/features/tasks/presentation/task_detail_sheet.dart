@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../personal/providers/personal_tasks_provider.dart';
+import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../../workspace/providers/workspace_members_provider.dart';
 import '../../workspace/providers/workspace_provider.dart';
 import '../data/task_dto.dart';
@@ -29,10 +30,14 @@ Future<void> showTaskDetailSheet({
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
+    useSafeArea: true,
     builder: (sheetContext) {
-      return _TaskDetailSheetBody(
-        projectId: projectId,
-        initialTask: task,
+      return Material(
+        color: Theme.of(sheetContext).colorScheme.surface,
+        child: _TaskDetailSheetBody(
+          projectId: projectId,
+          initialTask: task,
+        ),
       );
     },
   );
@@ -58,6 +63,8 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
   late TaskStatus _status;
   late final TabController _tabController;
   var _busy = false;
+  var _loadingDetails = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -65,12 +72,54 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
     _task = widget.initialTask;
     _status = widget.initialTask.status;
     _tabController = TabController(length: 4, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadTaskDetails());
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadTaskDetails() async {
+    final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id ??
+        widget.initialTask.workspaceId;
+    if (workspaceId == null || workspaceId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _loadingDetails = false;
+          _loadError = 'Aktif çalışma alanı yok.';
+        });
+      }
+      return;
+    }
+
+    try {
+      final fresh = await ref.read(taskRepositoryProvider).getTaskDetails(
+            workspaceId: workspaceId,
+            taskId: widget.initialTask.id,
+          );
+      if (!mounted) return;
+      setState(() {
+        _task = fresh;
+        _status = fresh.status;
+        _loadingDetails = false;
+        _loadError = null;
+      });
+    } on TaskException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingDetails = false;
+        _loadError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingDetails = false;
+        // Liste kartındaki veri ile devam et.
+        _loadError = null;
+      });
+    }
   }
 
   Future<void> _edit() async {
@@ -172,12 +221,15 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
       return;
     }
 
+    final isAdmin = ref.read(workspaceCapabilitiesProvider).isAdmin;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Görevi sil'),
-        content: const Text(
-          'İlerleme yoksa görev silinir. İlerleme varsa karşı tarafa silme onayı gönderilir.',
+        content: Text(
+          isAdmin
+              ? 'İlerleme yoksa görev hemen silinir. İlerleme varsa atanan kullanıcıya “Görev tamamlandı mı, sileyim mi?” onayı gönderilir.'
+              : 'İlerleme yoksa görev hemen silinir. İlerleme varsa yöneticiye “Görevi silmek istiyorum” onayı gönderilir.',
         ),
         actions: [
           TextButton(
@@ -195,32 +247,53 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
 
     setState(() => _busy = true);
     try {
-      final message = await ref
-          .read(tasksProvider(widget.projectId).notifier)
-          .deleteTask(_task.id);
+      final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id ??
+          _task.workspaceId;
+      if (workspaceId == null || workspaceId.isEmpty) {
+        throw TaskException('Workspace seçilmedi.');
+      }
+
+      late final String message;
+      late final String mode;
+      String? deletionStatus;
+
+      if (widget.projectId.isNotEmpty) {
+        message = await ref
+            .read(tasksProvider(widget.projectId).notifier)
+            .deleteTask(_task.id);
+        final items = ref
+                .read(tasksProvider(widget.projectId))
+                .valueOrNull
+                ?.items ??
+            const <TaskDto>[];
+        final stillThere = items.any((t) => t.id == _task.id);
+        mode = stillThere ? 'approval_requested' : 'deleted';
+        if (stillThere) {
+          deletionStatus =
+              items.firstWhere((t) => t.id == _task.id).deletionStatus;
+        }
+      } else {
+        final result = await ref.read(taskRepositoryProvider).deleteTask(
+              workspaceId: workspaceId,
+              taskId: _task.id,
+            );
+        mode = result['mode'] as String? ?? 'deleted';
+        message = result['message'] as String? ?? 'Görev silindi.';
+        deletionStatus = result['deletionStatus'] as String?;
+        ref.invalidate(personalTasksProvider);
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(message)));
 
-      final stillOpen = (ref
-                  .read(tasksProvider(widget.projectId))
-                  .valueOrNull
-                  ?.items ??
-              const <TaskDto>[])
-          .any((t) => t.id == _task.id);
-
-      if (stillOpen) {
-        await ref.read(tasksProvider(widget.projectId).notifier).refresh();
-        if (!mounted) return;
-        final items =
-            ref.read(tasksProvider(widget.projectId)).valueOrNull?.items ??
-                const <TaskDto>[];
-        for (final task in items) {
-          if (task.id == _task.id) {
-            setState(() => _task = task);
-            break;
-          }
+      if (mode == 'approval_requested') {
+        setState(() {
+          _task = _task.copyWith(deletionStatus: deletionStatus);
+        });
+        if (widget.projectId.isNotEmpty) {
+          await ref.read(tasksProvider(widget.projectId).notifier).refresh();
         }
       } else {
         Navigator.of(context).pop();
@@ -252,14 +325,47 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
     final height = MediaQuery.sizeOf(context).height * 0.88;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-    final scope = workspaceId == null
+    final scopeWorkspaceId = workspaceId ?? _task.workspaceId;
+    final scope = (scopeWorkspaceId == null || scopeWorkspaceId.isEmpty)
         ? null
-        : TaskScope(workspaceId: workspaceId, taskId: _task.id);
+        : TaskScope(workspaceId: scopeWorkspaceId, taskId: _task.id);
 
     if (scope != null) {
       ref.watch(commentsProvider(scope));
       ref.watch(taskFilesProvider(scope));
       ref.watch(subtasksProvider(scope));
+    }
+
+    if (_loadingDetails) {
+      return SizedBox(
+        height: height * 0.4,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_loadError != null && _task.id.isEmpty) {
+      return SizedBox(
+        height: height * 0.4,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_loadError!, textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () {
+                    setState(() => _loadingDetails = true);
+                    _loadTaskDetails();
+                  },
+                  child: const Text('Yeniden dene'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     return SizedBox(
@@ -269,13 +375,31 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_loadError != null)
+              MaterialBanner(
+                content: Text(_loadError!),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _loadingDetails = true;
+                        _loadError = null;
+                      });
+                      _loadTaskDetails();
+                    },
+                    child: const Text('Yenile'),
+                  ),
+                ],
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 4, 4),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
-                      _task.title,
+                      _task.title.isEmpty ? 'Görev' : _task.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                             letterSpacing: -0.2,
@@ -322,21 +446,18 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
                     onStatusSelected: _changeStatus,
                     onDelete: _delete,
                   ),
-                  if (scope != null)
-                    TaskSubtasksPanel(
-                      scope: scope,
-                      projectId: widget.projectId,
-                    )
-                  else
-                    const Center(child: Text('Aktif çalışma alanı yok.')),
-                  if (scope != null)
-                    TaskCommentsPanel(scope: scope)
-                  else
-                    const Center(child: Text('Aktif çalışma alanı yok.')),
-                  if (scope != null)
-                    TaskFilesPanel(scope: scope)
-                  else
-                    const Center(child: Text('Aktif çalışma alanı yok.')),
+                  scope != null
+                      ? TaskSubtasksPanel(
+                          scope: scope,
+                          projectId: widget.projectId,
+                        )
+                      : const Center(child: Text('Aktif çalışma alanı yok.')),
+                  scope != null
+                      ? TaskCommentsPanel(scope: scope)
+                      : const Center(child: Text('Aktif çalışma alanı yok.')),
+                  scope != null
+                      ? TaskFilesPanel(scope: scope)
+                      : const Center(child: Text('Aktif çalışma alanı yok.')),
                 ],
               ),
             ),
@@ -431,7 +552,7 @@ class _DetailsTab extends StatelessWidget {
                 ? Colors.red
                 : Colors.amber,
             title: task.isClaimOverdue
-                ? 'SLA aşıldı — sahiplenme bekleniyor'
+                ? 'Sahiplenme süresi aşıldı'
                 : 'Sahiplenme onayı bekleniyor',
             subtitle:
                 'Atanan kullanıcı kabul edene kadar durum değiştirilemez.',
@@ -454,21 +575,26 @@ class _DetailsTab extends StatelessWidget {
               ),
         ),
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
+        DropdownButtonFormField<TaskStatus>(
+          // ignore: deprecated_member_use
+          value: status,
+          decoration: const InputDecoration(
+            labelText: 'Görev durumu',
+            border: OutlineInputBorder(),
+            helperText: 'Menüden yeni durumu seçin',
+          ),
+          items: [
             for (final value in TaskStatus.values)
-              ChoiceChip(
-                label: Text(value.label),
-                selected: status == value,
-                onSelected: (busy || !task.canChangeStatus)
-                    ? null
-                    : (selected) {
-                        if (selected) onStatusSelected(value);
-                      },
+              DropdownMenuItem(
+                value: value,
+                child: Text(value.label),
               ),
           ],
+          onChanged: (busy || !task.canChangeStatus)
+              ? null
+              : (value) {
+                  if (value != null) onStatusSelected(value);
+                },
         ),
         const SizedBox(height: 28),
         Row(

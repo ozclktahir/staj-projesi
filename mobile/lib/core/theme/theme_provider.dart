@@ -15,8 +15,11 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
-    state = mode;
+    if (state == mode) return;
     await _prefs.setString(StorageKeys.themeMode, _toStorage(mode));
+    // Tema geçişini gesture/build bitiminden sonra uygula (Switch rebuild crash).
+    await Future<void>.delayed(Duration.zero);
+    state = mode;
   }
 
   static ThemeMode _fromStorage(String? raw) {

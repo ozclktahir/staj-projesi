@@ -147,7 +147,8 @@ Future<bool?> showCreateTaskDialog({
                       if (!isReassign) const SizedBox(height: 16),
                       if (!isReassign)
                         DropdownButtonFormField<TaskPriority>(
-                          initialValue: priority,
+                          // ignore: deprecated_member_use
+                          value: priority,
                           decoration: const InputDecoration(
                             labelText: 'Öncelik',
                           ),
@@ -169,7 +170,8 @@ Future<bool?> showCreateTaskDialog({
                       if (!isReassign) const SizedBox(height: 16),
                       if (!isReassign)
                         DropdownButtonFormField<TaskStatus>(
-                          initialValue: status,
+                          // ignore: deprecated_member_use
+                          value: status,
                           decoration: const InputDecoration(
                             labelText: 'Durum',
                           ),

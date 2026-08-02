@@ -157,8 +157,8 @@ class TaskDto {
 
   factory TaskDto.fromJson(Map<String, dynamic> json) {
     return TaskDto(
-      id: json['id'] as String,
-      title: json['title'] as String? ?? '',
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
       description: json['description'] as String?,
       status: TaskStatus.fromApi(json['status'] as String?),
       priority: TaskPriority.fromApi(json['priority'] as String?),

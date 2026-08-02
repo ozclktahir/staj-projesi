@@ -191,13 +191,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               if (active != null)
                 _DrawerNavTile(
-                  icon: Icons.group_outlined,
-                  selectedIcon: Icons.group,
-                  label: s.navMembers,
+                  icon: Icons.admin_panel_settings_outlined,
+                  selectedIcon: Icons.admin_panel_settings,
+                  label: s.settingsAdmin,
                   selected: false,
                   onTap: () {
                     Navigator.of(context).pop();
-                    context.push(AppRoutes.members);
+                    context.push(AppRoutes.admin);
                   },
                 ),
               if (active != null && caps.canInvite)
@@ -590,7 +590,8 @@ class _ProjectsBody extends StatelessWidget {
                       crossAxisCount: crossAxisCount,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
-                      childAspectRatio: crossAxisCount == 1 ? 2.4 : 1.15,
+                      // Daha yüksek kart: uzun açıklamalar taşmasın.
+                      mainAxisExtent: crossAxisCount == 1 ? 168 : 180,
                     ),
                     itemBuilder: (context, index) {
                       final project = projects[index];
@@ -665,20 +666,27 @@ class _ProjectCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Expanded(
-                child: Text(
-                  (description != null && description.isNotEmpty)
-                      ? description
-                      : 'Açıklama eklenmemiş',
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Text(
+                    (description != null && description.isNotEmpty)
+                        ? description
+                        : 'Açıklama eklenmemiş',
+                    maxLines: 3,
+                    softWrap: true,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.25,
+                        ),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 createdLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),

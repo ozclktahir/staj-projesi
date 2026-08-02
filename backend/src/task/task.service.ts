@@ -389,7 +389,7 @@ export class TaskService {
         user_id: assignee,
         type: 'task_deletion_request',
         title: 'Silme onayı gerekli',
-        message: `Yönetici, '${title}' görevini silmek istiyor. Onaylıyor musun?`,
+        message: `Yönetici, '${title}' görevini silmek istiyor. Görev tamamlandı mı, sileyim mi?`,
         metadata: {
           task_id: taskId,
           project_id: projectId,
@@ -460,7 +460,7 @@ export class TaskService {
           user_id: adminId,
           type: 'task_deletion_request',
           title: 'Silme onayı gerekli',
-          message: `'${title}' görevi için silme onayı isteniyor.`,
+          message: `Kullanıcı '${title}' görevini silmek istiyor.`,
           metadata: {
             task_id: taskId,
             project_id: projectId,
