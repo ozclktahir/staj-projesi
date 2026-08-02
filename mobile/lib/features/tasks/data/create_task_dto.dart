@@ -24,30 +24,28 @@ class CreateTaskDto {
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{
       'title': title.trim(),
+      // Nest CreateTaskDto ile hizalı — eksik alan validation hatası önlenir.
+      'status': (status ?? TaskStatus.todo).apiValue,
+      'priority': (priority ?? TaskPriority.medium).apiValue,
     };
     final desc = description?.trim();
     if (desc != null && desc.isNotEmpty) {
       map['description'] = desc;
     }
-    if (status != null) {
-      map['status'] = status!.apiValue;
-    }
-    if (priority != null) {
-      map['priority'] = priority!.apiValue;
-    }
     final assignee = assigneeId?.trim();
     if (assignee != null && assignee.isNotEmpty) {
       map['assignee_id'] = assignee;
+      map['assigned_to'] = assignee;
     }
     final due = dueDate?.trim();
     if (due != null && due.isNotEmpty) {
       map['due_date'] = due;
     }
-    if (projectId != null && projectId!.isNotEmpty) {
-      map['project_id'] = projectId;
+    if (projectId != null && projectId!.trim().isNotEmpty) {
+      map['project_id'] = projectId!.trim();
     }
-    if (parentTaskId != null && parentTaskId!.isNotEmpty) {
-      map['parent_task_id'] = parentTaskId;
+    if (parentTaskId != null && parentTaskId!.trim().isNotEmpty) {
+      map['parent_task_id'] = parentTaskId!.trim();
     }
     return map;
   }

@@ -148,8 +148,9 @@ class SettingsScreen extends ConsumerWidget {
             onSelectionChanged: (selected) {
               if (selected.isEmpty) return;
               final value = selected.first;
-              Future.microtask(() {
-                ref.read(localePreferenceProvider.notifier).setLocale(value);
+              // Frame bittikten sonra locale değiştir — _dependents.isEmpty crash önlemi.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                ref.read(localePreferenceProvider.notifier).scheduleLocale(value);
               });
             },
           ),

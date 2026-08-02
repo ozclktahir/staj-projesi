@@ -320,47 +320,18 @@ export class TaskService {
       );
     }
 
-    const hasProgress = await this.taskHasProgress(
-      taskId,
-      typeof existing.status === 'string' ? existing.status : null,
-    );
     const title =
       typeof existing.title === 'string' ? existing.title : 'görev';
     const projectId =
       typeof existing.project_id === 'string' ? existing.project_id : null;
 
-    if (!hasProgress) {
-      const { data, error } = await client
-        .from('tasks')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('workspace_id', workspaceId)
-        .eq('id', taskId)
-        .is('deleted_at', null)
-        .select()
-        .maybeSingle();
-
-      if (error) throw new BadRequestException(error.message);
-      if (!data) throw new NotFoundException('Görev bulunamadı.');
-
-      this.notificationGateway.emitToWorkspace(workspaceId, 'task_deleted', {
-        id: taskId,
-        project_id: projectId,
-      });
-
-      return {
-        mode: 'deleted' as const,
-        message: 'Görev silindi.',
-        taskId,
-        projectId,
-      };
-    }
-
+    // Dual approval zorunlu — ilerleme olsa da olmasa da doğrudan silme yok.
     const requestedAt = new Date().toISOString();
 
     if (isAdmin) {
       if (!assignee) {
         throw new BadRequestException(
-          'Bu görevde ilerleme var ancak atanan kullanıcı yok. Onaylı silme için önce bir kullanıcı atayın.',
+          'Onaylı silme için önce göreve bir kullanıcı atayın.',
         );
       }
 

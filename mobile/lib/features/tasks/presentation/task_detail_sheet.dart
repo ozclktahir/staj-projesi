@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../personal/providers/personal_tasks_provider.dart';
-import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../../workspace/providers/workspace_members_provider.dart';
 import '../../workspace/providers/workspace_provider.dart';
 import '../data/task_dto.dart';
@@ -15,6 +14,7 @@ import '../providers/file_provider.dart';
 import '../providers/subtask_provider.dart';
 import '../providers/task_provider.dart';
 import 'edit_task_dialog.dart';
+import 'task_actions.dart';
 import 'task_card.dart';
 import 'task_comments_panel.dart';
 import 'task_files_panel.dart';
@@ -210,93 +210,36 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
   }
 
   Future<void> _delete() async {
-    if (_task.isDeletionPending) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Bu görev için zaten silme onayı bekleniyor.'),
-          ),
-        );
-      return;
-    }
-
-    final isAdmin = ref.read(workspaceCapabilitiesProvider).isAdmin;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Görevi sil'),
-        content: Text(
-          isAdmin
-              ? 'İlerleme yoksa görev hemen silinir. İlerleme varsa atanan kullanıcıya “Görev tamamlandı mı, sileyim mi?” onayı gönderilir.'
-              : 'İlerleme yoksa görev hemen silinir. İlerleme varsa yöneticiye “Görevi silmek istiyorum” onayı gönderilir.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('İptal'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Sil / Onay iste'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
     setState(() => _busy = true);
     try {
-      final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id ??
-          _task.workspaceId;
-      if (workspaceId == null || workspaceId.isEmpty) {
-        throw TaskException('Workspace seçilmedi.');
-      }
-
-      late final String message;
-      late final String mode;
-      String? deletionStatus;
-
-      if (widget.projectId.isNotEmpty) {
-        message = await ref
-            .read(tasksProvider(widget.projectId).notifier)
-            .deleteTask(_task.id);
-        final items = ref
-                .read(tasksProvider(widget.projectId))
-                .valueOrNull
-                ?.items ??
-            const <TaskDto>[];
-        final stillThere = items.any((t) => t.id == _task.id);
-        mode = stillThere ? 'approval_requested' : 'deleted';
-        if (stillThere) {
-          deletionStatus =
-              items.firstWhere((t) => t.id == _task.id).deletionStatus;
-        }
-      } else {
-        final result = await ref.read(taskRepositoryProvider).deleteTask(
-              workspaceId: workspaceId,
-              taskId: _task.id,
-            );
-        mode = result['mode'] as String? ?? 'deleted';
-        message = result['message'] as String? ?? 'Görev silindi.';
-        deletionStatus = result['deletionStatus'] as String?;
-        ref.invalidate(personalTasksProvider);
-      }
-
-      if (!mounted) return;
+      final message = await confirmAndRequestTaskDeletion(
+        context: context,
+        ref: ref,
+        task: _task,
+        projectId: widget.projectId,
+      );
+      if (!mounted || message == null) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(message)));
 
-      if (mode == 'approval_requested') {
-        setState(() {
-          _task = _task.copyWith(deletionStatus: deletionStatus);
-        });
-        if (widget.projectId.isNotEmpty) {
-          await ref.read(tasksProvider(widget.projectId).notifier).refresh();
+      if (widget.projectId.isNotEmpty) {
+        await ref.read(tasksProvider(widget.projectId).notifier).refresh();
+        if (!mounted) return;
+        final items =
+            ref.read(tasksProvider(widget.projectId)).valueOrNull?.items ??
+                const <TaskDto>[];
+        final updated = items.where((t) => t.id == _task.id).toList();
+        if (updated.isEmpty) {
+          Navigator.of(context).pop();
+        } else {
+          setState(() => _task = updated.first);
         }
       } else {
-        Navigator.of(context).pop();
+        // Dual approval: görev listede kalır, silinmedi.
+        setState(() {
+          _task = _task.copyWith(deletionStatus: 'pending_admin_approval');
+        });
       }
     } on TaskException catch (error) {
       if (mounted) {
@@ -309,7 +252,7 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            const SnackBar(content: Text('Görev silinemedi.')),
+            const SnackBar(content: Text('Silme isteği gönderilemedi.')),
           );
       }
     } finally {
@@ -596,6 +539,20 @@ class _DetailsTab extends StatelessWidget {
                   if (value != null) onStatusSelected(value);
                 },
         ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: (busy || !task.canChangeStatus)
+              ? null
+              : () async {
+                  final selected = await showTaskStatusPicker(
+                    context: context,
+                    current: status,
+                  );
+                  if (selected != null) onStatusSelected(selected);
+                },
+          icon: const Icon(Icons.expand_more),
+          label: const Text('Durumu değiştir'),
+        ),
         const SizedBox(height: 28),
         Row(
           children: [
@@ -606,11 +563,14 @@ class _DetailsTab extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             const Spacer(),
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: scheme.error),
+            FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(
+                foregroundColor: scheme.error,
+              ),
               onPressed: (busy || task.isDeletionPending) ? null : onDelete,
-              child: Text(
-                task.isDeletionPending ? 'Onay bekleniyor' : 'Sil',
+              icon: const Icon(Icons.delete_outline),
+              label: Text(
+                task.isDeletionPending ? 'Onay bekleniyor' : 'Silme onayı iste',
               ),
             ),
           ],

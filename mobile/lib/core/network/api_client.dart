@@ -38,6 +38,11 @@ class ApiClient {
           } else {
             options.headers.remove('Authorization');
           }
+          // FormData: varsayılan application/json boundary'yi bozar — kaldır.
+          if (options.data is FormData) {
+            options.headers.remove(Headers.contentTypeHeader);
+            options.contentType = null;
+          }
           handler.next(options);
         },
         onError: (error, handler) async {

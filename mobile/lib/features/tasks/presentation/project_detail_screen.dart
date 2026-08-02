@@ -10,9 +10,11 @@ import '../../workspace/data/project_repository.dart';
 import '../../workspace/providers/project_provider.dart';
 import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../data/task_dto.dart';
+import '../data/task_repository.dart';
 import '../providers/kanban_filter_provider.dart';
 import '../providers/task_provider.dart';
 import 'create_task_dialog.dart';
+import 'task_actions.dart';
 import 'task_card.dart';
 import 'task_detail_sheet.dart';
 
@@ -562,6 +564,61 @@ class _TaskColumn extends ConsumerWidget {
               );
             }
             final task = tasks[index];
+            Future<void> handleStatus() async {
+              final next = await showTaskStatusPicker(
+                context: context,
+                current: task.status,
+              );
+              if (next == null || !context.mounted) return;
+              try {
+                await applyTaskStatusChange(
+                  ref: ref,
+                  task: task,
+                  projectId: projectId,
+                  status: next,
+                );
+              } on TaskException catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(SnackBar(content: Text(e.message)));
+              } catch (_) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    const SnackBar(content: Text('Durum güncellenemedi.')),
+                  );
+              }
+            }
+
+            Future<void> handleDelete() async {
+              try {
+                final message = await confirmAndRequestTaskDeletion(
+                  context: context,
+                  ref: ref,
+                  task: task,
+                  projectId: projectId,
+                );
+                if (message == null || !context.mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(SnackBar(content: Text(message)));
+              } on TaskException catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(SnackBar(content: Text(e.message)));
+              } catch (_) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    const SnackBar(content: Text('Silme isteği gönderilemedi.')),
+                  );
+              }
+            }
+
             return LongPressDraggable<TaskDto>(
               data: task,
               feedback: Material(
@@ -587,6 +644,8 @@ class _TaskColumn extends ConsumerWidget {
                   projectId: projectId,
                   task: task,
                 ),
+                onStatusChange: handleStatus,
+                onDelete: handleDelete,
               ),
             );
           },

@@ -285,31 +285,47 @@ Future<bool?> showCreateTaskDialog({
                             final resolvedAssignee = caps.isAdmin
                                 ? assigneeId
                                 : (assigneeId ?? userId);
+                            final trimmedTitle = titleController.text.trim();
+                            if (trimmedTitle.isEmpty) {
+                              setLocal(() {
+                                submitting = false;
+                                errorText = 'Başlık zorunludur.';
+                              });
+                              return;
+                            }
+                            debugPrint(
+                              '[CreateTask] projectId=$projectId '
+                              'assignee=$resolvedAssignee status=${status.apiValue} '
+                              'priority=${priority.apiValue}',
+                            );
                             final ok = await ref
                                 .read(tasksProvider(projectId).notifier)
                                 .createTask(
-                                  title: titleController.text,
+                                  title: trimmedTitle,
                                   description: descriptionController.text,
                                   status: status,
                                   priority: priority,
                                   assigneeId: resolvedAssignee,
-                                  dueDate:
-                                      dueDate?.toUtc().toIso8601String(),
+                                  dueDate: dueDate
+                                      ?.toUtc()
+                                      .toIso8601String(),
                                 );
                             if (dialogContext.mounted) {
                               Navigator.of(dialogContext).pop(ok);
                             }
                           } on TaskException catch (error) {
+                            debugPrint('[CreateTask] TaskException: ${error.message}');
                             setLocal(() {
                               submitting = false;
                               errorText = error.message;
                             });
-                          } catch (_) {
+                          } catch (error, stack) {
+                            debugPrint('[CreateTask] error: $error\n$stack');
                             setLocal(() {
                               submitting = false;
                               errorText = isReassign
                                   ? 'Yeniden atama başarısız.'
-                                  : 'Görev oluşturulamadı.';
+                                  : 'Görev oluşturulamadı: $error';
                             });
                           }
                         },

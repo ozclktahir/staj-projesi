@@ -9,10 +9,14 @@ class TaskCard extends ConsumerWidget {
     super.key,
     required this.task,
     required this.onTap,
+    this.onStatusChange,
+    this.onDelete,
   });
 
   final TaskDto task;
   final VoidCallback onTap;
+  final VoidCallback? onStatusChange;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -47,38 +51,62 @@ class TaskCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (claimPending || task.isDeletionPending)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        if (claimPending)
-                          _StatusBadge(
-                            label: claimOverdue
-                                ? 'Kullanıcı görevi henüz kabul etmedi'
-                                : 'Onay bekliyor',
-                            bg: claimOverdue
-                                ? Colors.red.shade100
-                                : Colors.amber.shade100,
-                            fg: claimOverdue
-                                ? Colors.red.shade800
-                                : Colors.amber.shade900,
-                            border: claimOverdue
-                                ? Colors.red.shade300
-                                : Colors.amber.shade300,
-                          ),
-                        if (task.isDeletionPending)
-                          _StatusBadge(
-                            label: 'Silme onayı bekleniyor',
-                            bg: Colors.orange.shade100,
-                            fg: Colors.orange.shade900,
-                            border: Colors.orange.shade300,
-                          ),
-                      ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: claimPending || task.isDeletionPending
+                          ? Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                if (claimPending)
+                                  _StatusBadge(
+                                    label: claimOverdue
+                                        ? 'Kullanıcı görevi henüz kabul etmedi'
+                                        : 'Onay bekliyor',
+                                    bg: claimOverdue
+                                        ? Colors.red.shade100
+                                        : Colors.amber.shade100,
+                                    fg: claimOverdue
+                                        ? Colors.red.shade800
+                                        : Colors.amber.shade900,
+                                    border: claimOverdue
+                                        ? Colors.red.shade300
+                                        : Colors.amber.shade300,
+                                  ),
+                                if (task.isDeletionPending)
+                                  _StatusBadge(
+                                    label: 'Silme onayı bekleniyor',
+                                    bg: Colors.orange.shade100,
+                                    fg: Colors.orange.shade900,
+                                    border: Colors.orange.shade300,
+                                  ),
+                              ],
+                            )
+                          : const SizedBox.shrink(),
                     ),
-                  ),
+                    if (onDelete != null)
+                      IconButton(
+                        tooltip: task.isDeletionPending
+                            ? 'Silme onayı bekleniyor'
+                            : 'Silme onayı iste',
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                        onPressed: task.isDeletionPending ? null : onDelete,
+                        icon: Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: scheme.error,
+                        ),
+                      ),
+                  ],
+                ),
+                if (claimPending || task.isDeletionPending || onDelete != null)
+                  const SizedBox(height: 4),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -121,13 +149,26 @@ class TaskCard extends ConsumerWidget {
                   children: [
                     PriorityBadge(priority: task.priority),
                     const Spacer(),
-                    Text(
-                      task.status.label,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
+                    if (onStatusChange != null)
+                      TextButton.icon(
+                        onPressed:
+                            task.canChangeStatus ? onStatusChange : null,
+                        icon: const Icon(Icons.swap_vert, size: 16),
+                        label: Text(task.status.label),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                      )
+                    else
+                      Text(
+                        task.status.label,
+                        style:
+                            Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                      ),
                   ],
                 ),
               ],
@@ -181,7 +222,8 @@ class _AssigneeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final initial = label.isNotEmpty ? label.characters.first.toUpperCase() : '?';
+    final initial =
+        label.isNotEmpty ? label.characters.first.toUpperCase() : '?';
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 120),
@@ -224,7 +266,6 @@ class PriorityBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Web `priorityClass`: HIGH red, LOW emerald, default (MEDIUM/URGENT) amber.
     final (Color bg, Color fg, Color border) = switch (priority) {
       TaskPriority.high => (
           Colors.red.shade100,

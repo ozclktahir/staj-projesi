@@ -32,11 +32,24 @@ class LocalePreferenceNotifier extends Notifier<AppLocaleOption> {
     return AppLocaleOption.fromCode(_prefs.getString(StorageKeys.localeCode));
   }
 
+  /// Locale değişimini frame bittikten sonra uygular — SegmentedButton /
+  /// Localizations dependent teardown yarışını önler.
   Future<void> setLocale(AppLocaleOption locale) async {
     if (state == locale) return;
     await _prefs.setString(StorageKeys.localeCode, locale.code);
-    await Future<void>.delayed(Duration.zero);
-    state = locale;
+  }
+
+  /// Ayarlar UI'dan çağrılır; state güncellemesi post-frame'de yapılır.
+  void scheduleLocale(AppLocaleOption locale) {
+    if (state == locale) return;
+    _prefs.setString(StorageKeys.localeCode, locale.code);
+    // ignore: discarded_futures
+    Future<void>(() async {
+      await Future<void>.delayed(Duration.zero);
+      if (state != locale) {
+        state = locale;
+      }
+    });
   }
 }
 

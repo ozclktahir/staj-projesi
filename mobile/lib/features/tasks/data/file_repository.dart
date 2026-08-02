@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
@@ -51,28 +50,38 @@ class FileRepository {
     String? mimeType,
   }) async {
     try {
+      final resolvedMime =
+          (mimeType != null && mimeType.trim().isNotEmpty)
+              ? mimeType.trim()
+              : _guessMimeFromName(fileName);
+
       final MultipartFile part;
-      if (filePath != null && filePath.isNotEmpty) {
-        part = await MultipartFile.fromFile(filePath, filename: fileName);
-      } else if (bytes != null) {
+      if (bytes != null && bytes.isNotEmpty) {
         part = MultipartFile.fromBytes(bytes, filename: fileName);
+      } else if (filePath != null && filePath.isNotEmpty) {
+        part = await MultipartFile.fromFile(filePath, filename: fileName);
       } else {
         throw FileException('Seçilen dosya okunamadı.');
       }
 
+      debugPrint(
+        '[FileUpload] POST multipart name=$fileName mime=$resolvedMime '
+        'bytes=${bytes?.length ?? 'path'} task=$taskId',
+      );
+
       final formData = FormData.fromMap({'file': part});
+      // Content-Type elle set edilmez; ApiClient FormData için json header'ı siler.
       final uploadResponse = await _dio.post<Map<String, dynamic>>(
         ApiConstants.taskFileUpload(workspaceId, taskId),
         data: formData,
-        options: Options(
-          contentType: Headers.multipartFormDataContentType,
-        ),
       );
 
       final uploadData = uploadResponse.data;
       if (uploadData == null) {
         throw FileException('Sunucu yükleme sonucu döndürmedi.');
       }
+      debugPrint('[FileUpload] upload OK keys=${uploadData.keys.toList()}');
+
       final uploaded = FileUploadResultDto.fromJson(uploadData);
       if (uploaded.url.isEmpty) {
         throw FileException('Yükleme URL\'i alınamadı.');
@@ -83,7 +92,7 @@ class FileRepository {
         data: CreateFileDto(
           fileName: uploaded.fileName.isNotEmpty ? uploaded.fileName : fileName,
           fileUrl: uploaded.url,
-          fileType: uploaded.fileType ?? mimeType,
+          fileType: uploaded.fileType ?? resolvedMime,
         ).toJson(),
       );
 
@@ -95,9 +104,14 @@ class FileRepository {
     } on FileException {
       rethrow;
     } on DioException catch (error) {
+      debugPrint(
+        '[FileUpload] DioException status=${error.response?.statusCode} '
+        'data=${error.response?.data}',
+      );
       throw FileException(_messageFromDio(error));
-    } catch (_) {
-      throw FileException('Dosya yüklenemedi.');
+    } catch (error) {
+      debugPrint('[FileUpload] unexpected: $error');
+      throw FileException('Dosya yüklenemedi: $error');
     }
   }
 
@@ -113,6 +127,26 @@ class FileRepository {
     } on DioException catch (error) {
       throw FileException(_messageFromDio(error));
     }
+  }
+
+  String _guessMimeFromName(String name) {
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.pdf')) return 'application/pdf';
+    if (lower.endsWith('.txt')) return 'text/plain';
+    if (lower.endsWith('.doc')) return 'application/msword';
+    if (lower.endsWith('.docx')) {
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+    if (lower.endsWith('.xls')) return 'application/vnd.ms-excel';
+    if (lower.endsWith('.xlsx')) {
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    }
+    if (lower.endsWith('.zip')) return 'application/zip';
+    return 'application/octet-stream';
   }
 
   String _messageFromDio(DioException error) {

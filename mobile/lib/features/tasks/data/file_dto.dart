@@ -66,13 +66,14 @@ class CreateFileDto {
   final String? fileType;
 
   Map<String, dynamic> toJson() {
-    final map = <String, dynamic>{
+    return {
       'file_name': fileName,
       'file_url': fileUrl,
+      // Nest CreateFileDto file_type zorunlu (@IsNotEmpty).
+      'file_type':
+          (fileType != null && fileType!.trim().isNotEmpty)
+              ? fileType!.trim()
+              : 'application/octet-stream',
     };
-    if (fileType != null && fileType!.isNotEmpty) {
-      map['file_type'] = fileType;
-    }
-    return map;
   }
 }

@@ -566,7 +566,8 @@ class _AppStringsScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(_AppStringsScope oldWidget) {
-    return oldWidget.strings.locale != strings.locale;
+    // Yalnızca dil kodu değişince notify — gereksiz unmount/rebuild yok.
+    return oldWidget.strings.locale.code != strings.locale.code;
   }
 }
 

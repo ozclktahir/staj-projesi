@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsUrl } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class CreateFileDto {
   @ApiProperty({
@@ -11,10 +11,11 @@ export class CreateFileDto {
   file_name: string;
 
   @ApiProperty({
-    example: 'https://xevthmygfvycnlbzxjtd.supabase.co/storage/v1/object/public/files/gorev-eki.pdf',
-    description: 'Dosyanın Supabase Storage üzerindeki erişim URL\'i',
+    example:
+      'https://example.supabase.co/storage/v1/object/public/uploads/gorev-eki.pdf',
+    description: 'Dosyanın Supabase Storage üzerindeki erişim URL değeri',
   })
-  @IsUrl()
+  @IsString()
   @IsNotEmpty()
   file_url: string;
 

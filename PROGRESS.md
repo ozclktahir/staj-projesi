@@ -627,3 +627,12 @@
 - **İlerleme raporları:** “Yeni rapor” FAB/dialog kaldırıldı; liste + admin silme kaldı.
 - `flutter analyze`: No issues found.
 
+### [2 Ağustos 2026] - Locale _dependents.isEmpty crash + dual delete/status/upload onarımı
+- **Dil çökmesi (`_dependents.isEmpty` / ancestor assertion):** `AppStrings` InheritedWidget `MaterialApp.builder` içinden çıkarıldı; scope tekrar **MaterialApp üstünde**. Locale yalnızca languageCode (`tr`/`en`); değişim `addPostFrameCallback` + `scheduleLocale` ile. Böylece Localizations ağacı bozulurken Inherited dependents asılı kalmıyor.
+- **Dual approval silme (zorunlu UI):** Kanban `TaskCard` sağ üstte çöp ikonu + detayda “Silme onayı iste”; Nest `requestOrDelete` artık **doğrudan soft-delete yapmıyor** — her zaman onay akışı (admin→assignee / member→admin bildirimleri).
+- **Durum değiştirme:** Kartta “Durum” butonu + bottom sheet (`showTaskStatusPicker`); detayda dropdown + sheet; PATCH + optimistic `updateStatus`.
+- **Görev oluşturma:** Payload Nest DTO ile hizalandı (`status`/`priority`/`project_id`/`assignee_id`+`assigned_to`); hata mesajları loglanıyor.
+- **Dosya yükleme:** Dio `FormData` isteğinde varsayılan `Content-Type: application/json` kaldırılıyor (boundary kırılıyordu); create kaydında zorunlu `file_type`; Nest `CreateFileDto` `IsUrl` → `IsString` (Storage URL validation).
+- `flutter analyze`: No issues found.
+
+

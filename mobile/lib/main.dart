@@ -57,54 +57,52 @@ class _StajMobileAppState extends ConsumerState<StajMobileApp> {
     ref.watch(unauthorizedSessionListenerProvider);
 
     final appLocale = switch (localeOption) {
-      AppLocaleOption.tr => const Locale('tr', 'TR'),
-      AppLocaleOption.en => const Locale('en', 'US'),
+      AppLocaleOption.tr => const Locale('tr'),
+      AppLocaleOption.en => const Locale('en'),
     };
 
-    return MaterialApp.router(
-      title: 'Staj Projesi',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: themeMode,
-      locale: appLocale,
-      supportedLocales: const [
-        Locale('tr', 'TR'),
-        Locale('tr'),
-        Locale('en', 'US'),
-        Locale('en'),
-      ],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      localeResolutionCallback: (locale, supported) {
-        if (locale == null) return supported.first;
-        for (final candidate in supported) {
-          if (candidate.languageCode == locale.languageCode &&
-              (candidate.countryCode == null ||
-                  candidate.countryCode!.isEmpty ||
-                  candidate.countryCode == locale.countryCode)) {
-            return candidate;
+    // AppStrings MaterialApp'İN ÜSTÜNDE kalmalı.
+    // builder içine InheritedWidget koymak locale değişiminde
+    // `_dependents.isEmpty` assertion crash'ine yol açar.
+    return wrapWithAppStrings(
+      strings: strings,
+      child: MaterialApp.router(
+        title: 'Staj Projesi',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: themeMode,
+        locale: appLocale,
+        supportedLocales: const [
+          Locale('tr'),
+          Locale('en'),
+        ],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        localeListResolutionCallback: (locales, supported) {
+          for (final locale in locales ?? const <Locale>[]) {
+            for (final candidate in supported) {
+              if (candidate.languageCode == locale.languageCode) {
+                return candidate;
+              }
+            }
           }
-        }
-        for (final candidate in supported) {
-          if (candidate.languageCode == locale.languageCode) {
-            return candidate;
+          return const Locale('en');
+        },
+        localeResolutionCallback: (locale, supported) {
+          if (locale == null) return const Locale('en');
+          for (final candidate in supported) {
+            if (candidate.languageCode == locale.languageCode) {
+              return candidate;
+            }
           }
-        }
-        // Material delegate tr desteklemezse en'e düş (AppStrings yine TR kalır).
-        return const Locale('en', 'US');
-      },
-      // Dil/tema değişince tüm ağaç AppStrings ile yeniden bağlanır.
-      builder: (context, child) {
-        return wrapWithAppStrings(
-          strings: strings,
-          child: child ?? const SizedBox.shrink(),
-        );
-      },
-      routerConfig: router,
+          return const Locale('en');
+        },
+        routerConfig: router,
+      ),
     );
   }
 }
