@@ -17,10 +17,11 @@ Started production rollout to **Render with Redis**. Step 1 completed: committed
 - Nest reads `CORS_ORIGIN` (comma-separated; empty/`*` → allow all).
 - Updated `backend/.env.example` and `frontend/.env.example` (`NEXT_PUBLIC_API_BASE_URL`).
 
-## Next
-- Step 4: User creates Blueprint on Render Dashboard (manual)
-- Step 5–6: Frontend production URL + verify
-- Step 7: Close out report
+## Step 5 — Frontend on Render (in progress)
+- Added `staj-projesi-web` to `render.yaml` (Next.js, free, Frankfurt, `rootDir: frontend`).
+- `NEXT_PUBLIC_API_BASE_URL=https://staj-projesi-api.onrender.com`
+- `next start -H 0.0.0.0` for Render port detection.
+- User must set `NEXT_PUBLIC_SUPABASE_*` on the web service and optionally set API `CORS_ORIGIN` to the web URL.
 
 ## Notes
 - Staj defteri: `STAJ_RAPORU_3_Agustos_2026.md` (gitignored)
