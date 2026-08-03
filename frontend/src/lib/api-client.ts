@@ -1,7 +1,12 @@
 import axios from "axios";
 
+const apiBaseUrl =
+  (typeof process !== "undefined" &&
+    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "")) ||
+  "http://localhost:3000";
+
 const apiClient = axios.create({
-  baseURL: "http://localhost:3000",
+  baseURL: apiBaseUrl,
   headers: {
     "Content-Type": "application/json",
   },
