@@ -133,8 +133,22 @@ export default function LoginPage() {
         setIsSubmitting(false);
         return;
       }
+
+      // MFA/istemci yan etkileri cookie'yi bozmuş olabilir — yönlendirmeden önce yenile
+      await persistAuthSession(
+        tokens.access_token,
+        tokens.user,
+        tokens.refresh_token,
+      );
     } catch (persistError) {
       console.error("[login] persist/MFA check:", persistError);
+      toast.error(
+        persistError instanceof Error
+          ? persistError.message
+          : t("auth.badCredentials"),
+      );
+      setIsSubmitting(false);
+      return;
     }
 
     await finishLoginRedirect();

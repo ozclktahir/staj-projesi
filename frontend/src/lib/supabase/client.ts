@@ -1,7 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-export function createSupabaseBrowserClient() {
+function getBrowserSupabaseEnv(): { url: string; anonKey: string } {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -11,7 +11,32 @@ export function createSupabaseBrowserClient() {
     );
   }
 
+  return { url, anonKey };
+}
+
+export function createSupabaseBrowserClient() {
+  const { url, anonKey } = getBrowserSupabaseEnv();
   return createBrowserClient(url, anonKey);
+}
+
+/**
+ * Cookie yazmayan istemci — login/MFA sırasında @supabase/ssr cookie şişmesi
+ * yüzünden sb_access_token kaybolmasın (redirect loop önlemi).
+ */
+export function createEphemeralSupabaseClient(): SupabaseClient {
+  const { url, anonKey } = getBrowserSupabaseEnv();
+  return createClient(url, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storage: {
+        getItem: () => null,
+        setItem: () => {},
+        removeItem: () => {},
+      },
+    },
+  });
 }
 
 /**

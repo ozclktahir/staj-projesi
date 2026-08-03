@@ -10,9 +10,9 @@ export default async function OnboardingPage() {
     redirect("/");
   }
 
-  // Oturum yoksa proxy login'e atar; yine de güvenli taraf
+  // Cookie görünür ama SSR auth başarısız → cookie temizle (redirect loop önlemi)
   if (!access.userId) {
-    redirect("/login");
+    redirect("/clear-session");
   }
 
   return (

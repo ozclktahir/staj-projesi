@@ -9,6 +9,11 @@ export default async function DashboardLayout({
 }>) {
   const access = await ensureWorkspaceAccess();
 
+  // Cookie var ama SSR oturum yoksa / ↔ /login döngüsünü kır
+  if (!access.userId) {
+    redirect("/clear-session");
+  }
+
   // Davet zorunluluğu yok: workspace'i olmayan kullanıcı onboarding'e gider
   if (!access.hasAccess) {
     redirect("/onboarding");

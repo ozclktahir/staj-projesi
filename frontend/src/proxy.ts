@@ -11,7 +11,12 @@ function readCookie(request: NextRequest, name: string): string | null {
     if (!value || value.trim() === "") {
       return null;
     }
-    return value.trim();
+    const trimmed = value.trim();
+    try {
+      return decodeURIComponent(trimmed);
+    } catch {
+      return trimmed;
+    }
   } catch {
     return null;
   }

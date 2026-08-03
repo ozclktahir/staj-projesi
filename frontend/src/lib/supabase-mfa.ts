@@ -1,9 +1,10 @@
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import type { Session } from "@supabase/supabase-js";
+import { createEphemeralSupabaseClient } from "@/lib/supabase/client";
 import { persistAuthSession } from "@/lib/auth-session";
 
-/** localStorage Nest JWT'lerini Supabase Auth oturumuna bağlar (MFA için gerekli). */
+/** localStorage Nest JWT'lerini bellek içi Supabase oturumuna bağlar (cookie yazmaz). */
 export async function ensureSupabaseAuthSession() {
-  const supabase = createSupabaseBrowserClient();
+  const supabase = createEphemeralSupabaseClient();
   const accessToken =
     typeof window !== "undefined"
       ? localStorage.getItem("access_token")
@@ -14,7 +15,7 @@ export async function ensureSupabaseAuthSession() {
       : null;
 
   if (!accessToken?.trim()) {
-    return { supabase, session: null as null };
+    return { supabase, session: null as Session | null };
   }
 
   if (refreshToken?.trim()) {
@@ -28,21 +29,20 @@ export async function ensureSupabaseAuthSession() {
     return { supabase, session: data.session };
   }
 
-  const { data } = await supabase.auth.getSession();
-  return { supabase, session: data.session };
+  // Refresh yoksa setSession yapılamaz; MFA için Nest'in refresh_token dönmesi gerekir.
+  await supabase.auth.getUser(accessToken);
+  return { supabase, session: null as Session | null };
 }
 
-export async function persistSupabaseSessionToApp() {
-  const supabase = createSupabaseBrowserClient();
-  const { data } = await supabase.auth.getSession();
-  const session = data.session;
-  if (!session?.access_token) return null;
+export async function persistSupabaseSessionToApp(session?: Session | null) {
+  const active = session ?? (await ensureSupabaseAuthSession()).session;
+  if (!active?.access_token) return null;
   await persistAuthSession(
-    session.access_token,
-    session.user,
-    session.refresh_token,
+    active.access_token,
+    active.user,
+    active.refresh_token,
   );
-  return session;
+  return active;
 }
 
 export type MfaFactorSummary = {
@@ -65,7 +65,8 @@ export async function listTotpFactors(): Promise<MfaFactorSummary[]> {
 }
 
 export async function needsMfaChallenge(): Promise<boolean> {
-  const { supabase } = await ensureSupabaseAuthSession();
+  const { supabase, session } = await ensureSupabaseAuthSession();
+  if (!session) return false;
   const { data, error } =
     await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (error) {

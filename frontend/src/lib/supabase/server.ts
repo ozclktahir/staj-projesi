@@ -75,10 +75,19 @@ export const getAuthenticatedUser = cache(async (): Promise<{
 } | null> => {
   try {
     const cookieStore = await cookies();
-    const accessToken =
+    const raw =
       cookieStore.get(ACCESS_TOKEN_COOKIE)?.value?.trim() ||
       cookieStore.get("access_token")?.value?.trim() ||
       null;
+
+    let accessToken: string | null = null;
+    if (raw) {
+      try {
+        accessToken = decodeURIComponent(raw);
+      } catch {
+        accessToken = raw;
+      }
+    }
 
     if (!accessToken) {
       return null;

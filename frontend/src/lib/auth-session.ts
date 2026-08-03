@@ -16,8 +16,26 @@ export const ACCESS_TOKEN_COOKIE = "sb_access_token";
 export const REFRESH_TOKEN_COOKIE = "sb_refresh_token";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
+function cookieSecuritySuffix(): string {
+  if (typeof window !== "undefined" && window.location.protocol === "https:") {
+    return "; Secure";
+  }
+  return "";
+}
+
 const EXPIRED_COOKIE =
   "path=/; max-age=0; SameSite=Lax; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+/** Cookie değerini güvenli oku (encodeURIComponent ile yazılmış olabilir). */
+export function decodeCookieValue(raw: string | null | undefined): string | null {
+  if (!raw || raw.trim() === "") return null;
+  const trimmed = raw.trim();
+  try {
+    return decodeURIComponent(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
 
 /** JWT imza doğrulamadan sadece exp kontrolü (client/proxy için). */
 export function isJwtExpired(token: string | null | undefined): boolean {
@@ -85,18 +103,21 @@ export function readAccessToken(): string | null {
 }
 
 function setProxySessionCookie() {
-  document.cookie = `${AUTH_COOKIE}=1; path=/; max-age=${SESSION_MAX_AGE_SECONDS}; SameSite=Lax`;
+  document.cookie = `${AUTH_COOKIE}=1; path=/; max-age=${SESSION_MAX_AGE_SECONDS}; SameSite=Lax${cookieSecuritySuffix()}`;
 }
 
 function setTokenCookies(accessToken: string, refreshToken?: string | null) {
-  document.cookie = `${ACCESS_TOKEN_COOKIE}=${accessToken}; path=/; max-age=${SESSION_MAX_AGE_SECONDS}; SameSite=Lax`;
+  // encodeURIComponent: JWT içindeki '=' cookie parser'ı kırıp oturumu bozabilir
+  const access = encodeURIComponent(accessToken);
+  document.cookie = `${ACCESS_TOKEN_COOKIE}=${access}; path=/; max-age=${SESSION_MAX_AGE_SECONDS}; SameSite=Lax${cookieSecuritySuffix()}`;
   if (refreshToken) {
-    document.cookie = `${REFRESH_TOKEN_COOKIE}=${refreshToken}; path=/; max-age=${SESSION_MAX_AGE_SECONDS}; SameSite=Lax`;
+    const refresh = encodeURIComponent(refreshToken);
+    document.cookie = `${REFRESH_TOKEN_COOKIE}=${refresh}; path=/; max-age=${SESSION_MAX_AGE_SECONDS}; SameSite=Lax${cookieSecuritySuffix()}`;
   }
 }
 
 function clearNamedCookie(name: string) {
-  document.cookie = `${name}=; ${EXPIRED_COOKIE}`;
+  document.cookie = `${name}=; ${EXPIRED_COOKIE}${cookieSecuritySuffix()}`;
 }
 
 function clearTokenCookies() {

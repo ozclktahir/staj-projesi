@@ -53,7 +53,7 @@ export function MfaChallengeCard({ onVerified, onCancel }: MfaChallengeCardProps
       });
       if (verified.error) throw new Error(verified.error.message);
 
-      await persistSupabaseSessionToApp();
+      await persistSupabaseSessionToApp(verified.data.session);
       toast.success(t("auth.mfaSuccess"));
       await onVerified();
     } catch (error) {
