@@ -1,11 +1,8 @@
-# Render Blueprint — NestJS API + Next.js frontend
+# Render Blueprint — NestJS API + Next.js (frontend/)
 # Docs: https://render.com/docs/blueprint-spec
 #
-# Redis/Key Value: Blueprint oluşturmaz. Mevcut instance'ın
-# connection string'ini API Environment → REDIS_URL olarak gir.
-#
-# Deploy: Render Dashboard → New → Blueprint → this repo (main)
-# Secrets sync: false → ilk deploy'da / Environment'tan girilir.
+# Web: rootDir=frontend — npm komutları frontend/ içinde çalışır.
+# Redis: Blueprint oluşturmaz; API Environment → REDIS_URL manuel.
 
 services:
   - type: web
@@ -28,7 +25,6 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      # Frontend URL hazır olunca örn: https://staj-projesi-web.onrender.com
       - key: CORS_ORIGIN
         sync: false
 
@@ -37,8 +33,10 @@ services:
     runtime: node
     plan: free
     region: frankfurt
+    # Monorepo: tüm npm/next işlemleri bu klasörde
     rootDir: frontend
-    buildCommand: npm ci && npm run build
+    # NODE_ENV=production iken devDeps atlanmasın diye --include=dev
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start
     healthCheckPath: /
     autoDeployTrigger: commit
