@@ -1,0 +1,20 @@
+name: Keep Render services warm
+
+# Render free-tier servisleri ~15 dk hareketsizlikte uykuya geçer ve sonraki
+# istekte 30-60 sn "cold start" gecikmesi yaşanır (bkz. STAJ_RAPORU_1_Agustos_2026.md).
+# Bu workflow API health endpoint'ini ve web kök sayfasını periyodik ping'leyerek
+# servisleri uyanık tutar. Demo/sunum öncesi manuel de tetiklenebilir.
+
+on:
+  schedule:
+    - cron: '*/10 6-22 * * *' # 06:00-22:00 UTC arası her 10 dakikada bir
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API health endpoint
+        run: curl -fsS --max-time 60 https://staj-projesi-api.onrender.com/health || true
+      - name: Ping web
+        run: curl -fsS --max-time 60 -o /dev/null https://staj-projesi-web.onrender.com || true

@@ -9,12 +9,23 @@ import {
   useRef,
   useState,
   useTransition,
+  type CSSProperties,
   type MouseEvent,
 } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowUpDown,
   Check,
+  GripVertical,
   ListTodo,
   MoreHorizontal,
   Trash2,
@@ -330,12 +341,31 @@ const TaskCard = memo(function TaskCard({
     task.deletion_status === "pending_admin_approval" ||
     task.deletion_status === "pending_user_approval";
 
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: task.id,
+      disabled: updating || claimPending,
+    });
+
+  const dragStyle: CSSProperties = {
+    touchAction: "none",
+    ...(transform
+      ? {
+          transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+          zIndex: 10,
+        }
+      : undefined),
+  };
+
   return (
     <div
+      ref={setNodeRef}
+      style={dragStyle}
       className={cn(
         "rounded-lg border-2 border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/50 hover:shadow-md dark:border dark:hover:border-primary/40",
         claimPending && "opacity-60",
         claimOverdue && "border-red-400/80 opacity-100 ring-1 ring-red-400/40",
+        isDragging && "opacity-40 shadow-lg",
       )}
     >
       <div className="mb-2 flex flex-wrap gap-1.5">
@@ -383,6 +413,22 @@ const TaskCard = memo(function TaskCard({
           ) : null}
         </button>
         <div className="flex shrink-0 items-start gap-1 pt-0.5">
+          {!updating && !claimPending ? (
+            <span
+              {...attributes}
+              {...listeners}
+              role="button"
+              tabIndex={0}
+              aria-label={t("projectBoard.dragHandle")}
+              title={t("projectBoard.dragHandle")}
+              className={cn(
+                "flex size-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing",
+                isDragging && "cursor-grabbing",
+              )}
+            >
+              <GripVertical className="size-3.5" />
+            </span>
+          ) : null}
           <AssigneeBadge assignee={task.assignee} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -465,11 +511,14 @@ const KanbanColumn = memo(function KanbanColumn({
   onDeleteRequest,
 }: KanbanColumnProps) {
   const { t } = useTranslation();
+  const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
     <section
+      ref={setNodeRef}
       className={cn(
-        "flex min-h-[280px] flex-col rounded-lg border-2 border-border border-t-4 bg-muted/40 p-3 shadow-sm dark:border dark:shadow-none",
+        "flex min-h-[280px] flex-col rounded-lg border-2 border-border border-t-4 bg-muted/40 p-3 shadow-sm transition-colors dark:border dark:shadow-none",
         columnAccent[status],
+        isOver && "bg-primary/5 ring-2 ring-primary/40",
       )}
     >
       <div className="mb-3 flex items-center justify-between gap-2 px-1">
@@ -795,6 +844,25 @@ export function ProjectTaskBoard({
     setSelectedTaskId(taskId);
   }, []);
 
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over) return;
+
+      const taskId = String(active.id);
+      const nextStatus = String(over.id) as TaskStatus;
+      const currentTask = optimisticTasks.find((task) => task.id === taskId);
+      if (!currentTask || currentTask.status === nextStatus) return;
+
+      handleStatusChange(taskId, nextStatus);
+    },
+    [optimisticTasks, handleStatusChange],
+  );
+
   const handleDeleteRequest = useCallback(
     (task: { id: string; title: string }) => {
       setTaskToDelete(task);
@@ -868,22 +936,24 @@ export function ProjectTaskBoard({
           {t("projectBoard.taskCount", { n: optimisticTasks.length })}
         </span>
       </div>
-      <div className="grid min-w-[720px] grid-cols-1 gap-4 md:grid-cols-3">
-        {columns.map(({ status, rawCount, visible }) => (
-          <KanbanColumn
-            key={status}
-            status={status}
-            rawCount={rawCount}
-            visible={visible}
-            prefs={columnPrefs[status]}
-            updatingId={updatingId}
-            onPrefsChange={handlePrefsChange}
-            onOpenTask={handleOpenTask}
-            onStatusChange={handleStatusChange}
-            onDeleteRequest={handleDeleteRequest}
-          />
-        ))}
-      </div>
+      <DndContext sensors={dndSensors} onDragEnd={handleDragEnd}>
+        <div className="grid min-w-[720px] grid-cols-1 gap-4 md:grid-cols-3">
+          {columns.map(({ status, rawCount, visible }) => (
+            <KanbanColumn
+              key={status}
+              status={status}
+              rawCount={rawCount}
+              visible={visible}
+              prefs={columnPrefs[status]}
+              updatingId={updatingId}
+              onPrefsChange={handlePrefsChange}
+              onOpenTask={handleOpenTask}
+              onStatusChange={handleStatusChange}
+              onDeleteRequest={handleDeleteRequest}
+            />
+          ))}
+        </div>
+      </DndContext>
 
       {selectedTaskId ? (
         <TaskDetailSheet

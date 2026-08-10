@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Not: Render otomatik deploy commit'e tetiklenir ve bu workflow'u beklemez.
+# Bu CI; build/test regresyonlarını görünür kılmak içindir (deploy'u bloklamaz).
+# Backend/Frontend lint adımları, kod tabanındaki mevcut (bu workflow'tan önceki)
+# @typescript-eslint teknik borcu nedeniyle bilinçli olarak `continue-on-error: true`.
+
+jobs:
+  backend:
+    name: Backend (NestJS)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Lint (bilgilendirme amaçlı, bloklamaz)
+        run: npx eslint "{src,test}/**/*.ts"
+        continue-on-error: true
+      - run: npm run build
+      - run: npm test -- --ci
+
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --include=dev
+      - run: npx tsc --noEmit
+      - name: Lint (bilgilendirme amaçlı, bloklamaz)
+        run: npm run lint
+        continue-on-error: true
+      - run: npm test -- --run
+      - run: npm run build
+
+  mobile:
+    name: Mobile (Flutter)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test

@@ -1,6 +1,8 @@
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { redisStore } from 'cache-manager-redis-yet';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -28,6 +30,8 @@ import { PersonalModule } from './personal/personal.module';
       // backend/.env yoksa kök .env (staj projesi/.env) yüklensin
       envFilePath: ['.env', '../.env'],
     }),
+    // Global rate limit: dakikada 100 istek/IP. Auth uçları @Throttle ile daha sıkı sınırlanır.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => {
@@ -74,6 +78,6 @@ import { PersonalModule } from './personal/personal.module';
     PersonalModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

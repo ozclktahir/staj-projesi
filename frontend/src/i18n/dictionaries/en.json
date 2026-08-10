@@ -423,6 +423,7 @@
     "deletionPending": "Deletion approval pending",
     "subtasks": "{done}/{total} Subtasks",
     "taskMenu": "Task menu",
+    "dragHandle": "Drag (drop on another column to change status)",
     "deleteTask": "Delete task",
     "taskStatus": "Task status",
     "emptyColumn": "No tasks in this column",

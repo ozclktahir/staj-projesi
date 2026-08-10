@@ -14,3 +14,6 @@ STAJ_RAPORU_*.md
 mobile/android/build/
 mobile/build/
 
+# Yerel proje notları / öneriler (repoya gönderilmesin)
+/CLAUDE.md
+

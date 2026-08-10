@@ -423,6 +423,7 @@
     "deletionPending": "Silme onayı bekleniyor",
     "subtasks": "{done}/{total} Alt Görev",
     "taskMenu": "Görev menüsü",
+    "dragHandle": "Sürükle (durumu değiştirmek için başka bir sütuna bırakın)",
     "deleteTask": "Görevi Sil",
     "taskStatus": "Görev durumu",
     "emptyColumn": "Bu kolonda görev yok",

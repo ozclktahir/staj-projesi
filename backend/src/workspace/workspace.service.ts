@@ -5,13 +5,17 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { MailService } from '../mail/mail.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
 
 @Injectable()
 export class WorkspaceService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly mailService: MailService,
+  ) {}
 
   /**
    * RLS uyumlu create: kullanıcı JWT’si ile istemci + owner_id = auth.uid().
@@ -170,6 +174,12 @@ export class WorkspaceService {
       throw new BadRequestException(invitationError.message);
     }
 
+    const { data: workspace } = await client
+      .from('workspaces')
+      .select('name')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
     // Davetli kayıtlıysa bildirim oluştur (mobil Kabul/Red için)
     const { data: profile } = await client
       .from('profiles')
@@ -178,12 +188,6 @@ export class WorkspaceService {
       .maybeSingle();
 
     if (profile?.id) {
-      const { data: workspace } = await client
-        .from('workspaces')
-        .select('name')
-        .eq('id', workspaceId)
-        .maybeSingle();
-
       await client.from('notifications').insert({
         workspace_id: workspaceId,
         user_id: profile.id,
@@ -198,6 +202,17 @@ export class WorkspaceService {
           role,
         },
         is_read: false,
+      });
+    }
+
+    // Davetli henüz kayıtlı değilse (profile yok) in-app bildirim ulaşmaz;
+    // SMTP yapılandırılıysa (opsiyonel) e-posta ile de haber verilir.
+    if (this.mailService.enabled) {
+      const workspaceName = workspace?.name ?? 'Bir çalışma alanı';
+      await this.mailService.send({
+        to: dto.email.trim(),
+        subject: `${workspaceName} — çalışma alanı daveti`,
+        html: `<p><strong>${workspaceName}</strong> sizi <strong>${role}</strong> rolüyle davet etti.</p><p>Daveti kabul etmek için uygulamaya giriş yapın.</p>`,
       });
     }
 
