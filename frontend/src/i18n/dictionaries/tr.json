@@ -248,6 +248,7 @@
     "overdueHint": "Teslim tarihi geçmiş",
     "activeMembers": "Aktif Üyeler",
     "activeMembersHint": "Çalışma alanındaki kişiler",
+    "activeMembersLiveHint": "Şu anda çevrimiçi",
     "statusDistribution": "Durum Dağılımı",
     "statusDesc": "Yapılacak · Devam ediyor · Tamamlandı",
     "priorityDensity": "Öncelik Yoğunluğu",

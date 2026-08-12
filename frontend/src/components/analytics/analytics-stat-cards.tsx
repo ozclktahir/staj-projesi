@@ -21,7 +21,13 @@ type StatCard = {
   iconWrap: string;
 };
 
-export function AnalyticsStatCards({ summary }: { summary: AnalyticsSummary }) {
+export function AnalyticsStatCards({
+  summary,
+  isMembersLive = false,
+}: {
+  summary: AnalyticsSummary;
+  isMembersLive?: boolean;
+}) {
   const { t } = useTranslation();
 
   const cards: StatCard[] = [
@@ -54,7 +60,9 @@ export function AnalyticsStatCards({ summary }: { summary: AnalyticsSummary }) {
     {
       label: t("analytics.activeMembers"),
       value: String(summary.activeMembers),
-      hint: t("analytics.activeMembersHint"),
+      hint: isMembersLive
+        ? t("analytics.activeMembersLiveHint")
+        : t("analytics.activeMembersHint"),
       icon: Users,
       accent: "border-amber-300/80 dark:border-amber-500/30",
       iconWrap:

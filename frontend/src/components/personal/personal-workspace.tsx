@@ -14,6 +14,8 @@ import {
   CalendarDays,
   Check,
   CheckSquare,
+  ChevronDown,
+  ChevronUp,
   Download,
   Flag,
   ImageIcon,
@@ -210,6 +212,48 @@ function dueTone(dueDate: string | null, completed: boolean): {
     className:
       "border-border bg-muted/50 text-muted-foreground",
   };
+}
+
+const NOTE_COLLAPSE_THRESHOLD = 220;
+
+/** Uzun not içeriği için "devamını göster/gizle" — dış tıklama (düzenleme) ile çakışmaz. */
+function ExpandableNoteContent({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > NOTE_COLLAPSE_THRESHOLD;
+  const display =
+    expanded || !isLong
+      ? text
+      : `${text.slice(0, NOTE_COLLAPSE_THRESHOLD).trimEnd()}…`;
+
+  return (
+    <div className="space-y-1">
+      <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+        {display || "—"}
+      </p>
+      {isLong ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded((v) => !v);
+          }}
+          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="size-3" />
+              Gizle
+            </>
+          ) : (
+            <>
+              <ChevronDown className="size-3" />
+              Devamını göster
+            </>
+          )}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 function isImageName(name: string): boolean {
@@ -1055,8 +1099,9 @@ export function PersonalWorkspace({
                       </time>
                     </div>
 
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       className={cn(
                         "w-full space-y-1 text-left",
                         note.isCompleted && "line-through opacity-60",
@@ -1067,14 +1112,20 @@ export function PersonalWorkspace({
                         setNoteContent(note.content);
                         setNoteTaskId(note.taskId ?? "none");
                       }}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" && e.key !== " ") return;
+                        e.preventDefault();
+                        setEditingNoteId(note.id);
+                        setNoteTitle(note.title);
+                        setNoteContent(note.content);
+                        setNoteTaskId(note.taskId ?? "none");
+                      }}
                     >
                       <p className="truncate text-sm font-semibold text-foreground">
                         {note.title || t("notes.untitled")}
                       </p>
-                      <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                        {note.content || "—"}
-                      </p>
-                    </button>
+                      <ExpandableNoteContent text={note.content} />
+                    </div>
 
                     <div className="flex items-center justify-end gap-1.5">
                       <Button

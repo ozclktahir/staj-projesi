@@ -389,12 +389,21 @@ export async function getCurrentUserProjects(
   }
 }
 
+/**
+ * `workspaceId` ile sorgular — `getCurrentUserProjects`'in sonucunu (projectIds)
+ * beklemeden, Promise.all içinde paralel çalışabilir (önceki tasarımda
+ * projectIds'e bağımlı olduğu için sıralı bir waterfall oluşturuyordu). RLS
+ * zaten Member/Guest için görünürlüğü kendi görevleriyle sınırlıyor (bkz.
+ * restrict_tasks_visibility_to_assignee.sql), bu yüzden sonuç kümesi aynı
+ * kalır.
+ */
 export async function getDashboardTaskStats(
-  projectIds: string[],
+  workspaceId: string | null | undefined,
 ): Promise<DashboardTaskStats> {
   const empty = { total: 0, inProgress: 0, done: 0 };
   try {
-    if (!projectIds.length) {
+    const ws = workspaceId?.trim();
+    if (!ws) {
       return empty;
     }
 
@@ -406,14 +415,14 @@ export async function getDashboardTaskStats(
     let { data, error } = await auth.supabase
       .from("tasks")
       .select("id, status, project_id")
-      .in("project_id", projectIds)
+      .eq("workspace_id", ws)
       .is("deleted_at", null);
 
     if (error?.message?.includes("deleted_at")) {
       ({ data, error } = await auth.supabase
         .from("tasks")
         .select("id, status, project_id")
-        .in("project_id", projectIds));
+        .eq("workspace_id", ws));
     }
 
     if (error || !data) {

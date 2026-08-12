@@ -603,8 +603,8 @@ export async function uploadPersonalFile(
     if (!(file instanceof File) || file.size <= 0) {
       return { success: false, error: "Geçerli bir dosya seçin." };
     }
-    if (file.size > 25 * 1024 * 1024) {
-      return { success: false, error: "Dosya boyutu 25 MB sınırını aşıyor." };
+    if (file.size > 50 * 1024 * 1024) {
+      return { success: false, error: "Dosya boyutu 50 MB sınırını aşıyor." };
     }
 
     const auth = await getAuthenticatedUser();

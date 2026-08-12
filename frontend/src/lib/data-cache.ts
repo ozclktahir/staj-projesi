@@ -79,9 +79,9 @@ export function getCachedWorkspaceMembers(
         };
       });
 
-      if (!isAdmin) {
-        members = members.filter((m) => m.id === userId);
-      }
+      // Görüntüleme herkese açık (view-only); rol değiştirme/çıkarma gibi
+      // düzenleme işlemleri istemci tarafında (MembersTable) `isAdmin`
+      // ile ayrıca kısıtlanır — bkz. members-table.tsx.
 
       return { members, isAdmin, role, isOwner };
     },

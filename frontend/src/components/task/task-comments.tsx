@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MoreHorizontal, Trash2, UserRound } from "lucide-react";
+import { ChevronDown, ChevronUp, MoreHorizontal, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { createComment, deleteComment } from "@/app/actions/comments";
 import { Button } from "@/components/ui/button";
@@ -19,12 +19,17 @@ type TaskCommentsProps = {
   taskId: string;
   comments: TaskComment[];
   onChange: (comments: TaskComment[]) => void;
+  /** Kapalıysa yalnızca başlık + sayaç görünür (varsayılan: açık). */
+  open?: boolean;
+  onToggleOpen?: () => void;
 };
 
 export function TaskComments({
   taskId,
   comments,
   onChange,
+  open = true,
+  onToggleOpen,
 }: TaskCommentsProps) {
   const { locale } = useTranslation();
   const [draft, setDraft] = useState("");
@@ -84,29 +89,47 @@ export function TaskComments({
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold text-foreground">Yorumlar</h3>
+      <button
+        type="button"
+        onClick={onToggleOpen}
+        disabled={!onToggleOpen}
+        className="flex w-full items-center justify-between text-left disabled:cursor-default"
+      >
+        <h3 className="text-sm font-semibold text-foreground">
+          Yorumlar {comments.length > 0 ? `(${comments.length})` : ""}
+        </h3>
+        {onToggleOpen ? (
+          open ? (
+            <ChevronUp className="size-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="size-4 text-muted-foreground" />
+          )
+        ) : null}
+      </button>
 
-      <div className="space-y-2">
-        <textarea
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          rows={2}
-          placeholder="Yorum yaz…"
-          disabled={submitting}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
-        />
-        <Button
-          type="button"
-          size="sm"
-          className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
-          disabled={!draft.trim() || submitting}
-          onClick={() => void handleAdd()}
-        >
-          {submitting ? "Gönderiliyor…" : "Yorum Yap"}
-        </Button>
-      </div>
+      {!open ? null : (
+        <>
+          <div className="space-y-2">
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              rows={2}
+              placeholder="Yorum yaz…"
+              disabled={submitting}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+              disabled={!draft.trim() || submitting}
+              onClick={() => void handleAdd()}
+            >
+              {submitting ? "Gönderiliyor…" : "Yorum Yap"}
+            </Button>
+          </div>
 
-      {comments.length === 0 ? (
+          {comments.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
           Henüz yorum yok. İlk yorumunu ekle.
         </div>
@@ -192,6 +215,8 @@ export function TaskComments({
             );
           })}
         </ul>
+          )}
+        </>
       )}
     </section>
   );

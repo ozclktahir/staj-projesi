@@ -43,3 +43,30 @@ export function setCachedWorkspaceMembers(
 ): void {
   membersCache.set(workspaceId, { value: payload, at: Date.now() });
 }
+
+/**
+ * Sekme-içi anlık senkron: görev sahiplenme (claim) kabul/red gibi, farklı bir
+ * bileşenden (bildirim menüsü) tetiklenip Kanban board'un HEMEN yansıtması
+ * gereken olaylar için. router.refresh()/realtime'a ek, onlardan bağımsız —
+ * cache/realtime gecikmesi olsa bile UI anında doğru durumu gösterir.
+ */
+export type TaskAssignmentChangeEvent =
+  | { taskId: string; kind: "accepted" }
+  | { taskId: string; kind: "rejected" };
+
+type TaskAssignmentListener = (event: TaskAssignmentChangeEvent) => void;
+
+const taskAssignmentListeners = new Set<TaskAssignmentListener>();
+
+export function emitTaskAssignmentChange(
+  event: TaskAssignmentChangeEvent,
+): void {
+  for (const listener of taskAssignmentListeners) listener(event);
+}
+
+export function onTaskAssignmentChange(
+  listener: TaskAssignmentListener,
+): () => void {
+  taskAssignmentListeners.add(listener);
+  return () => taskAssignmentListeners.delete(listener);
+}

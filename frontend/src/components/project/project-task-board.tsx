@@ -25,7 +25,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowUpDown,
   Check,
-  GripVertical,
   ListTodo,
   MoreHorizontal,
   Trash2,
@@ -36,6 +35,7 @@ import { loadMoreProjectTasks } from "@/app/actions/tasks";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { DeleteTaskModal } from "@/components/delete-task-modal";
 import { TaskDetailSheet } from "@/components/task-detail-sheet";
+import { onTaskAssignmentChange } from "@/lib/client-cache";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -361,8 +361,19 @@ const TaskCard = memo(function TaskCard({
     <div
       ref={setNodeRef}
       style={dragStyle}
+      {...attributes}
+      {...listeners}
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(task.id)}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        onOpen(task.id);
+      }}
       className={cn(
-        "rounded-lg border-2 border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/50 hover:shadow-md dark:border dark:hover:border-primary/40",
+        "rounded-lg border-2 border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:border dark:hover:border-primary/40",
+        !updating && !claimPending && "cursor-grab active:cursor-grabbing",
         claimPending && "opacity-60",
         claimOverdue && "border-red-400/80 opacity-100 ring-1 ring-red-400/40",
         isDragging && "opacity-40 shadow-lg",
@@ -390,11 +401,7 @@ const TaskCard = memo(function TaskCard({
         ) : null}
       </div>
       <div className="flex items-start justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => onOpen(task.id)}
-          className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold leading-snug text-foreground">
             {task.title}
           </p>
@@ -411,24 +418,8 @@ const TaskCard = memo(function TaskCard({
               })}
             </p>
           ) : null}
-        </button>
+        </div>
         <div className="flex shrink-0 items-start gap-1 pt-0.5">
-          {!updating && !claimPending ? (
-            <span
-              {...attributes}
-              {...listeners}
-              role="button"
-              tabIndex={0}
-              aria-label={t("projectBoard.dragHandle")}
-              title={t("projectBoard.dragHandle")}
-              className={cn(
-                "flex size-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing",
-                isDragging && "cursor-grabbing",
-              )}
-            >
-              <GripVertical className="size-3.5" />
-            </span>
-          ) : null}
           <AssigneeBadge assignee={task.assignee} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -711,6 +702,29 @@ export function ProjectTaskBoard({
       void client.removeChannel(channel);
     };
   }, [projectId]);
+
+  // Task claim kabul/red bildirim menüsünden geldiğinde board'u anında güncelle
+  // (router.refresh()/realtime beklemeden — bkz. client-cache.ts).
+  useEffect(() => {
+    return onTaskAssignmentChange((event) => {
+      if (event.kind === "accepted") {
+        setTasks((prev) =>
+          prev.map((task) =>
+            task.id === event.taskId
+              ? {
+                  ...task,
+                  assignment_status: "accepted",
+                  assignment_pending_at: null,
+                }
+              : task,
+          ),
+        );
+      } else {
+        setTasks((prev) => prev.filter((task) => task.id !== event.taskId));
+        setSelectedTaskId((cur) => (cur === event.taskId ? null : cur));
+      }
+    });
+  }, []);
 
   const columns = useMemo(() => {
     const q = debouncedSearch.trim().toLocaleLowerCase("tr-TR");

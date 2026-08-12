@@ -12,6 +12,7 @@ import { QuickActivityFeed } from "@/components/analytics/quick-activity-feed";
 import { UpcomingDeadlines } from "@/components/analytics/upcoming-deadlines";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n/use-translation";
+import { useWorkspacePresence } from "@/hooks/use-workspace-presence";
 import { cn } from "@/lib/utils";
 
 const StatusDonutCard = dynamic(
@@ -53,6 +54,7 @@ type AnalyticsDashboardProps = {
   recentLogs?: ActivityLogItem[];
   title?: string;
   description?: string;
+  workspaceId?: string | null;
 };
 
 export function AnalyticsDashboard({
@@ -61,15 +63,23 @@ export function AnalyticsDashboard({
   recentLogs = [],
   title,
   description,
+  workspaceId = null,
 }: AnalyticsDashboardProps) {
   const { t } = useTranslation();
   const resolvedTitle = title ?? t("dashboardPage.commandCenter");
   const resolvedDescription =
     description ?? t("dashboardPage.commandCenterDesc");
+  const presence = useWorkspacePresence(workspaceId);
+  // Presence kanalı henüz senkronlaşmadıysa sunucudan gelen statik üye
+  // sayısına geri düş; hazır olunca gerçek zamanlı çevrimiçi sayısı gösterilir.
+  const summary = presence.ready
+    ? { ...data.summary, activeMembers: presence.onlineCount }
+    : data.summary;
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
     align: "start",
     dragFree: false,
+    watchDrag: false,
   });
   const [page, setPage] = useState(0);
 
@@ -159,10 +169,7 @@ export function AnalyticsDashboard({
       <div className="overflow-hidden" ref={emblaRef}>
         <div className="flex touch-pan-y">
           <div className="min-w-0 shrink-0 grow-0 basis-full pr-1">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {t("dashboard.pageMain")}
-            </p>
-            <AnalyticsStatCards summary={data.summary} />
+            <AnalyticsStatCards summary={summary} isMembersLive={presence.ready} />
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
               <StatusDonutCard data={data.byStatus} />
               <PriorityBarCard data={data.byPriority} />

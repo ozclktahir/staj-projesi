@@ -248,6 +248,7 @@
     "overdueHint": "Past due date",
     "activeMembers": "Active members",
     "activeMembersHint": "People in this workspace",
+    "activeMembersLiveHint": "Currently online",
     "statusDistribution": "Status distribution",
     "statusDesc": "To do · In progress · Done",
     "priorityDensity": "Priority density",

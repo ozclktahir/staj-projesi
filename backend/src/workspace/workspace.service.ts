@@ -402,9 +402,8 @@ export class WorkspaceService {
       };
     });
 
-    if (!isAdmin) {
-      members = members.filter((m) => m.id === userId);
-    }
+    // Görüntüleme herkese açık (view-only) — rol değiştirme/çıkarma zaten
+    // ayrı uçlarda (@Roles('Admin'|'OWNER')) admin-only kısıtlanıyor.
 
     members.sort((a, b) =>
       a.displayName.localeCompare(b.displayName, 'tr', {

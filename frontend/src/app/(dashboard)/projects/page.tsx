@@ -21,19 +21,18 @@ async function ProjectsContent({
   const params = await searchParams;
   const workspaceId = await resolveActiveWorkspaceId(params.workspaceId ?? null);
 
-  const [{ userName, projects }, auth] = await Promise.all([
+  // Üçü de birbirinden bağımsız — tek Promise.all ile paralel (önceden stats,
+  // projects'in sonucunu (projectIds) beklediği için 2 aşamalı bir waterfall'du).
+  const [{ userName, projects }, auth, stats] = await Promise.all([
     getCurrentUserProjects(workspaceId),
     getAuthenticatedUser(),
+    getDashboardTaskStats(workspaceId),
   ]);
 
-  const projectIds = projects.map((p) => p.id);
-
-  const [stats, roleCtx] = await Promise.all([
-    getDashboardTaskStats(projectIds),
+  const roleCtx =
     workspaceId && auth
-      ? resolveWorkspaceRole(auth.supabase, workspaceId, auth.user.id)
-      : Promise.resolve(null),
-  ]);
+      ? await resolveWorkspaceRole(auth.supabase, workspaceId, auth.user.id)
+      : null;
 
   const canCreateProject = Boolean(roleCtx?.isAdmin);
 

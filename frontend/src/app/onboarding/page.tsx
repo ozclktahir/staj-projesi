@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
+import { getMyPendingInvitations } from "@/app/actions/notifications";
 import { ensureWorkspaceAccess } from "@/app/actions/workspace-access";
-import { OnboardingCreateWorkspace } from "@/components/onboarding-create-workspace";
+import { OnboardingGate } from "@/components/onboarding-gate";
 
 export default async function OnboardingPage() {
   const access = await ensureWorkspaceAccess();
@@ -15,6 +16,10 @@ export default async function OnboardingPage() {
     redirect("/clear-session");
   }
 
+  const invitesResult = await getMyPendingInvitations();
+  const invitations = invitesResult.success ? invitesResult.invitations : [];
+  const hasInvitations = invitations.length > 0;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
       <div className="w-full max-w-md space-y-6">
@@ -23,15 +28,16 @@ export default async function OnboardingPage() {
             İş Yönetim Sistemi
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Workspace Oluştur
+            {hasInvitations ? "Bekleyen Davetin Var" : "Workspace Oluştur"}
           </h1>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            İlk çalışma alanını oluştur. Bu workspace&apos;in sahibi (Admin)
-            olursun; proje ve görev ekleyebilir, ekibini davet edebilirsin.
+            {hasInvitations
+              ? "Seni bir çalışma alanına davet ettiler. Kabul edersen doğrudan o workspace'e geçersin; reddedersen kendi workspace'ini oluşturabilirsin."
+              : "İlk çalışma alanını oluştur. Bu workspace'in sahibi (Admin) olursun; proje ve görev ekleyebilir, ekibini davet edebilirsin."}
           </p>
         </div>
 
-        <OnboardingCreateWorkspace />
+        <OnboardingGate invitations={invitations} />
       </div>
     </div>
   );

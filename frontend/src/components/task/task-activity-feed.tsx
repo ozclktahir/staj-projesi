@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { History, UserRound } from "lucide-react";
+import { ChevronDown, ChevronUp, History, UserRound } from "lucide-react";
 import {
   getTaskActivityLogs,
   type ActivityLogItem,
@@ -15,9 +15,17 @@ import { useTranslation } from "@/i18n/use-translation";
 type TaskActivityFeedProps = {
   taskId: string;
   refreshKey?: number;
+  /** Kapalıysa yalnızca başlık + sayaç görünür (varsayılan: açık). */
+  open?: boolean;
+  onToggleOpen?: () => void;
 };
 
-export function TaskActivityFeed({ taskId, refreshKey = 0 }: TaskActivityFeedProps) {
+export function TaskActivityFeed({
+  taskId,
+  refreshKey = 0,
+  open = true,
+  onToggleOpen,
+}: TaskActivityFeedProps) {
   const { locale } = useTranslation();
   const [logs, setLogs] = useState<ActivityLogItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,12 +74,28 @@ export function TaskActivityFeed({ taskId, refreshKey = 0 }: TaskActivityFeedPro
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center gap-2 text-foreground">
-        <History className="size-4 text-primary" />
-        <h3 className="text-sm font-semibold">Aktivite Geçmişi</h3>
-      </div>
+      <button
+        type="button"
+        onClick={onToggleOpen}
+        disabled={!onToggleOpen}
+        className="flex w-full items-center justify-between text-left disabled:cursor-default"
+      >
+        <div className="flex items-center gap-2 text-foreground">
+          <History className="size-4 text-primary" />
+          <h3 className="text-sm font-semibold">
+            Aktivite Geçmişi {logs.length > 0 ? `(${logs.length})` : ""}
+          </h3>
+        </div>
+        {onToggleOpen ? (
+          open ? (
+            <ChevronUp className="size-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="size-4 text-muted-foreground" />
+          )
+        ) : null}
+      </button>
 
-      {loading ? (
+      {!open ? null : loading ? (
         <p className="text-xs text-muted-foreground">Yükleniyor…</p>
       ) : logs.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">

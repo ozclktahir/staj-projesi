@@ -8,6 +8,7 @@ import {
   ChevronsUpDown,
   FolderKanban,
   LayoutDashboard,
+  LogOut,
   NotebookPen,
   PanelLeftClose,
   PanelLeftOpen,
@@ -17,6 +18,8 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { toast } from "sonner";
+import { leaveWorkspace } from "@/app/actions/workspaces";
 import { CreateWorkspaceModal } from "@/components/create-workspace-modal";
 import { DeleteWorkspaceModal } from "@/components/delete-workspace-modal";
 import { InviteMemberModal } from "@/components/invite-member-modal";
@@ -136,8 +139,38 @@ function SidebarInner({
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const canInvite = isAdminRole(activeWorkspace?.role);
+  const isWorkspaceOwner =
+    String(activeWorkspace?.role ?? "").toUpperCase() === "OWNER";
+
+  async function handleLeaveWorkspace() {
+    if (!activeWorkspace || leaving) return;
+    const confirmed = window.confirm(
+      `"${activeWorkspace.name}" çalışma alanından ayrılmak istediğine emin misin?`,
+    );
+    if (!confirmed) return;
+
+    setLeaving(true);
+    try {
+      const result = await leaveWorkspace(activeWorkspace.id);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`"${activeWorkspace.name}" çalışma alanından ayrıldın`);
+      void afterWorkspaceDeleted(activeWorkspace.id, result.nextWorkspaceId);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Ayrılma işlemi sırasında bir hata oluştu.",
+      );
+    } finally {
+      setLeaving(false);
+    }
+  }
   const workspaceInitials = (activeWorkspace?.name ?? "İY")
     .slice(0, 2)
     .toUpperCase();
@@ -262,6 +295,19 @@ function SidebarInner({
               <Trash2 className="size-4" />
               {t("sidebar.deleteWorkspace")}
             </DropdownMenuItem>
+            {activeWorkspace && !isWorkspaceOwner ? (
+              <DropdownMenuItem
+                className="cursor-pointer gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
+                disabled={leaving}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  void handleLeaveWorkspace();
+                }}
+              >
+                <LogOut className="size-4" />
+                {leaving ? "Ayrılıyor…" : "Çalışma Alanından Ayrıl"}
+              </DropdownMenuItem>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
 

@@ -26,7 +26,7 @@ export type DeleteTaskWorkflowResult =
   | { success: false; error: string };
 
 export type RespondResult =
-  | { success: true; message: string }
+  | { success: true; message: string; taskId?: string }
   | { success: false; error: string };
 
 function revalidateTaskPaths(projectId: string | null) {
@@ -599,13 +599,15 @@ export async function respondToTaskClaim(
     const title = typeof task.title === "string" ? task.title : "görev";
 
     if (decision === "accept") {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from("tasks")
         .update({
           assignment_status: "accepted" satisfies TaskAssignmentStatus,
           assignment_pending_at: null,
         })
-        .eq("id", taskId);
+        .eq("id", taskId)
+        .select("id")
+        .maybeSingle();
 
       if (error) {
         if (error.message.includes("assignment_status")) {
@@ -617,15 +619,27 @@ export async function respondToTaskClaim(
         }
         return { success: false, error: error.message };
       }
+      // RLS satırı sessizce engellemiş olabilir (error=null, data=null) — bunu
+      // açık bir hata olarak yüzeye çıkar, aksi hâlde UI yanlışlıkla "kabul
+      // edildi" der ama görev DB'de hâlâ "pending" kalır.
+      if (!updated) {
+        return {
+          success: false,
+          error:
+            "Görev güncellenemedi (yetki/RLS engeli olabilir). Lütfen tekrar deneyin veya yöneticinize bildirin.",
+        };
+      }
     } else {
       // Red: görevi silme — arşivle (rejected) ve adminleri bilgilendir
-      const { error: rejectError } = await supabase
+      const { data: rejected, error: rejectError } = await supabase
         .from("tasks")
         .update({
           assignment_status: "rejected" satisfies TaskAssignmentStatus,
           assignment_pending_at: null,
         })
-        .eq("id", taskId);
+        .eq("id", taskId)
+        .select("id")
+        .maybeSingle();
 
       if (rejectError) {
         if (rejectError.message.includes("assignment_status")) {
@@ -636,6 +650,13 @@ export async function respondToTaskClaim(
           };
         }
         return { success: false, error: rejectError.message };
+      }
+      if (!rejected) {
+        return {
+          success: false,
+          error:
+            "Görev güncellenemedi (yetki/RLS engeli olabilir). Lütfen tekrar deneyin veya yöneticinize bildirin.",
+        };
       }
     }
 
@@ -712,6 +733,7 @@ export async function respondToTaskClaim(
     revalidateTaskPaths(projectId);
     return {
       success: true,
+      taskId,
       message:
         decision === "accept"
           ? "Görev kabul edildi."

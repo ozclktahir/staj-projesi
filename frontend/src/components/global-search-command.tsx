@@ -135,6 +135,7 @@ export function GlobalSearchCommand() {
         onOpenChange={setOpen}
         title={t("search.title")}
         description={t("search.description")}
+        shouldFilter={false}
       >
         <CommandInput
           placeholder={t("search.inputPlaceholder")}

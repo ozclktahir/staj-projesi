@@ -57,6 +57,7 @@ async function DashboardContent({
         data={analyticsResult.data}
         upcomingItems={deadlinesResult.success ? deadlinesResult.items : []}
         recentLogs={activityResult.success ? activityResult.logs : []}
+        workspaceId={workspaceId}
       />
     </div>
   );

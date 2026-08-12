@@ -13,6 +13,11 @@ import {
   getSubtasks,
   toggleSubtask,
 } from "@/app/actions/subtasks";
+import {
+  getTaskAssignees,
+  setTaskAssignees,
+  type TaskAssigneeOption,
+} from "@/app/actions/task-assignees";
 import { updateTask } from "@/app/actions/update-task";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { getWorkspaceMembers } from "@/app/actions/workspace-members";
@@ -103,6 +108,15 @@ export function TaskDetailSheet({
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
+  const [extraAssignees, setExtraAssignees] = useState<TaskAssigneeOption[]>(
+    [],
+  );
+  const [selectedExtraAssigneeIds, setSelectedExtraAssigneeIds] = useState<
+    string[]
+  >([]);
+  const [savingAssignees, setSavingAssignees] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(true);
+  const [activityOpen, setActivityOpen] = useState(true);
 
   const applyTaskToForm = useCallback((next: ProjectTask) => {
     setTask(next);
@@ -140,14 +154,21 @@ export function TaskDetailSheet({
           ? getWorkspaceMembers(wsHint)
           : Promise.resolve(null);
 
-      const [details, subResult, commentResult, attachmentResult, membersResult] =
-        await Promise.all([
-          getTaskDetails(id),
-          getSubtasks(id),
-          getTaskComments(id),
-          getTaskAttachments(id),
-          membersPromise,
-        ]);
+      const [
+        details,
+        subResult,
+        commentResult,
+        attachmentResult,
+        membersResult,
+        assigneesResult,
+      ] = await Promise.all([
+        getTaskDetails(id),
+        getSubtasks(id),
+        getTaskComments(id),
+        getTaskAttachments(id),
+        membersPromise,
+        getTaskAssignees(id),
+      ]);
 
       if (!details.success) {
         if (!seed) setTask(null);
@@ -163,6 +184,11 @@ export function TaskDetailSheet({
       setAttachments(
         attachmentResult.success ? attachmentResult.attachments : [],
       );
+      const nextExtraAssignees = assigneesResult.success
+        ? assigneesResult.assignees
+        : [];
+      setExtraAssignees(nextExtraAssignees);
+      setSelectedExtraAssigneeIds(nextExtraAssignees.map((a) => a.id));
       setLoading(false);
 
       if (
@@ -496,6 +522,30 @@ export function TaskDetailSheet({
     router.refresh();
   }
 
+  async function handleSaveExtraAssignees() {
+    if (!task || savingAssignees) return;
+    setSavingAssignees(true);
+    try {
+      const result = await setTaskAssignees(
+        task.id,
+        selectedExtraAssigneeIds,
+      );
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      setExtraAssignees(result.assignees);
+      setSelectedExtraAssigneeIds(result.assignees.map((a) => a.id));
+      toast.success("Atananlar güncellendi");
+      setActivityKey((k) => k + 1);
+    } catch (error) {
+      console.error("[TaskDetailSheet] setTaskAssignees:", error);
+      toast.error("Atananlar güncellenirken bir hata oluştu.");
+    } finally {
+      setSavingAssignees(false);
+    }
+  }
+
   async function handleAddSubtask() {
     if (!task || !subtaskDraft.trim() || subtaskBusy) return;
     setSubtaskBusy(true);
@@ -712,6 +762,85 @@ export function TaskDetailSheet({
               </div>
 
               <div className="space-y-1.5">
+                <Label className="text-xs">
+                  Ek Atananlar (çoklu — {selectedExtraAssigneeIds.length})
+                </Label>
+                {isAdmin ? (
+                  <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                    {members.length === 0 ? (
+                      <p className="px-1 py-1 text-xs text-muted-foreground">
+                        Üye bulunamadı.
+                      </p>
+                    ) : (
+                      members.map((member) => {
+                        const label =
+                          cleanText(member.fullName) ||
+                          cleanText(member.displayName) ||
+                          emailLocalPart(member.email) ||
+                          cleanText(member.email) ||
+                          "";
+                        if (!label) return null;
+                        const checked = selectedExtraAssigneeIds.includes(
+                          member.id,
+                        );
+                        return (
+                          <label
+                            key={member.id}
+                            className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                setSelectedExtraAssigneeIds((prev) =>
+                                  checked
+                                    ? prev.filter((v) => v !== member.id)
+                                    : [...prev, member.id],
+                                );
+                              }}
+                              className="size-3.5 rounded border-border accent-primary"
+                            />
+                            <span className="truncate text-foreground">
+                              {label}
+                            </span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {extraAssignees.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Ek atanan yok.
+                      </p>
+                    ) : (
+                      extraAssignees.map((a) => (
+                        <span
+                          key={a.id}
+                          className="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground"
+                        >
+                          {a.displayName}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                )}
+                {isAdmin ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={savingAssignees}
+                    onClick={() => void handleSaveExtraAssignees()}
+                    className="rounded-lg"
+                  >
+                    {savingAssignees ? "Kaydediliyor…" : "Atananları Kaydet"}
+                  </Button>
+                ) : null}
+              </div>
+
+              <div className="space-y-1.5">
                 <Label htmlFor="task-desc" className="text-xs">
                   Açıklama
                 </Label>
@@ -863,9 +992,16 @@ export function TaskDetailSheet({
                 setComments(next);
                 setActivityKey((k) => k + 1);
               }}
+              open={commentsOpen}
+              onToggleOpen={() => setCommentsOpen((v) => !v)}
             />
 
-            <TaskActivityFeed taskId={task.id} refreshKey={activityKey} />
+            <TaskActivityFeed
+              taskId={task.id}
+              refreshKey={activityKey}
+              open={activityOpen}
+              onToggleOpen={() => setActivityOpen((v) => !v)}
+            />
           </div>
         ) : null}
       </SheetContent>

@@ -52,14 +52,16 @@ export class TaskController {
   @Get()
   @ApiOperation({
     summary:
-      'Çalışma alanına ait görevleri arama, filtreleme ve sayfalama ile listeler',
+      'Çalışma alanına ait görevleri arama, filtreleme ve sayfalama ile listeler. ' +
+      'OWNER/Admin tüm görevleri, Member/Guest yalnızca kendine atanmış görevleri görür.',
   })
   @ApiResponse({ status: 200, description: 'Görevler listelendi.' })
   findAll(
     @Param('workspaceId') workspaceId: string,
+    @GetUser() user: { id: string },
     @Query() filterDto: GetTasksFilterDto,
   ) {
-    return this.taskService.findAll(workspaceId, filterDto);
+    return this.taskService.findAll(workspaceId, user.id, filterDto);
   }
 
   @Get('rejected')

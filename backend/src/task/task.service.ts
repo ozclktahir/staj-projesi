@@ -78,7 +78,11 @@ export class TaskService {
     return data;
   }
 
-  async findAll(workspaceId: string, filterDto: GetTasksFilterDto) {
+  async findAll(
+    workspaceId: string,
+    actorUserId: string,
+    filterDto: GetTasksFilterDto,
+  ) {
     const client = this.supabaseService.getClient();
     const { search, status, priority, assignee_id, parent_task_id, projectId } =
       filterDto;
@@ -90,6 +94,15 @@ export class TaskService {
       .select('*', { count: 'exact' })
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null);
+
+    // Member/Guest: yalnızca kendine atanmış (veya kendi oluşturduğu)
+    // görevleri görebilir; OWNER/Admin workspace'teki tüm görevleri görür.
+    const isAdmin = await this.isWorkspaceAdmin(workspaceId, actorUserId);
+    if (!isAdmin) {
+      query = query.or(
+        `assignee_id.eq.${actorUserId},assigned_to.eq.${actorUserId},created_by.eq.${actorUserId}`,
+      );
+    }
 
     if (status) {
       query = query.eq('status', status);

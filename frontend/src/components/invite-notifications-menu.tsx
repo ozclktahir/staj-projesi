@@ -23,6 +23,7 @@ import {
   markNotificationRead,
   respondToWorkspaceInvite,
 } from "@/app/actions/notifications";
+import { emitTaskAssignmentChange } from "@/lib/client-cache";
 import {
   approveTaskDeletion,
   rejectTaskDeletion,
@@ -431,6 +432,18 @@ export function InviteNotificationsMenu({
                 "Silme işlemi veritabanı engeli nedeniyle başarısız oldu",
             );
             return;
+          }
+
+          // Kanban board'u anında haberdar et — router.refresh()/realtime
+          // gecikmesini beklemeden "onay bekliyor" rozetini temizler.
+          if (kind !== "task_deletion_request") {
+            const taskId = taskIdFromNotification(notification);
+            if (taskId) {
+              emitTaskAssignmentChange({
+                taskId,
+                kind: action === "accept" ? "accepted" : "rejected",
+              });
+            }
           }
 
           setResolvedActionIds((prev) => new Set(prev).add(notification.id));
