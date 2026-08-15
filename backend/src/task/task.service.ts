@@ -171,6 +171,105 @@ export class TaskService {
     return data;
   }
 
+  /**
+   * Görevin ek atananlarını (task_assignees — web'deki 12 Ağustos çoklu
+   * atama katmanı, database/migrations/add_task_assignees_multi.sql)
+   * listeler. Web bu tabloya doğrudan Supabase RLS ile erişiyor; mobil
+   * NestJS üzerinden geçtiği için bu uç, web'in getTaskAssignees() server
+   * action'ının NestJS karşılığıdır.
+   */
+  async listAssignees(workspaceId: string, taskId: string) {
+    await this.findOne(workspaceId, taskId);
+    const client = this.supabaseService.getClient();
+
+    const { data: rows, error } = await client
+      .from('task_assignees')
+      .select('user_id')
+      .eq('task_id', taskId);
+
+    if (error) {
+      if (this.isMissingAssigneesTable(error)) return [];
+      throw new BadRequestException(error.message);
+    }
+
+    const userIds = (rows ?? [])
+      .map((row) => row.user_id as string)
+      .filter(Boolean);
+    if (userIds.length === 0) return [];
+
+    const { data: profiles, error: profileError } = await client
+      .from('profiles')
+      .select('id, email, full_name, avatar_url, first_name, last_name')
+      .in('id', userIds);
+
+    const byId = new Map(
+      (profileError ? [] : profiles ?? []).map((p: Record<string, unknown>) => [
+        p.id as string,
+        p,
+      ]),
+    );
+
+    return userIds.map((id) => {
+      const profile = byId.get(id);
+      const displayName =
+        (profile?.full_name as string | undefined)?.trim() ||
+        [profile?.first_name, profile?.last_name]
+          .filter(Boolean)
+          .join(' ')
+          .trim() ||
+        (profile?.email as string | undefined) ||
+        id;
+      return {
+        id,
+        displayName,
+        avatarUrl: (profile?.avatar_url as string | null | undefined) ?? null,
+      };
+    });
+  }
+
+  /**
+   * Ek atanan listesini TAM olarak bu kümeyle değiştirir. Web'in
+   * task_assignees_insert_admin/delete_admin RLS politikalarıyla aynı kural
+   * (yalnızca workspace admin/OWNER düzenleyebilir) NestJS tarafında
+   * controller'daki @Roles('OWNER','Admin') + WorkspaceRoleGuard ile uygulanır.
+   */
+  async setAssignees(workspaceId: string, taskId: string, userIds: string[]) {
+    await this.findOne(workspaceId, taskId);
+    const client = this.supabaseService.getClient();
+
+    const unique = [...new Set((userIds ?? []).filter(Boolean))];
+
+    const { error: deleteError } = await client
+      .from('task_assignees')
+      .delete()
+      .eq('task_id', taskId);
+
+    if (deleteError && !this.isMissingAssigneesTable(deleteError)) {
+      throw new BadRequestException(deleteError.message);
+    }
+
+    if (unique.length > 0) {
+      const { error: insertError } = await client
+        .from('task_assignees')
+        .insert(unique.map((userId) => ({ task_id: taskId, user_id: userId })));
+
+      if (insertError) {
+        if (this.isMissingAssigneesTable(insertError)) {
+          throw new BadRequestException(
+            "task_assignees tablosu yok. add_task_assignees_multi.sql migration'ını Supabase'te çalıştırın.",
+          );
+        }
+        throw new BadRequestException(insertError.message);
+      }
+    }
+
+    return this.listAssignees(workspaceId, taskId);
+  }
+
+  private isMissingAssigneesTable(error: { message?: string }): boolean {
+    return Boolean(error?.message?.includes('task_assignees'));
+  }
+
   async update(
     workspaceId: string,
     taskId: string,

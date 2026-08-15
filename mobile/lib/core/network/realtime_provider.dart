@@ -13,6 +13,7 @@ import '../../features/tasks/providers/task_provider.dart';
 import '../../features/workspace/providers/project_provider.dart';
 import '../../features/workspace/providers/workspace_provider.dart';
 import 'socket_service.dart';
+import 'workspace_presence_provider.dart';
 
 final socketServiceProvider = Provider<SocketService>((ref) {
   final service = SocketService();
@@ -61,6 +62,7 @@ final realtimeConnectionProvider = Provider<void>((ref) {
       userId == null ||
       userId.isEmpty) {
     socket.disconnect();
+    ref.read(workspacePresenceProvider.notifier).reset();
     ref.onDispose(() {
       debounce?.cancel();
       socket.disconnect();
@@ -91,10 +93,26 @@ final realtimeConnectionProvider = Provider<void>((ref) {
         scheduleInvalidate(activityLogProvider);
       });
     },
+    onPresenceUpdated: (payload) {
+      // Debounce'suz — presence anlık olmalı, KPI kartı tek int render eder.
+      try {
+        final map = payload is Map ? payload : <String, dynamic>{};
+        final payloadWorkspaceId = map['workspaceId'] as String?;
+        if (payloadWorkspaceId != null && payloadWorkspaceId != workspaceId) {
+          return;
+        }
+        final raw = map['onlineUserIds'];
+        final ids = raw is List ? raw.whereType<String>() : const <String>[];
+        ref.read(workspacePresenceProvider.notifier).update(ids);
+      } catch (error, stack) {
+        debugPrint('[Realtime] presence handler failed: $error\n$stack');
+      }
+    },
   );
 
   ref.onDispose(() {
     debounce?.cancel();
     socket.disconnect();
+    ref.read(workspacePresenceProvider.notifier).reset();
   });
 });

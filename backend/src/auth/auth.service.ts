@@ -227,6 +227,95 @@ export class AuthService {
     return { message: 'Çıkış işlemi başarıyla tamamlandı.' };
   }
 
+  /**
+   * Verilen access/refresh token çiftiyle TAZE bir Supabase istemcisi kurar
+   * (paylaşılan singleton ASLA kullanılmaz — bkz. SupabaseService.createEphemeralClient).
+   */
+  private async sessionClient(accessToken: string, refreshToken: string) {
+    const client = this.supabaseService.createEphemeralClient();
+    const { error } = await client.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error) {
+      throw new UnauthorizedException('Oturum doğrulanamadı: ' + error.message);
+    }
+    return client;
+  }
+
+  /** Web'deki needsMfaChallenge() ile aynı mantık: AAL1→AAL2 yükseltmesi gerekiyor mu? */
+  async mfaStatus(accessToken: string, refreshToken: string) {
+    const client = await this.sessionClient(accessToken, refreshToken);
+    const { data, error } =
+      await client.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+    return {
+      needsChallenge:
+        data.currentLevel === 'aal1' && data.nextLevel === 'aal2',
+    };
+  }
+
+  /** Doğrulanmış TOTP faktörü için challenge başlatır (web'deki MfaChallengeCard.submit ile aynı akış). */
+  async mfaChallenge(accessToken: string, refreshToken: string) {
+    const client = await this.sessionClient(accessToken, refreshToken);
+
+    const { data: factorsData, error: factorsError } =
+      await client.auth.mfa.listFactors();
+    if (factorsError) {
+      throw new BadRequestException(factorsError.message);
+    }
+
+    const factor = (factorsData.totp ?? []).find(
+      (f) => f.status === 'verified',
+    );
+    if (!factor) {
+      throw new BadRequestException('Doğrulanmış bir MFA yöntemi bulunamadı.');
+    }
+
+    const { data, error } = await client.auth.mfa.challenge({
+      factorId: factor.id,
+    });
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    return { factor_id: factor.id, challenge_id: data.id };
+  }
+
+  /** TOTP kodunu doğrular ve AAL2'ye yükseltilmiş yeni oturumu döner. */
+  async mfaVerify(
+    accessToken: string,
+    refreshToken: string,
+    factorId: string,
+    challengeId: string,
+    code: string,
+  ) {
+    const client = await this.sessionClient(accessToken, refreshToken);
+
+    const { error } = await client.auth.mfa.verify({
+      factorId,
+      challengeId,
+      code,
+    });
+    if (error) {
+      throw new UnauthorizedException(error.message);
+    }
+
+    const { data: sessionData, error: sessionError } =
+      await client.auth.getSession();
+    if (sessionError || !sessionData.session) {
+      throw new UnauthorizedException('Doğrulanmış oturum alınamadı.');
+    }
+
+    return {
+      access_token: sessionData.session.access_token,
+      refresh_token: sessionData.session.refresh_token,
+      user: sessionData.session.user,
+    };
+  }
+
   /** Access token yenileme — Supabase refreshSession. */
   async refresh(refreshToken: string) {
     const { data, error } = await this.supabaseService

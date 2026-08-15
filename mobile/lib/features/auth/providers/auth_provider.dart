@@ -14,6 +14,9 @@ enum AuthStatus {
   unknown,
   authenticated,
   unauthenticated,
+  // Şifre doğru ama hesapta MFA (TOTP) açık — TOTP kodu bekleniyor.
+  // Web'deki LoginPage'in yerel `mfaPending` state'iyle aynı adım.
+  mfaPending,
 }
 
 @immutable
@@ -24,6 +27,8 @@ class AuthState {
     this.userId,
     this.isSubmitting = false,
     this.errorMessage,
+    this.mfaAccessToken,
+    this.mfaRefreshToken,
   });
 
   const AuthState.unknown()
@@ -31,26 +36,46 @@ class AuthState {
         token = null,
         userId = null,
         isSubmitting = false,
-        errorMessage = null;
+        errorMessage = null,
+        mfaAccessToken = null,
+        mfaRefreshToken = null;
 
   const AuthState.authenticated({
     required String this.token,
     this.userId,
   })  : status = AuthStatus.authenticated,
         isSubmitting = false,
-        errorMessage = null;
+        errorMessage = null,
+        mfaAccessToken = null,
+        mfaRefreshToken = null;
 
   const AuthState.unauthenticated({this.errorMessage})
       : status = AuthStatus.unauthenticated,
         token = null,
         userId = null,
-        isSubmitting = false;
+        isSubmitting = false,
+        mfaAccessToken = null,
+        mfaRefreshToken = null;
+
+  /// Şifre doğrulandı, TOTP kodu bekleniyor. `mfaAccessToken`/`mfaRefreshToken`
+  /// Supabase'in verdiği AAL1 (geçici) oturumu — verify başarılı olunca
+  /// gerçek (AAL2) oturumla değiştirilir, o ana kadar kalıcı depoya yazılmaz.
+  const AuthState.mfaPending({
+    required String this.mfaAccessToken,
+    this.mfaRefreshToken,
+    this.userId,
+  })  : status = AuthStatus.mfaPending,
+        token = null,
+        isSubmitting = false,
+        errorMessage = null;
 
   final AuthStatus status;
   final String? token;
   final String? userId;
   final bool isSubmitting;
   final String? errorMessage;
+  final String? mfaAccessToken;
+  final String? mfaRefreshToken;
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
 
@@ -70,6 +95,8 @@ class AuthState {
       userId: clearUserId ? null : (userId ?? this.userId),
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      mfaAccessToken: mfaAccessToken,
+      mfaRefreshToken: mfaRefreshToken,
     );
   }
 }
@@ -153,6 +180,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final session = await repository.login(
         LoginDto(email: email, password: password),
       );
+
+      // Web'deki needsMfaChallenge() ile aynı kontrol: hesapta doğrulanmış
+      // bir TOTP faktörü varsa AAL1 oturumu tek başına yeterli değildir.
+      if (session.refreshToken != null && session.refreshToken!.isNotEmpty) {
+        try {
+          // Geçici (AAL1) token'ı belleğe koy — mfaStatus isteği bunu kullanır.
+          onTokensUpdated(session.accessToken, session.refreshToken);
+          final mfa = await repository.mfaStatus(session.refreshToken!);
+          if (mfa.needsChallenge) {
+            state = AuthState.mfaPending(
+              mfaAccessToken: session.accessToken,
+              mfaRefreshToken: session.refreshToken,
+              userId: session.userId,
+            );
+            return false;
+          }
+        } on AuthException {
+          // MFA durumu sorgulanamadıysa girişi bloklama — normal akışa devam.
+        }
+      }
+
       await _persistSession(session);
       state = AuthState.authenticated(
         token: session.accessToken,
@@ -160,14 +208,61 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return true;
     } on AuthException catch (error) {
+      onTokensUpdated(null, null);
       state = AuthState.unauthenticated(errorMessage: error.message);
       return false;
     } catch (_) {
+      onTokensUpdated(null, null);
       state = const AuthState.unauthenticated(
         errorMessage: 'Giriş sırasında beklenmeyen bir hata oluştu.',
       );
       return false;
     }
+  }
+
+  /// MFA ekranında girilen TOTP kodunu doğrular; başarılıysa AAL2 oturumunu
+  /// kalıcı depoya yazıp kullanıcıyı authenticated yapar.
+  Future<bool> submitMfaCode(String code) async {
+    if (state.status != AuthStatus.mfaPending) return false;
+    final refreshToken = state.mfaRefreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) {
+      state = const AuthState.unauthenticated(
+        errorMessage: 'Oturum bilgisi eksik. Lütfen tekrar giriş yapın.',
+      );
+      return false;
+    }
+
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      final challenge = await repository.mfaChallenge(refreshToken);
+      final session = await repository.mfaVerify(
+        refreshToken: refreshToken,
+        factorId: challenge.factorId,
+        challengeId: challenge.challengeId,
+        code: code,
+      );
+      await _persistSession(session);
+      state = AuthState.authenticated(
+        token: session.accessToken,
+        userId: session.userId,
+      );
+      return true;
+    } on AuthException catch (error) {
+      state = state.copyWith(isSubmitting: false, errorMessage: error.message);
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: 'Doğrulama sırasında beklenmeyen bir hata oluştu.',
+      );
+      return false;
+    }
+  }
+
+  /// MFA ekranından "vazgeç" — geçici oturumu tamamen temizler.
+  void cancelMfaChallenge() {
+    onTokensUpdated(null, null);
+    state = const AuthState.unauthenticated();
   }
 
   Future<bool> register({

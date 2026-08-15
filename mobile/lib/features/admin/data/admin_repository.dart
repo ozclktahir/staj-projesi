@@ -60,6 +60,22 @@ class AdminRepository {
     }
   }
 
+  /// Yalnızca 'Admin' | 'Member' desteklenir (backend UpdateMemberRoleDto).
+  Future<void> updateMemberRole({
+    required String workspaceId,
+    required String userId,
+    required String role,
+  }) async {
+    try {
+      await _dio.patch<void>(
+        ApiConstants.workspaceAdminUpdateRole(workspaceId, userId),
+        data: {'role': role},
+      );
+    } on DioException catch (e) {
+      throw AdminException(_msg(e));
+    }
+  }
+
   String _msg(DioException error) {
     final data = error.response?.data;
     if (data is Map) {

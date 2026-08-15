@@ -13,11 +13,16 @@ class ActivityLogPanel extends ConsumerWidget {
   const ActivityLogPanel({
     super.key,
     this.projectId,
+    this.taskId,
     this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 88),
   });
 
   /// null ise tüm workspace aktiviteleri.
   final String? projectId;
+
+  /// Verilirse yalnızca bu göreve ait kayıtlar gösterilir (görev detayı
+  /// "Aktivite" sekmesi — web'deki TaskActivityFeed parity).
+  final String? taskId;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -25,8 +30,16 @@ class ActivityLogPanel extends ConsumerWidget {
     final async = ref.watch(activityLogProvider(projectId));
     final formatter = DateFormat('dd.MM.yyyy HH:mm');
     final memberNames = ref.watch(workspaceMemberLabelMapProvider);
+    final taskFilter = taskId;
 
-    return async.when(
+    final filteredAsync = taskFilter == null || taskFilter.isEmpty
+        ? async
+        : async.whenData(
+            (logs) =>
+                logs.where((log) => log.taskId == taskFilter).toList(),
+          );
+
+    return filteredAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(
         child: Padding(

@@ -80,6 +80,25 @@ export class SupabaseService implements OnModuleInit {
   }
 
   /**
+   * Paylaşılan singleton `client`'tan BAĞIMSIZ, her çağrıda taze bir istemci
+   * üretir. MFA challenge/verify gibi `auth.setSession()` çağıran akışlar
+   * için ZORUNLU: singleton üzerinde setSession çağırmak GoTrue'nin dahili
+   * oturum durumunu global olarak değiştirir ve eşzamanlı isteklerde
+   * kullanıcılar arası oturum karışmasına (session bleed) yol açar.
+   */
+  createEphemeralClient(): SupabaseClient {
+    if (!this.supabaseUrl || !this.supabaseAnonKey) {
+      throw new ServiceUnavailableException(
+        'Supabase istemcisi başlatılmamış.',
+      );
+    }
+
+    return createClient(this.supabaseUrl, this.supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+
+  /**
    * 'uploads' bucket'ına dosya yükler ve oluşan public URL'i döner.
    */
   async uploadFile(file: Express.Multer.File, path: string): Promise<string> {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/constants/upload_limits.dart';
 import '../data/file_repository.dart';
 import '../data/task_scope.dart';
 import '../providers/file_provider.dart';
@@ -26,6 +27,22 @@ class _TaskFilesPanelState extends ConsumerState<TaskFilesPanel> {
     if (result == null || result.files.isEmpty) return;
 
     final file = result.files.single;
+    if (file.size > UploadLimits.maxFileBytes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                'Dosya çok büyük (${UploadLimits.formatBytes(file.size)}). '
+                'En fazla ${UploadLimits.formatBytes(UploadLimits.maxFileBytes)} yükleyebilirsiniz.',
+              ),
+            ),
+          );
+      }
+      return;
+    }
+
     setState(() => _uploading = true);
     try {
       await ref.read(taskFilesProvider(widget.scope).notifier).upload(

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/network/workspace_presence_provider.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../activity/data/activity_log_dto.dart';
 import '../../activity/providers/activity_log_provider.dart';
@@ -91,6 +92,11 @@ class DashboardScreen extends ConsumerWidget {
               completionRateLabel: s.dashboardCompletionRate,
               overdueLabel: s.dashboardOverdueTasks,
               activeMembersLabel: s.dashboardActiveMembers,
+              activeMembersHint: ref.watch(
+                workspacePresenceProvider.select((p) => p.ready),
+              )
+                  ? 'Şu anda çevrimiçi'
+                  : null,
             ),
             const SizedBox(height: 20),
             Text(
@@ -136,6 +142,7 @@ class _KpiGrid extends StatelessWidget {
     required this.completionRateLabel,
     required this.overdueLabel,
     required this.activeMembersLabel,
+    this.activeMembersHint,
   });
 
   final DashboardData data;
@@ -143,6 +150,7 @@ class _KpiGrid extends StatelessWidget {
   final String completionRateLabel;
   final String overdueLabel;
   final String activeMembersLabel;
+  final String? activeMembersHint;
 
   @override
   Widget build(BuildContext context) {
@@ -181,6 +189,7 @@ class _KpiGrid extends StatelessWidget {
           value: '${data.activeMembers}',
           icon: Icons.group_outlined,
           accent: const Color(0xFFF59E0B),
+          hint: activeMembersHint,
         ),
       ],
     );
@@ -193,12 +202,14 @@ class _KpiCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.accent,
+    this.hint,
   });
 
   final String label;
   final String value;
   final IconData icon;
   final Color accent;
+  final String? hint;
 
   @override
   Widget build(BuildContext context) {
@@ -252,6 +263,17 @@ class _KpiCard extends StatelessWidget {
                           ),
                     ),
                   ),
+                  if (hint != null)
+                    Text(
+                      hint!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: accent,
+                            fontSize: 9,
+                            height: 1.1,
+                          ),
+                    ),
                 ],
               ),
             ),

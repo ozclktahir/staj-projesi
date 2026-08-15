@@ -45,6 +45,10 @@ class AppStrings {
   String get commonSelectWorkspace => t('common.selectWorkspace');
   String get commonCreateWorkspace => t('common.createWorkspace');
 
+  String get searchPlaceholder => t('search.placeholder');
+  String get searchHint => t('search.hint');
+  String get searchEmpty => t('search.empty');
+
   String get settingsTitle => t('settings.title');
   String get settingsAppearance => t('settings.appearance');
   String get settingsTheme => t('settings.theme');
@@ -62,6 +66,10 @@ class AppStrings {
   String get settingsDeleteWorkspaceBody => t('settings.deleteWorkspaceBody');
   String get settingsWorkspaceDeleted => t('settings.workspaceDeleted');
   String get settingsDeleteFailed => t('settings.deleteFailed');
+  String get settingsLeaveWorkspace => t('settings.leaveWorkspace');
+  String get settingsLeaveWorkspaceTitle => t('settings.leaveWorkspaceTitle');
+  String get settingsLeftWorkspace => t('settings.leftWorkspace');
+  String get settingsLeaveFailed => t('settings.leaveFailed');
 
   String get authLogin => t('auth.login');
   String get authLoginSubtitle => t('auth.loginSubtitle');
@@ -73,6 +81,13 @@ class AppStrings {
   String get authHaveAccount => t('auth.haveAccount');
   String get authBackToLogin => t('auth.backToLogin');
   String get authCheckingSession => t('auth.checkingSession');
+  String get authMfaTitle => t('auth.mfaTitle');
+  String get authMfaSubtitle => t('auth.mfaSubtitle');
+  String get authMfaCode => t('auth.mfaCode');
+  String get authMfaVerify => t('auth.mfaVerify');
+  String get authMfaCancel => t('auth.mfaCancel');
+  String get authMfaSuccess => t('auth.mfaSuccess');
+  String get authMfaFail => t('auth.mfaFail');
 
   String get notificationsTitle => t('notifications.title');
   String get notificationsEmpty => t('notifications.empty');
@@ -194,6 +209,10 @@ class AppStrings {
   String adminRemoveMemberBody(String name) =>
       t('admin.removeMemberBody', {'name': name});
   String get adminMemberRemoved => t('admin.memberRemoved');
+  String get adminChangeRole => t('admin.changeRole');
+  String adminChangeRoleBody(String nextRole) =>
+      t('admin.changeRoleBody', {'role': nextRole});
+  String get adminRoleUpdated => t('admin.roleUpdated');
   String get adminForbiddenTitle => t('admin.forbiddenTitle');
   String get adminForbiddenSubtitle => t('admin.forbiddenSubtitle');
 
@@ -261,6 +280,9 @@ class AppStrings {
     'common.notifications': 'Bildirimler',
     'common.newProject': 'Yeni proje',
     'common.selectWorkspace': 'Çalışma alanı seç',
+    'search.placeholder': 'Proje, görev veya üye ara…',
+    'search.hint': 'Aramaya başlamak için yazın.',
+    'search.empty': 'Sonuç bulunamadı.',
     'common.createWorkspace': 'Çalışma alanı oluştur',
     'common.statusTodo': 'Yapılacaklar',
     'common.statusInProgress': 'Devam Edenler',
@@ -288,6 +310,12 @@ class AppStrings {
         '"{name}" kalıcı olarak silinecek. Bu işlem geri alınamaz. Devam etmek istiyor musunuz?',
     'settings.workspaceDeleted': 'Çalışma alanı silindi.',
     'settings.deleteFailed': 'Silinemedi.',
+    'settings.leaveWorkspace': 'Çalışma Alanından Ayrıl',
+    'settings.leaveWorkspaceTitle': 'Çalışma alanından ayrıl',
+    'settings.leaveWorkspaceBody':
+        '"{name}" çalışma alanından ayrılmak istediğine emin misin?',
+    'settings.leftWorkspace': 'Çalışma alanından ayrıldın.',
+    'settings.leaveFailed': 'Ayrılamadın.',
     'auth.login': 'Giriş Yap',
     'auth.loginSubtitle': 'Hesabına giriş yaparak devam et',
     'auth.loginFailed': 'Giriş başarısız.',
@@ -298,6 +326,13 @@ class AppStrings {
     'auth.haveAccount': 'Zaten hesabın var mı? Giriş yap',
     'auth.backToLogin': 'Girişe dön',
     'auth.checkingSession': 'Oturum kontrol ediliyor…',
+    'auth.mfaTitle': 'İki adımlı doğrulama',
+    'auth.mfaSubtitle': 'Authenticator uygulamanızdaki 6 haneli kodu girin.',
+    'auth.mfaCode': 'Doğrulama kodu',
+    'auth.mfaVerify': 'Doğrula ve devam et',
+    'auth.mfaCancel': 'İptal',
+    'auth.mfaSuccess': '2FA doğrulandı',
+    'auth.mfaFail': 'Doğrulama kodu hatalı.',
     'notifications.title': 'Bildirimler',
     'notifications.empty': 'Bildirim yok.',
     'notifications.markAll': 'Tümünü okundu',
@@ -376,6 +411,9 @@ class AppStrings {
     'admin.removeMember': 'Üyeyi kaldır',
     'admin.removeMemberBody': '"{name}" çalışma alanından kaldırılsın mı?',
     'admin.memberRemoved': 'Üye kaldırıldı.',
+    'admin.changeRole': 'Rolü değiştir',
+    'admin.changeRoleBody': 'Rol "{role}" olarak değiştirilsin mi?',
+    'admin.roleUpdated': 'Rol güncellendi.',
     'admin.forbiddenTitle': 'Yetki yok',
     'admin.forbiddenSubtitle': 'Bu sayfa yalnızca admin / owner içindir.',
     'progress.title': 'İlerleme raporları',
@@ -424,6 +462,9 @@ class AppStrings {
     'common.notifications': 'Notifications',
     'common.newProject': 'New project',
     'common.selectWorkspace': 'Select workspace',
+    'search.placeholder': 'Search projects, tasks, members…',
+    'search.hint': 'Start typing to search.',
+    'search.empty': 'No results found.',
     'common.createWorkspace': 'Create workspace',
     'common.statusTodo': 'To do',
     'common.statusInProgress': 'In progress',
@@ -451,6 +492,12 @@ class AppStrings {
         '"{name}" will be permanently deleted. This cannot be undone. Continue?',
     'settings.workspaceDeleted': 'Workspace deleted.',
     'settings.deleteFailed': 'Could not delete.',
+    'settings.leaveWorkspace': 'Leave Workspace',
+    'settings.leaveWorkspaceTitle': 'Leave workspace',
+    'settings.leaveWorkspaceBody':
+        'Are you sure you want to leave "{name}"?',
+    'settings.leftWorkspace': 'You left the workspace.',
+    'settings.leaveFailed': 'Could not leave.',
     'auth.login': 'Sign in',
     'auth.loginSubtitle': 'Sign in to continue',
     'auth.loginFailed': 'Sign-in failed.',
@@ -461,6 +508,13 @@ class AppStrings {
     'auth.haveAccount': 'Already have an account? Sign in',
     'auth.backToLogin': 'Back to sign in',
     'auth.checkingSession': 'Checking session…',
+    'auth.mfaTitle': 'Two-factor authentication',
+    'auth.mfaSubtitle': 'Enter the 6-digit code from your authenticator app.',
+    'auth.mfaCode': 'Verification code',
+    'auth.mfaVerify': 'Verify and continue',
+    'auth.mfaCancel': 'Cancel',
+    'auth.mfaSuccess': '2FA verified',
+    'auth.mfaFail': 'Invalid verification code.',
     'notifications.title': 'Notifications',
     'notifications.empty': 'No notifications.',
     'notifications.markAll': 'Mark all read',
@@ -535,6 +589,9 @@ class AppStrings {
     'admin.removeMember': 'Remove member',
     'admin.removeMemberBody': 'Remove "{name}" from this workspace?',
     'admin.memberRemoved': 'Member removed.',
+    'admin.changeRole': 'Change role',
+    'admin.changeRoleBody': 'Change role to "{role}"?',
+    'admin.roleUpdated': 'Role updated.',
     'admin.forbiddenTitle': 'No access',
     'admin.forbiddenSubtitle': 'This page is for admins / owners only.',
     'progress.title': 'Progress reports',

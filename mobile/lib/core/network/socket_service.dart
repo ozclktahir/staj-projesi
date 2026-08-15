@@ -21,6 +21,7 @@ class SocketService {
     SocketPayloadHandler? onTaskUpdated,
     SocketPayloadHandler? onNewNotification,
     SocketPayloadHandler? onActivityLogged,
+    SocketPayloadHandler? onPresenceUpdated,
   }) {
     final signature = '$userId|${workspaceId ?? ''}|${token.hashCode}';
     if (_socket != null && _signature == signature && _socket!.connected) {
@@ -86,6 +87,9 @@ class SocketService {
     }
     if (onActivityLogged != null) {
       socket.on('activity_logged', onActivityLogged);
+    }
+    if (onPresenceUpdated != null) {
+      socket.on('presence_updated', onPresenceUpdated);
     }
   }
 

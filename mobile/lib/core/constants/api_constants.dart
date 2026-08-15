@@ -19,7 +19,16 @@ abstract final class ApiConstants {
   static const String authRegister = '/auth/register';
   static const String authRefresh = '/auth/refresh';
   static const String authLogout = '/auth/logout';
+  static const String authMfaStatus = '/auth/mfa/status';
+  static const String authMfaChallenge = '/auth/mfa/challenge';
+  static const String authMfaVerify = '/auth/mfa/verify';
   static const String workspaces = '/workspace';
+
+  static String workspaceLeave(String workspaceId) =>
+      '/workspace/$workspaceId/leave';
+
+  static String workspaceSearch(String workspaceId) =>
+      '/workspace/$workspaceId/search';
 
   static String workspaceProjects(String workspaceId) =>
       '/workspaces/$workspaceId/projects';
@@ -111,6 +120,9 @@ abstract final class ApiConstants {
   static String workspaceTaskReassign(String workspaceId, String taskId) =>
       '/workspaces/$workspaceId/tasks/$taskId/reassign';
 
+  static String workspaceTaskAssignees(String workspaceId, String taskId) =>
+      '/workspaces/$workspaceId/tasks/$taskId/assignees';
+
   static String workspaceAdminStats(String workspaceId) =>
       '/workspaces/$workspaceId/admin/stats';
 
@@ -119,6 +131,12 @@ abstract final class ApiConstants {
     String userId,
   ) =>
       '/workspaces/$workspaceId/admin/users/$userId/remove';
+
+  static String workspaceAdminUpdateRole(
+    String workspaceId,
+    String userId,
+  ) =>
+      '/workspaces/$workspaceId/admin/users/$userId/role';
 
   static String workspaceProgressReports(String workspaceId) =>
       '/workspaces/$workspaceId/progress-reports';

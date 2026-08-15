@@ -125,7 +125,33 @@ class AdminScreen extends ConsumerWidget {
                         ),
                       ),
                       title: Text(m.displayName),
-                      subtitle: Text(m.role ?? '—'),
+                      subtitle: _isRoleEditable(m.role) && caps.isAdmin
+                          ? InkWell(
+                              onTap: workspaceId == null
+                                  ? null
+                                  : () => _changeRole(
+                                        context,
+                                        ref,
+                                        workspaceId: workspaceId,
+                                        userId: m.id,
+                                        currentRole: m.role!,
+                                      ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(m.role ?? '—'),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.edit_outlined,
+                                    size: 14,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Text(m.role ?? '—'),
                       trailing: caps.isAdmin
                           ? IconButton(
                               tooltip: s.adminRemoveMember,
@@ -149,6 +175,62 @@ class AdminScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// Backend UpdateMemberRoleDto yalnızca 'Admin' | 'Member' kabul eder —
+  /// OWNER/Guest satırları burada değiştirilemez (web ile aynı kısıt).
+  bool _isRoleEditable(String? role) {
+    final normalized = (role ?? '').trim().toUpperCase();
+    return normalized == 'ADMIN' || normalized == 'MEMBER';
+  }
+
+  Future<void> _changeRole(
+    BuildContext context,
+    WidgetRef ref, {
+    required String workspaceId,
+    required String userId,
+    required String currentRole,
+  }) async {
+    final s = ref.read(appStringsProvider);
+    final isCurrentlyAdmin = currentRole.trim().toUpperCase() == 'ADMIN';
+    final nextRole = isCurrentlyAdmin ? 'Member' : 'Admin';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.adminChangeRole),
+        content: Text(s.adminChangeRoleBody(nextRole)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(s.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(s.commonSave),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ref.read(adminRepositoryProvider).updateMemberRole(
+            workspaceId: workspaceId,
+            userId: userId,
+            role: nextRole,
+          );
+      ref.invalidate(workspaceMembersProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(s.adminRoleUpdated)),
+      );
+    } on AdminException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    }
   }
 
   Future<void> _confirmRemove(

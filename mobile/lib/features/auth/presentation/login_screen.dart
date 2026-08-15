@@ -54,6 +54,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final busy = auth.isSubmitting;
     final s = ref.watch(appStringsProvider);
 
+    if (auth.status == AuthStatus.mfaPending) {
+      return const AuthSplitShell(child: _MfaChallengeCard());
+    }
+
     return AuthSplitShell(
       child: AuthFormCard(
         child: Form(
@@ -167,6 +171,133 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Şifre doğrulandıktan sonra TOTP kodu isteyen ekran — web'deki
+/// `MfaChallengeCard` ile aynı adım (AAL1 → AAL2).
+class _MfaChallengeCard extends ConsumerStatefulWidget {
+  const _MfaChallengeCard();
+
+  @override
+  ConsumerState<_MfaChallengeCard> createState() => _MfaChallengeCardState();
+}
+
+class _MfaChallengeCardState extends ConsumerState<_MfaChallengeCard> {
+  final _codeController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _codeController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final code = _codeController.text.trim();
+    if (code.length < 6) return;
+    FocusScope.of(context).unfocus();
+
+    final ok = await ref.read(authProvider.notifier).submitMfaCode(code);
+    if (!mounted || ok) return;
+
+    final s = ref.read(appStringsProvider);
+    final message = ref.read(authProvider).errorMessage ?? s.authMfaFail;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = ref.watch(authProvider);
+    final busy = auth.isSubmitting;
+    final s = ref.watch(appStringsProvider);
+
+    return AuthFormCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Icon(
+            Icons.shield_outlined,
+            color: Theme.of(context).colorScheme.primary,
+            size: 32,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            s.authMfaTitle,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            s.authMfaSubtitle,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFFA1A1AA),
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          TextField(
+            controller: _codeController,
+            enabled: !busy,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.oneTimeCode],
+            style: const TextStyle(color: Colors.white, letterSpacing: 4),
+            textAlign: TextAlign.center,
+            maxLength: 8,
+            onChanged: (value) {
+              final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
+              if (digitsOnly != value) {
+                _codeController.value = TextEditingValue(
+                  text: digitsOnly,
+                  selection: TextSelection.collapsed(offset: digitsOnly.length),
+                );
+              }
+            },
+            onSubmitted: (_) => _submit(),
+            decoration: InputDecoration(
+              labelText: s.authMfaCode,
+              hintText: '123456',
+              counterText: '',
+            ),
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: (busy || _codeController.text.trim().length < 6)
+                ? null
+                : _submit,
+            child: busy
+                ? SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                  )
+                : Text(s.authMfaVerify),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: busy
+                ? null
+                : () => ref.read(authProvider.notifier).cancelMfaChallenge(),
+            child: Text(s.authMfaCancel),
+          ),
+        ],
       ),
     );
   }

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -98,6 +99,37 @@ export class TaskController {
     @Param('id') id: string,
   ) {
     return this.taskService.findOne(workspaceId, id);
+  }
+
+  @Get(':id/assignees')
+  @ApiOperation({
+    summary:
+      "Görevin ek atananlarını (task_assignees — çoklu atama katmanı) listeler",
+  })
+  listAssignees(
+    @Param('workspaceId') workspaceId: string,
+    @Param('id') id: string,
+  ) {
+    return this.taskService.listAssignees(workspaceId, id);
+  }
+
+  @Put(':id/assignees')
+  @Roles('OWNER', 'Admin')
+  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
+  @ApiOperation({
+    summary:
+      'Görevin ek atanan listesini (user_ids) tam olarak bu kümeyle değiştirir (yalnızca OWNER/Admin)',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Çoklu atama yalnızca OWNER veya Admin tarafından düzenlenebilir.',
+  })
+  setAssignees(
+    @Param('workspaceId') workspaceId: string,
+    @Param('id') id: string,
+    @Body() body: { user_ids: string[] },
+  ) {
+    return this.taskService.setAssignees(workspaceId, id, body?.user_ids ?? []);
   }
 
   @Post(':id/reassign')

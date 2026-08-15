@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client_provider.dart';
+import '../../../core/network/workspace_presence_provider.dart';
 import '../../tasks/data/task_dto.dart';
 import '../../tasks/data/task_repository.dart';
 import '../../tasks/providers/task_provider.dart';
@@ -36,6 +37,11 @@ class DashboardNotifier extends AutoDisposeAsyncNotifier<DashboardData> {
       for (final m in members) m.id: m.label,
     };
 
+    // Canlı "Aktif Üyeler" — NestJS Socket.IO presence (bkz. CLAUDE.md
+    // platform farkları notu). Hazır değilken null → statik üye sayısına düşer.
+    final presence = ref.watch(workspacePresenceProvider);
+    final onlineCount = presence.ready ? presence.onlineCount : null;
+
     WorkspaceStatisticsDto? remote;
     try {
       remote = await ref
@@ -62,6 +68,7 @@ class DashboardNotifier extends AutoDisposeAsyncNotifier<DashboardData> {
       remote: remote,
       memberLabels: memberLabels,
       memberCount: members.length,
+      onlineCount: onlineCount,
     );
   }
 

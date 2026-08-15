@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/constants/upload_limits.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -724,6 +725,19 @@ class _FilesTab extends ConsumerWidget {
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
     if (file.path == null) return;
+    if (file.size > UploadLimits.maxFileBytes) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Dosya çok büyük (${UploadLimits.formatBytes(file.size)}). '
+              'En fazla ${UploadLimits.formatBytes(UploadLimits.maxFileBytes)} yükleyebilirsiniz.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
     try {
       await ref.read(personalFilesProvider.notifier).upload(
             filePath: file.path!,

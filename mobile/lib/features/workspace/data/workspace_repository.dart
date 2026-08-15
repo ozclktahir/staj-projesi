@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
+import 'search_hit_dto.dart';
 import 'workspace_dto.dart';
 
 class WorkspaceException implements Exception {
@@ -54,6 +55,40 @@ class WorkspaceRepository {
   Future<void> deleteWorkspace(String workspaceId) async {
     try {
       await _dio.delete<void>(ApiConstants.workspaceById(workspaceId));
+    } on DioException catch (error) {
+      throw WorkspaceException(_messageFromDio(error));
+    }
+  }
+
+  /// Web'in globalSearch() server action'ının NestJS karşılığı — proje/görev/üye arar.
+  Future<List<SearchHitDto>> search({
+    required String workspaceId,
+    required String query,
+  }) async {
+    final q = query.trim();
+    if (q.isEmpty) return const [];
+    try {
+      final response = await _dio.get<dynamic>(
+        ApiConstants.workspaceSearch(workspaceId),
+        queryParameters: {'q': q},
+      );
+      final data = response.data;
+      final raw = data is Map ? data['hits'] : data;
+      if (raw is! List) return const [];
+      return raw
+          .whereType<Map>()
+          .map((item) => SearchHitDto.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } on DioException catch (error) {
+      throw WorkspaceException(_messageFromDio(error));
+    }
+  }
+
+  /// Web'deki leaveWorkspace() server action ile aynı kurallar backend'de
+  /// uygulanır: gerçek sahip ayrılamaz; tek Admin/OWNER iken ayrılamaz.
+  Future<void> leaveWorkspace(String workspaceId) async {
+    try {
+      await _dio.post<void>(ApiConstants.workspaceLeave(workspaceId));
     } on DioException catch (error) {
       throw WorkspaceException(_messageFromDio(error));
     }

@@ -3,8 +3,11 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -92,6 +95,41 @@ export class WorkspaceController {
       dto,
       extractBearerToken(request),
     );
+  }
+
+  @Get(':id/search')
+  @ApiOperation({
+    summary:
+      'Çalışma alanı içinde proje/görev/üye arar (global arama — web globalSearch parity)',
+  })
+  @ApiResponse({ status: 200, description: 'Arama sonuçları döndü.' })
+  search(
+    @Req() request: Request,
+    @Param('id') id: string,
+    @Query('q') q: string,
+  ) {
+    return this.workspaceService.search(id, q ?? '', extractBearerToken(request));
+  }
+
+  @Post(':id/leave')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Kullanıcı çalışma alanından kendi isteğiyle ayrılır (gerçek sahip ayrılamaz; tek Admin/OWNER iken ayrılamaz)',
+  })
+  @ApiResponse({ status: 200, description: 'Çalışma alanından ayrıldı.' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Workspace sahibi ayrılamaz veya kullanıcı workspace\'teki tek Admin/OWNER.',
+  })
+  @ApiResponse({ status: 404, description: 'Çalışma alanı bulunamadı.' })
+  leave(
+    @Req() request: Request,
+    @Param('id') id: string,
+    @GetUser() user: { id: string },
+  ) {
+    return this.workspaceService.leave(id, user.id, extractBearerToken(request));
   }
 
   @Delete(':id')

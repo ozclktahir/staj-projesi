@@ -9,9 +9,13 @@ import '../data/task_dto.dart';
 import '../data/task_repository.dart';
 import '../data/task_scope.dart';
 import '../data/update_task_dto.dart';
+import '../../activity/presentation/activity_log_panel.dart';
+import '../../workspace/data/workspace_member_dto.dart';
+import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../providers/comment_provider.dart';
 import '../providers/file_provider.dart';
 import '../providers/subtask_provider.dart';
+import '../providers/task_assignees_provider.dart';
 import '../providers/task_provider.dart';
 import 'edit_task_dialog.dart';
 import 'task_actions.dart';
@@ -71,7 +75,7 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
     super.initState();
     _task = widget.initialTask;
     _status = widget.initialTask.status;
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadTaskDetails());
   }
 
@@ -372,6 +376,7 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
                 Tab(text: 'Alt Görevler'),
                 Tab(text: 'Yorumlar'),
                 Tab(text: 'Dosyalar'),
+                Tab(text: 'Aktivite'),
               ],
             ),
             Expanded(
@@ -385,6 +390,7 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
                     ),
                     status: _status,
                     busy: _busy,
+                    scope: scope,
                     onEdit: _edit,
                     onStatusSelected: _changeStatus,
                     onDelete: _delete,
@@ -401,6 +407,12 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
                   scope != null
                       ? TaskFilesPanel(scope: scope)
                       : const Center(child: Text('Aktif çalışma alanı yok.')),
+                  ActivityLogPanel(
+                    projectId:
+                        widget.projectId.isEmpty ? null : widget.projectId,
+                    taskId: _task.id,
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  ),
                 ],
               ),
             ),
@@ -411,12 +423,13 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
   }
 }
 
-class _DetailsTab extends StatelessWidget {
+class _DetailsTab extends ConsumerWidget {
   const _DetailsTab({
     required this.task,
     required this.assigneeLabel,
     required this.status,
     required this.busy,
+    required this.scope,
     required this.onEdit,
     required this.onStatusSelected,
     required this.onDelete,
@@ -426,12 +439,13 @@ class _DetailsTab extends StatelessWidget {
   final String assigneeLabel;
   final TaskStatus status;
   final bool busy;
+  final TaskScope? scope;
   final VoidCallback onEdit;
   final ValueChanged<TaskStatus> onStatusSelected;
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final dueLabel = task.dueDate == null
         ? 'Belirtilmedi'
@@ -476,6 +490,10 @@ class _DetailsTab extends StatelessWidget {
         _FieldLabel(text: 'Atanan'),
         const SizedBox(height: 6),
         Text(assigneeLabel, style: Theme.of(context).textTheme.bodyMedium),
+        if (scope != null) ...[
+          const SizedBox(height: 16),
+          _ExtraAssigneesSection(scope: scope!),
+        ],
         const SizedBox(height: 16),
         _FieldLabel(text: 'Teslim tarihi'),
         const SizedBox(height: 6),
@@ -577,6 +595,155 @@ class _DetailsTab extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+/// "Ek Atananlar" (task_assignees) — birincil "Atanan"a ek katman.
+/// Admin: düzenlenebilir çoklu seçim. Diğerleri: salt okunur rozet listesi.
+class _ExtraAssigneesSection extends ConsumerWidget {
+  const _ExtraAssigneesSection({required this.scope});
+
+  final TaskScope scope;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final assigneesAsync = ref.watch(taskAssigneesProvider(scope));
+    final isAdmin = ref.watch(workspaceCapabilitiesProvider).isAdmin;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _FieldLabel(text: 'Ek Atananlar'),
+            const Spacer(),
+            if (isAdmin)
+              TextButton.icon(
+                onPressed: () => _editExtraAssignees(context, ref),
+                icon: const Icon(Icons.group_add_outlined, size: 16),
+                label: const Text('Düzenle'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        assigneesAsync.when(
+          loading: () => const SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          error: (error, _) => Text(
+            'Yüklenemedi.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+          ),
+          data: (assignees) {
+            if (assignees.isEmpty) {
+              return Text(
+                'Ek atanan yok.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              );
+            }
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final assignee in assignees)
+                  Chip(
+                    avatar: CircleAvatar(
+                      backgroundColor: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.15),
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                      child: Text(
+                        assignee.displayName.isNotEmpty
+                            ? assignee.displayName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    ),
+                    label: Text(assignee.displayName),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Future<void> _editExtraAssignees(BuildContext context, WidgetRef ref) async {
+    final members =
+        ref.read(workspaceMembersProvider).valueOrNull ?? const <WorkspaceMemberDto>[];
+    final current = ref.read(taskAssigneesProvider(scope)).valueOrNull ??
+        const <TaskAssigneeOption>[];
+    final selected = {for (final a in current) a.id};
+
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (dialogContext) {
+        var localSelected = {...selected};
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            return AlertDialog(
+              title: const Text('Ek atananlar'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: members.isEmpty
+                    ? const Text('Çalışma alanında üye yok.')
+                    : ListView(
+                        shrinkWrap: true,
+                        children: [
+                          for (final member in members)
+                            CheckboxListTile(
+                              value: localSelected.contains(member.id),
+                              title: Text(member.label),
+                              onChanged: (checked) {
+                                setLocal(() {
+                                  if (checked == true) {
+                                    localSelected.add(member.id);
+                                  } else {
+                                    localSelected.remove(member.id);
+                                  }
+                                });
+                              },
+                            ),
+                        ],
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('İptal'),
+                ),
+                FilledButton(
+                  onPressed: () =>
+                      Navigator.of(dialogContext).pop(localSelected),
+                  child: const Text('Kaydet'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null || !context.mounted) return;
+
+    try {
+      await ref
+          .read(taskAssigneesProvider(scope).notifier)
+          .setAssignees(result.toList());
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Kaydedilemedi: $error')));
+    }
   }
 }
 

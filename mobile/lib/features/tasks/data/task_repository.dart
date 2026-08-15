@@ -48,6 +48,30 @@ class TaskListMeta {
   bool get hasMore => page < totalPages;
 }
 
+/// task_assignees — birincil `assignee_id`'ye ek katman (web'deki
+/// 12 Ağustos çoklu atama özelliği ile aynı model).
+class TaskAssigneeOption {
+  const TaskAssigneeOption({
+    required this.id,
+    required this.displayName,
+    this.avatarUrl,
+  });
+
+  factory TaskAssigneeOption.fromJson(Map<String, dynamic> json) {
+    return TaskAssigneeOption(
+      id: json['id'] as String? ?? '',
+      displayName: (json['displayName'] as String?)?.trim().isNotEmpty == true
+          ? json['displayName'] as String
+          : (json['id'] as String? ?? ''),
+      avatarUrl: json['avatarUrl'] as String?,
+    );
+  }
+
+  final String id;
+  final String displayName;
+  final String? avatarUrl;
+}
+
 class TaskListPage {
   const TaskListPage({
     required this.items,
@@ -302,6 +326,55 @@ class TaskRepository {
         return TaskDto.fromJson(Map<String, dynamic>.from(task));
       }
       throw TaskException('Yeniden atama yanıtı beklenmeyen formatta.');
+    } on DioException catch (error) {
+      throw TaskException(_messageFromDio(error));
+    }
+  }
+
+  /// Görevin ek atananları (task_assignees) — birincil assignee_id'ye ek.
+  Future<List<TaskAssigneeOption>> getAssignees({
+    required String workspaceId,
+    required String taskId,
+  }) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        ApiConstants.workspaceTaskAssignees(workspaceId, taskId),
+      );
+      final data = response.data;
+      if (data is! List) return const [];
+      return data
+          .whereType<Map>()
+          .map(
+            (item) =>
+                TaskAssigneeOption.fromJson(Map<String, dynamic>.from(item)),
+          )
+          .toList();
+    } on DioException catch (error) {
+      throw TaskException(_messageFromDio(error));
+    }
+  }
+
+  /// Ek atanan listesini TAM olarak `userIds` ile değiştirir.
+  /// Yalnızca workspace admin/OWNER çağırabilir (backend de aynı kuralı uygular).
+  Future<List<TaskAssigneeOption>> setAssignees({
+    required String workspaceId,
+    required String taskId,
+    required List<String> userIds,
+  }) async {
+    try {
+      final response = await _dio.put<dynamic>(
+        ApiConstants.workspaceTaskAssignees(workspaceId, taskId),
+        data: {'user_ids': userIds},
+      );
+      final data = response.data;
+      if (data is! List) return const [];
+      return data
+          .whereType<Map>()
+          .map(
+            (item) =>
+                TaskAssigneeOption.fromJson(Map<String, dynamic>.from(item)),
+          )
+          .toList();
     } on DioException catch (error) {
       throw TaskException(_messageFromDio(error));
     }

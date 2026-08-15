@@ -68,6 +68,9 @@ class DashboardData {
     WorkspaceStatisticsDto? remote,
     Map<String, String> memberLabels = const {},
     int? memberCount,
+    // Web'deki useWorkspacePresence ile aynı sözleşme: null/hazır değilken
+    // statik üye sayısına düşülür, hazır olunca gerçek zamanlı sayı kullanılır.
+    int? onlineCount,
   }) {
     final topLevel = [
       for (final task in tasks)
@@ -156,8 +159,7 @@ class DashboardData {
         total == 0 ? 0.0 : ((completedFinal / total) * 1000).round() / 10;
 
     final members = memberCount ?? memberLabels.length;
-    final activeMembers =
-        workload.isNotEmpty ? workload.length : members;
+    final activeMembers = onlineCount ?? members;
 
     return DashboardData(
       totalTasks: total,

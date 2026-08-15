@@ -282,6 +282,205 @@ export class WorkspaceService {
   }
 
   /**
+   * Kullanıcı workspace'ten kendi isteğiyle ayrılır.
+   * Kurallar web'deki leaveWorkspace() server action'ıyla BİREBİR aynı
+   * (frontend/src/app/actions/workspaces.ts):
+   * - Gerçek sahip (workspaces.owner_id): ayrılamaz — devretme özelliği yok,
+   *   önce workspace'i silmeli.
+   * - Admin/OWNER rolü: kendisi dışında başka bir Admin/OWNER yoksa ayrılamaz.
+   * - Member/Guest: serbestçe ayrılabilir.
+   */
+  async leave(workspaceId: string, userId: string, accessToken: string) {
+    if (!accessToken?.trim()) {
+      throw new UnauthorizedException('Bearer token gerekli.');
+    }
+    const client = this.supabaseService.createUserClient(accessToken);
+
+    const { data: workspace, error: workspaceError } = await client
+      .from('workspaces')
+      .select('id, owner_id')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
+    if (workspaceError) {
+      throw new BadRequestException(workspaceError.message);
+    }
+    if (!workspace) {
+      throw new NotFoundException('Çalışma alanı bulunamadı.');
+    }
+    if (workspace.owner_id === userId) {
+      throw new ForbiddenException(
+        "Bu workspace'in sahibisin; ayrılamazsın. Devretme özelliği yok — gerekirse workspace'i silebilirsin.",
+      );
+    }
+
+    const { data: membership, error: memberError } = await client
+      .from('workspace_members')
+      .select('role')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (memberError) {
+      throw new BadRequestException(memberError.message);
+    }
+    if (!membership) {
+      throw new BadRequestException("Bu workspace'in üyesi değilsin.");
+    }
+
+    const myRole = String(membership.role ?? '').toUpperCase();
+    if (myRole === 'ADMIN' || myRole === 'OWNER') {
+      const { data: otherMembers, error: othersError } = await client
+        .from('workspace_members')
+        .select('user_id, role')
+        .eq('workspace_id', workspaceId)
+        .neq('user_id', userId);
+
+      if (othersError) {
+        throw new BadRequestException(othersError.message);
+      }
+
+      const hasOtherAdmin = (otherMembers ?? []).some((m) => {
+        const role = String(
+          (m as { role?: string | null }).role ?? '',
+        ).toUpperCase();
+        return role === 'ADMIN' || role === 'OWNER';
+      });
+
+      if (!hasOtherAdmin) {
+        throw new ForbiddenException(
+          "Ayrılmadan önce başka birini Admin/Owner yapmalısın — workspace'te başka yönetici yok.",
+        );
+      }
+    }
+
+    const { error: deleteError } = await client
+      .from('workspace_members')
+      .delete()
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId);
+
+    if (deleteError) {
+      throw new BadRequestException(deleteError.message);
+    }
+
+    return { message: 'Çalışma alanından ayrıldın.', id: workspaceId };
+  }
+
+  /**
+   * Çapraz arama (proje/görev/üye) — web'in globalSearch() server action'ının
+   * NestJS karşılığı, aynı sorguların birebir portu. `createUserClient`
+   * (RLS-scoped) kullanıldığı için Member/Guest görev görünürlük kısıtı
+   * (tasks_select_assignee_or_admin RLS politikası) burada da otomatik
+   * uygulanır — web ile davranış tek kaynaktan (RLS) garanti altında,
+   * ayrıca kod tarafında tekrar edilmiyor.
+   */
+  async search(
+    workspaceId: string,
+    query: string,
+    accessToken: string,
+  ): Promise<{
+    hits: Array<{
+      id: string;
+      type: 'project' | 'task' | 'member';
+      title: string;
+      subtitle: string | null;
+      projectId?: string | null;
+    }>;
+  }> {
+    const q = (query ?? '').trim();
+    if (!q) return { hits: [] };
+    if (!accessToken?.trim()) {
+      throw new UnauthorizedException('Bearer token gerekli.');
+    }
+
+    const client = this.supabaseService.createUserClient(accessToken);
+    const like = `%${q}%`;
+
+    const [projectsRes, tasksRes, membersRes] = await Promise.all([
+      client
+        .from('projects')
+        .select('id, name, description')
+        .eq('workspace_id', workspaceId)
+        .is('deleted_at', null)
+        .ilike('name', like)
+        .limit(8),
+      client
+        .from('tasks')
+        .select('id, title, project_id, status')
+        .eq('workspace_id', workspaceId)
+        .is('deleted_at', null)
+        .ilike('title', like)
+        .limit(10),
+      client
+        .from('workspace_members')
+        .select('user_id, role, profiles:user_id(id, email, full_name)')
+        .eq('workspace_id', workspaceId)
+        .limit(40),
+    ]);
+
+    const hits: Array<{
+      id: string;
+      type: 'project' | 'task' | 'member';
+      title: string;
+      subtitle: string | null;
+      projectId?: string | null;
+    }> = [];
+
+    for (const row of projectsRes.data ?? []) {
+      hits.push({
+        id: row.id as string,
+        type: 'project',
+        title: String(row.name ?? 'Proje'),
+        subtitle: (row.description as string | null) ?? null,
+      });
+    }
+
+    for (const row of tasksRes.data ?? []) {
+      hits.push({
+        id: row.id as string,
+        type: 'task',
+        title: String(row.title ?? 'Görev'),
+        subtitle: (row.status as string | null) ?? null,
+        projectId: (row.project_id as string | null) ?? null,
+      });
+    }
+
+    const qLower = q.toLowerCase();
+    let memberHits = 0;
+    for (const row of membersRes.data ?? []) {
+      if (memberHits >= 8) break;
+      const profile = Array.isArray(row.profiles)
+        ? row.profiles[0]
+        : row.profiles;
+      const name = String(
+        (profile as { full_name?: string } | null)?.full_name ??
+          (profile as { email?: string } | null)?.email ??
+          row.user_id ??
+          '',
+      );
+      const email = String(
+        (profile as { email?: string } | null)?.email ?? '',
+      );
+      if (
+        !name.toLowerCase().includes(qLower) &&
+        !email.toLowerCase().includes(qLower)
+      ) {
+        continue;
+      }
+      hits.push({
+        id: String(row.user_id),
+        type: 'member',
+        title: name || email || 'Üye',
+        subtitle: (row.role as string | null) ?? null,
+      });
+      memberHits++;
+    }
+
+    return { hits };
+  }
+
+  /**
    * Workspace üyelerini listeler (profil + rol).
    * Admin/OWNER: tüm üyeler; Member/Guest: yalnızca kendisi (web parity).
    */

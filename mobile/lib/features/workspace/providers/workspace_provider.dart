@@ -250,6 +250,47 @@ class WorkspaceNotifier extends StateNotifier<WorkspaceState> {
     }
   }
 
+  /// Kullanıcı aktif workspace'ten kendi isteğiyle ayrılır. Kurallar
+  /// (sahip ayrılamaz, tek Admin/OWNER iken ayrılamaz) NestJS'te uygulanır —
+  /// bu metod yalnızca isteği yapıp yerel state'i günceller.
+  Future<bool> leaveWorkspace(String workspaceId) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+
+    final wasActive = state.activeWorkspace?.id == workspaceId;
+
+    try {
+      await repository.leaveWorkspace(workspaceId);
+      final remaining = [
+        for (final workspace in state.workspaces)
+          if (workspace.id != workspaceId) workspace,
+      ];
+      final nextActive = wasActive
+          ? (remaining.isEmpty ? null : remaining.first)
+          : state.activeWorkspace;
+      if (nextActive != null) {
+        await prefs.setString(StorageKeys.activeWorkspaceId, nextActive.id);
+      } else {
+        await prefs.remove(StorageKeys.activeWorkspaceId);
+      }
+      state = WorkspaceState(
+        workspaces: remaining,
+        activeWorkspace: nextActive,
+        isLoading: false,
+        isSubmitting: false,
+      );
+      return true;
+    } on WorkspaceException catch (error) {
+      state = state.copyWith(isSubmitting: false, errorMessage: error.message);
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: 'Çalışma alanından ayrılamadın.',
+      );
+      return false;
+    }
+  }
+
   WorkspaceDto? _resolveActive(List<WorkspaceDto> list, String? savedId) {
     if (list.isEmpty) return null;
     if (savedId != null) {

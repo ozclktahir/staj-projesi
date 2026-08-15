@@ -27,6 +27,24 @@ class AuthSession {
   final String? userId;
 }
 
+/// AAL1→AAL2 yükseltmesi gerekip gerekmediği (web'deki needsMfaChallenge()).
+class MfaStatusResult {
+  const MfaStatusResult({required this.needsChallenge});
+
+  final bool needsChallenge;
+}
+
+/// mfa/challenge yanıtı — verify adımında geri gönderilmesi gerekir.
+class MfaChallengeResult {
+  const MfaChallengeResult({
+    required this.factorId,
+    required this.challengeId,
+  });
+
+  final String factorId;
+  final String challengeId;
+}
+
 /// NestJS `/auth/*` uçları — JWT access_token + user id.
 class AuthRepository {
   AuthRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
@@ -85,6 +103,63 @@ class AuthRepository {
       final response = await _dio.post<Map<String, dynamic>>(
         ApiConstants.authRefresh,
         data: {'refresh_token': refreshToken},
+      );
+      return _sessionFromResponse(response.data);
+    } on DioException catch (error) {
+      throw AuthException(_messageFromDio(error));
+    }
+  }
+
+  /// Web'deki needsMfaChallenge() ile aynı: AAL1→AAL2 yükseltmesi gerekiyor mu?
+  /// Çağıran taraf, bu isteğin `refreshToken`'a ait geçici access token ile
+  /// gönderilmesini sağlamalı (ApiClient'ın bellek token'ını güncelleyerek).
+  Future<MfaStatusResult> mfaStatus(String refreshToken) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiConstants.authMfaStatus,
+        data: {'refresh_token': refreshToken},
+      );
+      return MfaStatusResult(
+        needsChallenge: response.data?['needsChallenge'] == true,
+      );
+    } on DioException catch (error) {
+      throw AuthException(_messageFromDio(error));
+    }
+  }
+
+  Future<MfaChallengeResult> mfaChallenge(String refreshToken) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiConstants.authMfaChallenge,
+        data: {'refresh_token': refreshToken},
+      );
+      final data = response.data ?? const <String, dynamic>{};
+      final factorId = data['factor_id'] as String?;
+      final challengeId = data['challenge_id'] as String?;
+      if (factorId == null || challengeId == null) {
+        throw AuthException('MFA doğrulaması başlatılamadı.');
+      }
+      return MfaChallengeResult(factorId: factorId, challengeId: challengeId);
+    } on DioException catch (error) {
+      throw AuthException(_messageFromDio(error));
+    }
+  }
+
+  Future<AuthSession> mfaVerify({
+    required String refreshToken,
+    required String factorId,
+    required String challengeId,
+    required String code,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiConstants.authMfaVerify,
+        data: {
+          'refresh_token': refreshToken,
+          'factor_id': factorId,
+          'challenge_id': challengeId,
+          'code': code,
+        },
       );
       return _sessionFromResponse(response.data);
     } on DioException catch (error) {

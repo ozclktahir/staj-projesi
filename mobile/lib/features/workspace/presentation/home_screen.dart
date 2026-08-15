@@ -271,6 +271,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         actions: [
           if (active != null) ...[
+            IconButton(
+              tooltip: s.searchPlaceholder,
+              onPressed: () => context.push(AppRoutes.search),
+              icon: const Icon(Icons.search),
+            ),
             if (!wide && caps.canInvite)
               IconButton(
                 tooltip: s.navInvite,

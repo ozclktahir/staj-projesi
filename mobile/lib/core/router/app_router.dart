@@ -12,6 +12,7 @@ import '../../features/progress/presentation/progress_reports_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/tasks/presentation/project_detail_screen.dart';
 import '../../features/tasks/presentation/trash_screen.dart';
+import '../../features/workspace/presentation/global_search_screen.dart';
 import '../../features/workspace/presentation/home_screen.dart';
 import '../../features/workspace/presentation/members_screen.dart';
 import '../../features/workspace/providers/workspace_provider.dart';
@@ -25,6 +26,7 @@ abstract final class AppRoutes {
   static const onboarding = '/onboarding';
   static const settings = '/settings';
   static const members = '/members';
+  static const search = '/search';
   static const trash = '/trash';
   static const admin = '/admin';
   static const progress = '/progress';
@@ -142,6 +144,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.members,
         name: 'members',
         builder: (context, state) => const MembersScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.search,
+        name: 'search',
+        builder: (context, state) => const GlobalSearchScreen(),
       ),
       GoRoute(
         path: AppRoutes.trash,

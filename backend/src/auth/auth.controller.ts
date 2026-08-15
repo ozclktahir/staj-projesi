@@ -11,6 +11,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { MfaSessionDto, MfaVerifyDto } from './dto/mfa.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 
@@ -75,20 +76,69 @@ export class AuthController {
     description: 'Authorization başlığı eksik veya geçersiz.',
   })
   logout(@Headers('authorization') authorization?: string) {
-    const header = Array.isArray(authorization)
-      ? authorization[0]
-      : authorization;
+    return this.authService.logout(this.extractBearerToken(authorization));
+  }
+
+  private extractBearerToken(authorization?: string | string[]): string {
+    const header = Array.isArray(authorization) ? authorization[0] : authorization;
     const token =
       typeof header === 'string'
         ? header.replace(/^Bearer\s+/i, '').trim()
         : '';
-
     if (!token) {
       throw new UnauthorizedException(
         'Authorization başlığında Bearer token bulunamadı.',
       );
     }
+    return token;
+  }
 
-    return this.authService.logout(token);
+  @Post('mfa/status')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Giriş yapan kullanıcı için MFA (TOTP) doğrulaması gerekip gerekmediğini döner (AAL1→AAL2)',
+  })
+  mfaStatus(
+    @Body() dto: MfaSessionDto,
+    @Headers('authorization') authorization?: string,
+  ) {
+    const token = this.extractBearerToken(authorization);
+    return this.authService.mfaStatus(token, dto.refresh_token);
+  }
+
+  @Post('mfa/challenge')
+  @Throttle(AUTH_THROTTLE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Doğrulanmış TOTP faktörü için MFA challenge başlatır',
+  })
+  mfaChallenge(
+    @Body() dto: MfaSessionDto,
+    @Headers('authorization') authorization?: string,
+  ) {
+    const token = this.extractBearerToken(authorization);
+    return this.authService.mfaChallenge(token, dto.refresh_token);
+  }
+
+  @Post('mfa/verify')
+  @Throttle(AUTH_THROTTLE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'TOTP kodunu doğrular ve AAL2 seviyesine yükseltilmiş yeni oturumu döner',
+  })
+  mfaVerify(
+    @Body() dto: MfaVerifyDto,
+    @Headers('authorization') authorization?: string,
+  ) {
+    const token = this.extractBearerToken(authorization);
+    return this.authService.mfaVerify(
+      token,
+      dto.refresh_token,
+      dto.factor_id,
+      dto.challenge_id,
+      dto.code,
+    );
   }
 }

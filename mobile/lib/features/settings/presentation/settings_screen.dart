@@ -74,6 +74,69 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 
+  /// Web'deki sidebar dropdown "Çalışma Alanından Ayrıl" ile aynı akış.
+  /// Gerçek kural seti (sahip ayrılamaz, tek Admin/OWNER iken ayrılamaz)
+  /// NestJS'te uygulanıyor; burada yalnızca UI/onay akışı var.
+  Future<void> _confirmLeaveWorkspace(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final active = ref.read(workspaceProvider).activeWorkspace;
+    if (active == null) return;
+    final s = ref.read(appStringsProvider);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(s.settingsLeaveWorkspaceTitle),
+        content: Text(
+          s.t('settings.leaveWorkspaceBody', {'name': active.name}),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(s.commonCancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(s.settingsLeaveWorkspace),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    invalidateWorkspaceScopedProvidersWithWidgetRef(ref);
+
+    final ok =
+        await ref.read(workspaceProvider.notifier).leaveWorkspace(active.id);
+    if (!context.mounted) return;
+
+    invalidateWorkspaceScopedProvidersWithWidgetRef(ref);
+
+    if (ok) {
+      final remaining = ref.read(workspaceProvider).workspaces;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(s.settingsLeftWorkspace)));
+      if (remaining.isEmpty) {
+        context.go(AppRoutes.onboarding);
+      } else {
+        context.go(AppRoutes.home);
+      }
+    } else {
+      final message =
+          ref.read(workspaceProvider).errorMessage ?? s.settingsLeaveFailed;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
@@ -82,8 +145,10 @@ class SettingsScreen extends ConsumerWidget {
     final submitting = ref.watch(
       workspaceProvider.select((state) => state.isSubmitting),
     );
-    final canDeleteWorkspace =
-        ref.watch(workspaceCapabilitiesProvider).canDeleteWorkspace;
+    final caps = ref.watch(workspaceCapabilitiesProvider);
+    final canDeleteWorkspace = caps.canDeleteWorkspace;
+    final hasActiveWorkspace =
+        ref.watch(workspaceProvider.select((s) => s.activeWorkspace != null));
 
     return Scaffold(
       appBar: AppBar(
@@ -179,6 +244,23 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoutes.progress),
           ),
+          if (!caps.isOwner && hasActiveWorkspace) ...[
+            const SizedBox(height: 28),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                Icons.logout,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: Text(
+                s.settingsLeaveWorkspace,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              onTap: submitting
+                  ? null
+                  : () => _confirmLeaveWorkspace(context, ref),
+            ),
+          ],
           if (canDeleteWorkspace) ...[
             const SizedBox(height: 36),
             Text(
