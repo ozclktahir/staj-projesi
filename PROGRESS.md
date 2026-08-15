@@ -678,4 +678,16 @@
 
 **Not:** Migration'lar (`restrict_tasks_visibility_to_assignee.sql`, `add_task_assignees_multi.sql`, `fix_workspace_members_select_all.sql`) Supabase SQL Editor'de manuel çalıştırılmalı — kod bu şemaya bağımlı (task_assignees tablosu yoksa `getTaskAssignees` sessizce boş döner, `setTaskAssignees` açıklayıcı hata verir).
 
+### [15 Ağustos 2026] - BUG FIX: Görev oluşturma "infinite recursion detected in policy for relation tasks"
+
+**Kök neden:** Bir önceki paketteki (12 Ağustos, madde 13) `add_task_assignees_multi.sql` iki politikayı birbirine çapraz bağımlı hale getirmişti:
+- `tasks."tasks_select_assignee_or_admin"` → `task_assignees`'e `EXISTS` ile bakıyor
+- `task_assignees."task_assignees_select"` → `tasks`'a `EXISTS` ile bakıyor
+
+Her iki `EXISTS` alt sorgusu da normal (SECURITY DEFINER olmayan) context'te planlandığından, karşı tablonun RLS'ini yeniden tetikliyor ve PostgreSQL bunu sonsuz döngü olarak tespit edip hata veriyordu. Hata "görev oluşturma"da görünmesinin sebebi: `create-task.ts`'teki `insert(basePayload).select("id").single()` — Postgres `RETURNING` için eklenen satıra SELECT politikasını da uygulamak zorunda, bu da döngüyü tetikliyor (INSERT politikasının kendisiyle ilgisi yok).
+
+**Çözüm:** Yeni migration `database/migrations/fix_tasks_task_assignees_rls_recursion.sql` — `is_workspace_admin`/`is_workspace_member`'da zaten kullanılan pattern'i tekrarlıyor: iki yeni `SECURITY DEFINER` fonksiyon (`is_task_assignee(task_id)`, `can_view_task(task_id)`) çapraz-tablo kontrollerini RLS'i bypass ederek yapıyor, döngü kırılıyor. `tasks_select_assignee_or_admin` ve `task_assignees_select` politikaları bu fonksiyonları çağıracak şekilde `DROP + CREATE` edildi; erişim kuralları (creator/assignee/admin/task_assignees üyeliği) davranışsal olarak DEĞİŞMEDİ, yalnızca sorgu planlama yolu düzeltildi.
+
+**Durum:** Migration dosyası hazır, **Supabase SQL Editor'de manuel çalıştırılması gerekiyor** (bu asistanın doğrudan DB erişimi yok — bkz. `CLAUDE.md`). Çalıştırılmadan görev oluşturma (ve muhtemelen `task_assignees` okuyan diğer akışlar) hata vermeye devam eder.
+
 
