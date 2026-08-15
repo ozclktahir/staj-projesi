@@ -31,6 +31,12 @@ final realtimeConnectionProvider = Provider<void>((ref) {
     workspaceProvider.select((s) => s.activeWorkspace?.id),
   );
   final socket = ref.watch(socketServiceProvider);
+  // Bir kez yakalanıyor: onDispose içinde `ref.read(...)` çağırmak, bu
+  // provider dependency-invalidation nedeniyle dispose edilirken Riverpod'un
+  // "Cannot use ref functions after the dependency changed but before the
+  // provider rebuilt" assertion'ını tetikliyordu. Notifier'ı doğrudan
+  // tutup çağırmak (socket'te zaten yapılan pattern) bu sorunu ortadan kaldırır.
+  final presence = ref.read(workspacePresenceProvider.notifier);
 
   Timer? debounce;
 
@@ -62,7 +68,7 @@ final realtimeConnectionProvider = Provider<void>((ref) {
       userId == null ||
       userId.isEmpty) {
     socket.disconnect();
-    ref.read(workspacePresenceProvider.notifier).reset();
+    presence.reset();
     ref.onDispose(() {
       debounce?.cancel();
       socket.disconnect();
@@ -103,7 +109,7 @@ final realtimeConnectionProvider = Provider<void>((ref) {
         }
         final raw = map['onlineUserIds'];
         final ids = raw is List ? raw.whereType<String>() : const <String>[];
-        ref.read(workspacePresenceProvider.notifier).update(ids);
+        presence.update(ids);
       } catch (error, stack) {
         debugPrint('[Realtime] presence handler failed: $error\n$stack');
       }
@@ -113,6 +119,6 @@ final realtimeConnectionProvider = Provider<void>((ref) {
   ref.onDispose(() {
     debounce?.cancel();
     socket.disconnect();
-    ref.read(workspacePresenceProvider.notifier).reset();
+    presence.reset();
   });
 });
