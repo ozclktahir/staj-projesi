@@ -729,3 +729,20 @@ Her iki `EXISTS` alt sorgusu da normal (SECURITY DEFINER olmayan) context'te pla
 
 **Ek — test sırasında bulunan operasyonel tuzak:** `adb reverse tcp:3000 tcp:3000` USB tüneli, telefon fiziksel olarak çıkarılıp tekrar takıldığında OTOMATİK olarak düşüyor (yeniden kurulması gerekiyor) — yerel debug build'i test ederken "giriş yapamıyorum" şikâyetinin kök nedeni buydu, kod hatası değildi. Gelecekte benzer bir cihaz test oturumunda ilk kontrol noktası bu olmalı.
 
+### [16 Ağustos 2026] - BUG FIX: Kayıt (register) formunda "User not allowed" hatası
+
+**Belirti:** Web'de kayıt formu doldurulup "Kayıt Ol"a basıldığında `POST /auth/register` "User not allowed" hatasıyla başarısız oluyordu, kayıt tamamlanmıyordu.
+
+**Kök neden — kod değil, credential:** `AuthService.register()` ([backend/src/auth/auth.service.ts](backend/src/auth/auth.service.ts)), `SUPABASE_SERVICE_ROLE_KEY` tanımlıysa (rate limit'siz, e-posta onaylı kullanıcı oluşturmak için) `admin.auth.admin.createUser()` admin API'sini çağırıyor. "User not allowed", Supabase GoTrue'nun bu admin API'sine gönderilen anahtarın `service_role` yetkisine sahip olmadığını gösteren kendine özgü hatası — yani Render'daki `staj-projesi-api` servisinin `SUPABASE_SERVICE_ROLE_KEY` env değişkeni **tanımlıydı ama geçersizdi** (muhtemelen Supabase Dashboard'dan kopyalanırken fazladan boşluk/satır sonu, rotasyon veya yanlış proje anahtarı — kesin sebep doğrulanamadı, sadece anahtar güncellenerek çözüldü).
+
+**Neden koda dokunulmadı:** `git log -p` ile `auth.service.ts`/`supabase.service.ts` geçmişi incelendi — admin client/register mantığı haftalardır değişmemiş (son dokunan commit 5cddb89 yalnızca `createEphemeralClient` eklemiş, register akışına dokunmamış). Davet-öncelikli onboarding akışıyla (`resolvePostLoginRedirect`) bir çakışma da yok — o yalnızca register+login BAŞARILI olduktan SONRA çalışıyor. Mobil de aynı `POST /auth/register` uç noktasını kullandığından ayrı bir mobil bug da yoktu — tek kök neden ikisini birden etkiliyordu.
+
+**Çözüm:** Kullanıcı, Supabase Dashboard → Project Settings → API'den güncel `service_role` (secret) anahtarını Render Dashboard → `staj-projesi-api` → Environment → `SUPABASE_SERVICE_ROLE_KEY`'e yeniden girdi (Render otomatik yeniden deploy tetikledi).
+
+**Doğrulama (prod, canlı API'ye gerçek istekle):**
+```
+POST https://staj-projesi-api.onrender.com/auth/register → 201 Created
+POST https://staj-projesi-api.onrender.com/auth/login    → 200 OK (access_token döndü)
+```
+Test kullanıcısı: `ozclk.tahir+claudetest1786910138@gmail.com` — Supabase Authentication panelinden istenirse silinebilir (bu oturumda kullanıcı silme uç noktası yok).
+
