@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   removeWorkspaceMember,
@@ -33,6 +34,7 @@ export function MembersTable({
   currentUserId,
 }: MembersTableProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const [members, setMembers] = useState(initial);
   const [pending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
@@ -47,6 +49,7 @@ export function MembersTable({
   }, [members, query]);
 
   function onRoleChange(userId: string, role: "Admin" | "Member") {
+    const previous = members.find((m) => m.id === userId)?.role ?? null;
     startTransition(async () => {
       const result = await updateWorkspaceMemberRole({
         workspaceId,
@@ -54,6 +57,10 @@ export function MembersTable({
         role,
       });
       if (!result.success) {
+        // Sunucu reddetti — yerel state'i geri al ki UI gerçekle uyuşsun.
+        setMembers((prev) =>
+          prev.map((m) => (m.id === userId ? { ...m, role: previous } : m)),
+        );
         toast.error(result.error);
         return;
       }
@@ -61,6 +68,8 @@ export function MembersTable({
         prev.map((m) => (m.id === userId ? { ...m, role } : m)),
       );
       toast.success(result.message);
+      // Sunucu tarafındaki listeyi de tazele (cache invalidation sonrası).
+      router.refresh();
     });
   }
 
@@ -74,6 +83,7 @@ export function MembersTable({
       }
       setMembers((prev) => prev.filter((m) => m.id !== userId));
       toast.success(result.message);
+      router.refresh();
     });
   }
 

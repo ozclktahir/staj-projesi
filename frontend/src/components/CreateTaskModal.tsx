@@ -79,6 +79,7 @@ export function CreateTaskModal({
   const [members, setMembers] = useState<WorkspaceMemberOption[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [extraAssigneeIds, setExtraAssigneeIds] = useState<string[]>([]);
 
   const [rejectedTasks, setRejectedTasks] = useState<RejectedTaskItem[]>([]);
   const [selectedRejectedId, setSelectedRejectedId] = useState("");
@@ -132,6 +133,7 @@ export function CreateTaskModal({
     setStatus("TODO");
     setPriority("MEDIUM");
     setAssigneeId("");
+    setExtraAssigneeIds([]);
     setDueDate("");
     setSelectedRejectedId("");
     setRejectedNote(null);
@@ -185,6 +187,8 @@ export function CreateTaskModal({
           status,
           priority,
           assigneeId: assigneeId || null,
+          // Birincil atanan ek listeye de yazılmasın — tekrar olurdu.
+          extraAssigneeIds: extraAssigneeIds.filter((id) => id !== assigneeId),
         });
 
         if (!result.success) {
@@ -408,6 +412,68 @@ export function CreateTaskModal({
                 })}
               </select>
             </div>
+
+            {/*
+              Çoklu atama artık görev OLUŞTURULURKEN de sorulur (önceden
+              yalnızca görev detayında düzenlenebiliyordu). Görev detayındaki
+              düzenleme özelliği yerinde duruyor.
+            */}
+            {!isReassignMode && isAdmin ? (
+              <div className="space-y-2">
+                <Label>
+                  {t("taskModal.extraAssignees")} ({extraAssigneeIds.length})
+                </Label>
+                <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border-2 border-border p-2 dark:border">
+                  {members.length === 0 ? (
+                    <p className="px-1 py-1 text-xs text-muted-foreground">
+                      {t("taskModal.noMembers")}
+                    </p>
+                  ) : (
+                    members.map((member) => {
+                      const label =
+                        cleanText(member.fullName) ||
+                        cleanText(member.displayName) ||
+                        emailLocalPart(member.email) ||
+                        cleanText(member.email) ||
+                        "";
+                      if (!label) return null;
+                      const checked = extraAssigneeIds.includes(member.id);
+                      const isPrimary = assigneeId === member.id;
+                      return (
+                        <label
+                          key={member.id}
+                          className={cn(
+                            "flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50",
+                            isPrimary && "opacity-50",
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={isSubmitting || isPrimary}
+                            onChange={() =>
+                              setExtraAssigneeIds((prev) =>
+                                checked
+                                  ? prev.filter((v) => v !== member.id)
+                                  : [...prev, member.id],
+                              )
+                            }
+                            className="size-3.5 rounded border-border accent-primary"
+                          />
+                          <span className="truncate text-foreground">
+                            {label}
+                            {isPrimary ? ` — ${t("taskModal.primary")}` : ""}
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {t("taskModal.extraAssigneesHint")}
+                </p>
+              </div>
+            ) : null}
 
             {isReassignMode ? (
               <div className="space-y-2">

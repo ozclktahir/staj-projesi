@@ -382,7 +382,7 @@ export class WorkspaceService {
   ): Promise<{
     hits: Array<{
       id: string;
-      type: 'project' | 'task' | 'member';
+      type: 'project' | 'task' | 'member' | 'note' | 'todo';
       title: string;
       subtitle: string | null;
       projectId?: string | null;
@@ -396,32 +396,62 @@ export class WorkspaceService {
 
     const client = this.supabaseService.createUserClient(accessToken);
     const like = `%${q}%`;
+    // PostgREST `or=` filtresinde virgül/parantez ayırıcıdır — temizle.
+    const orLike = `%${q.replace(/[(),]/g, ' ').trim()}%`;
 
-    const [projectsRes, tasksRes, membersRes] = await Promise.all([
-      client
-        .from('projects')
-        .select('id, name, description')
-        .eq('workspace_id', workspaceId)
-        .is('deleted_at', null)
-        .ilike('name', like)
-        .limit(8),
-      client
-        .from('tasks')
-        .select('id, title, project_id, status')
-        .eq('workspace_id', workspaceId)
-        .is('deleted_at', null)
-        .ilike('title', like)
-        .limit(10),
-      client
-        .from('workspace_members')
-        .select('user_id, role, profiles:user_id(id, email, full_name)')
-        .eq('workspace_id', workspaceId)
-        .limit(40),
-    ]);
+    const { data: authData } = await client.auth.getUser(accessToken);
+    const userId = authData?.user?.id ?? null;
+
+    const [projectsRes, tasksRes, memberRowsRes, ownerRes, notesRes, todosRes] =
+      await Promise.all([
+        client
+          .from('projects')
+          .select('id, name, description')
+          .eq('workspace_id', workspaceId)
+          .is('deleted_at', null)
+          .or(`name.ilike.${orLike},description.ilike.${orLike}`)
+          .limit(8),
+        client
+          .from('tasks')
+          .select('id, title, description, project_id, status')
+          .eq('workspace_id', workspaceId)
+          .is('deleted_at', null)
+          .or(`title.ilike.${orLike},description.ilike.${orLike}`)
+          .limit(10),
+        // `profiles:user_id(...)` embed'i şemada FK ilişkisi olmadığı için
+        // PGRST200 ile HER ZAMAN hata veriyordu → üye araması hiç sonuç
+        // döndürmüyordu. Profiller ayrı sorguyla çekiliyor.
+        client
+          .from('workspace_members')
+          .select('user_id, role')
+          .eq('workspace_id', workspaceId)
+          .limit(100),
+        client
+          .from('workspaces')
+          .select('owner_id')
+          .eq('id', workspaceId)
+          .maybeSingle(),
+        userId
+          ? client
+              .from('personal_notes')
+              .select('id, title, content')
+              .eq('user_id', userId)
+              .or(`title.ilike.${orLike},content.ilike.${orLike}`)
+              .limit(6)
+          : Promise.resolve({ data: [], error: null }),
+        userId
+          ? client
+              .from('personal_todos')
+              .select('id, task, is_completed')
+              .eq('user_id', userId)
+              .ilike('task', like)
+              .limit(6)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
     const hits: Array<{
       id: string;
-      type: 'project' | 'task' | 'member';
+      type: 'project' | 'task' | 'member' | 'note' | 'todo';
       title: string;
       subtitle: string | null;
       projectId?: string | null;
@@ -446,35 +476,78 @@ export class WorkspaceService {
       });
     }
 
-    const qLower = q.toLowerCase();
-    let memberHits = 0;
-    for (const row of membersRes.data ?? []) {
-      if (memberHits >= 8) break;
-      const profile = Array.isArray(row.profiles)
-        ? row.profiles[0]
-        : row.profiles;
-      const name = String(
-        (profile as { full_name?: string } | null)?.full_name ??
-          (profile as { email?: string } | null)?.email ??
-          row.user_id ??
-          '',
-      );
-      const email = String(
-        (profile as { email?: string } | null)?.email ?? '',
-      );
-      if (
-        !name.toLowerCase().includes(qLower) &&
-        !email.toLowerCase().includes(qLower)
-      ) {
-        continue;
+    // ── Üyeler (profil adları ayrı sorguyla) ──
+    const roleByUserId = new Map<string, string | null>();
+    for (const row of memberRowsRes.data ?? []) {
+      if (typeof row.user_id === 'string') {
+        roleByUserId.set(row.user_id, (row.role as string | null) ?? null);
       }
+    }
+    const ownerId =
+      typeof ownerRes.data?.owner_id === 'string'
+        ? ownerRes.data.owner_id
+        : null;
+    if (ownerId && !roleByUserId.has(ownerId)) {
+      roleByUserId.set(ownerId, 'OWNER');
+    }
+
+    const memberIds = [...roleByUserId.keys()];
+    if (memberIds.length > 0) {
+      const { data: profiles } = await client
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', memberIds);
+
+      const profileById = new Map<
+        string,
+        { email?: string | null; full_name?: string | null }
+      >();
+      for (const p of profiles ?? []) {
+        if (typeof p.id === 'string') profileById.set(p.id, p);
+      }
+
+      const qLower = q.toLowerCase();
+      let memberHits = 0;
+      for (const uid of memberIds) {
+        if (memberHits >= 8) break;
+        const profile = profileById.get(uid) ?? null;
+        const name = String(profile?.full_name ?? '');
+        const email = String(profile?.email ?? '');
+        if (
+          !name.toLowerCase().includes(qLower) &&
+          !email.toLowerCase().includes(qLower)
+        ) {
+          continue;
+        }
+        hits.push({
+          id: uid,
+          type: 'member',
+          title: name || email || 'Üye',
+          subtitle: roleByUserId.get(uid) ?? null,
+        });
+        memberHits++;
+      }
+    }
+
+    for (const row of notesRes.data ?? []) {
+      const content = (row as { content?: string | null }).content ?? null;
       hits.push({
-        id: String(row.user_id),
-        type: 'member',
-        title: name || email || 'Üye',
-        subtitle: (row.role as string | null) ?? null,
+        id: String((row as { id: string }).id),
+        type: 'note',
+        title: String((row as { title?: string }).title ?? 'Not'),
+        subtitle: content ? content.slice(0, 60) : null,
       });
-      memberHits++;
+    }
+
+    for (const row of todosRes.data ?? []) {
+      hits.push({
+        id: String((row as { id: string }).id),
+        type: 'todo',
+        title: String((row as { task?: string }).task ?? 'Görev'),
+        subtitle: (row as { is_completed?: boolean }).is_completed
+          ? 'Tamamlandı'
+          : null,
+      });
     }
 
     return { hits };

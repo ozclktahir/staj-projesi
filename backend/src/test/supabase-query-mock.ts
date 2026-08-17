@@ -8,6 +8,12 @@ export type QueryResult<T = unknown> = {
   data?: T;
   error?: { message: string; code?: string } | null;
   count?: number | null;
+  /**
+   * Aynı tablo hem tekil (`maybeSingle`) hem liste olarak sorgulanıyorsa,
+   * liste yolunda (await / `range`) dönecek veri. Verilmezse `data` kullanılır.
+   * Örn. workspace_members: üyelik kontrolü tekil, admin listesi çoğul.
+   */
+  listData?: unknown;
 };
 
 export function createQueryBuilderMock<T = unknown>(
@@ -15,6 +21,12 @@ export function createQueryBuilderMock<T = unknown>(
 ): any {
   const resolved = {
     data: result.data ?? null,
+    error: result.error ?? null,
+    count: result.count ?? null,
+  };
+
+  const listResolved = {
+    data: result.listData ?? result.data ?? null,
     error: result.error ?? null,
     count: result.count ?? null,
   };
@@ -32,12 +44,12 @@ export function createQueryBuilderMock<T = unknown>(
     is: jest.fn(() => builder),
     not: jest.fn(() => builder),
     order: jest.fn(() => builder),
-    range: jest.fn(() => Promise.resolve(resolved)),
+    range: jest.fn(() => Promise.resolve(listResolved)),
     limit: jest.fn(() => builder),
     maybeSingle: jest.fn(() => Promise.resolve(resolved)),
     single: jest.fn(() => Promise.resolve(resolved)),
     then: (onFulfilled: any, onRejected?: any) =>
-      Promise.resolve(resolved).then(onFulfilled, onRejected),
+      Promise.resolve(listResolved).then(onFulfilled, onRejected),
   };
 
   return builder;

@@ -19,11 +19,14 @@ type OnboardingInviteResponseProps = {
   invitations: PendingInvitationItem[];
   /** Hiç davet kalmayınca (hepsi yanıtlandı) workspace oluşturma formuna geç. */
   onAllResolved: () => void;
+  /** Tek bir davet yanıtlandığında üst bileşeni haberdar et. */
+  onInvitationResolved?: (invitationId: string) => void;
 };
 
 export function OnboardingInviteResponse({
   invitations: initialInvitations,
   onAllResolved,
+  onInvitationResolved,
 }: OnboardingInviteResponseProps) {
   const [invitations, setInvitations] = useState(initialInvitations);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -43,7 +46,8 @@ export function OnboardingInviteResponse({
       if (action === "accept") {
         const ws = result.workspaceId || invitation.workspaceId;
         writeActiveWorkspaceId(ws);
-        toast.success(`"${invitation.workspaceName}" daveti kabul edildi`);
+        toast.success(`"${invitation.workspaceName}" çalışma alanına katıldın`);
+        // Tam sayfa yükleme: cookie/aktif workspace sunucuya da yansısın.
         window.location.assign(`/?workspaceId=${encodeURIComponent(ws)}`);
         return;
       }
@@ -51,6 +55,7 @@ export function OnboardingInviteResponse({
       toast.success("Davet reddedildi");
       const remaining = invitations.filter((i) => i.id !== invitation.id);
       setInvitations(remaining);
+      onInvitationResolved?.(invitation.id);
       if (remaining.length === 0) onAllResolved();
     } catch (error) {
       toast.error(
@@ -92,7 +97,9 @@ export function OnboardingInviteResponse({
               disabled={busyId === invitation.id}
               onClick={() => void handleRespond(invitation, "accept")}
             >
-              {busyId === invitation.id ? "İşleniyor…" : "Kabul Et"}
+              {busyId === invitation.id
+                ? "Katılıyor…"
+                : "Workspace'e Katıl"}
             </Button>
             <Button
               type="button"

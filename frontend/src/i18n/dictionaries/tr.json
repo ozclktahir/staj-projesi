@@ -75,7 +75,9 @@
     "nav": "Sayfalar",
     "projects": "Projeler",
     "tasks": "Görevler",
-    "members": "Üyeler"
+    "members": "Üyeler",
+    "notes": "Kişisel Notlar",
+    "todos": "Kişisel Görevler"
   },
   "dashboard": {
     "prevPage": "Önceki sayfa",
@@ -470,7 +472,11 @@
     "reassignFailed": "Yeniden atama başarısız",
     "rejectedBy": "Bu görev daha önce {name} tarafından reddedildi",
     "hide": "Gizle",
-    "countItems": "{n} adet"
+    "countItems": "{n} adet",
+    "extraAssignees": "Ek Atananlar (çoklu)",
+    "extraAssigneesHint": "Birincil atanana ek olarak bu görevi görebilecek üyeler.",
+    "noMembers": "Üye bulunamadı.",
+    "primary": "birincil atanan"
   },
   "loading": {
     "generic": "Yükleniyor…",
@@ -503,5 +509,8 @@
     "tasks": "Görevler",
     "tasksHint": "Kartlara tıklayarak detay panelini aç. Durumu hızlıca değiştir.",
     "created": "Oluşturulma"
+  },
+  "taskDetail": {
+    "priorityReadOnly": "Öncelik görev oluşturulurken belirlenir; sonradan değiştirilemez."
   }
 }

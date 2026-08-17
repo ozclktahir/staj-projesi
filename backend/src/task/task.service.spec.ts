@@ -95,4 +95,61 @@ describe('TaskService', () => {
       ).rejects.toThrow('zaten bir silme onayı bekleniyor');
     });
   });
+
+  // ── 17 Ağustos 2026: silme HER ZAMAN onaydan geçer (PROGRESS.md madde 6) ──
+  describe('requestOrDelete (onaysız silme yok)', () => {
+    it('hiç dokunulmamış (TODO, aktivitesiz) görev bile doğrudan silinmez', async () => {
+      const existing = {
+        id: 't1',
+        title: 'Dokunulmamış görev',
+        status: 'TODO',
+        project_id: 'p1',
+        assignee_id: 'assignee-1',
+        assigned_to: 'assignee-1',
+        created_by: 'admin-1',
+        deletion_status: 'none',
+      };
+      await build({
+        tasks: { data: existing },
+        workspaces: { data: { owner_id: 'admin-1' } },
+        workspace_members: {
+          data: { role: 'Admin' },
+          listData: [{ user_id: 'admin-1', role: 'Admin' }],
+        },
+      });
+
+      const result = await service.requestOrDelete('ws-1', 't1', 'admin-1');
+
+      expect(result.mode).toBe('approval_requested');
+      expect(result.deletionStatus).toBe('pending_user_approval');
+      expect(result.message).toContain('görev silinmedi');
+    });
+
+    it('onaylayacak kimse yoksa hiçbir şey değiştirmeden hata verir', async () => {
+      const existing = {
+        id: 't1',
+        title: 'Tek kişilik workspace görevi',
+        status: 'TODO',
+        project_id: 'p1',
+        // Görev talep edenin kendisine atanmış → assignee onaylayıcı olamaz
+        assignee_id: 'solo-owner',
+        assigned_to: 'solo-owner',
+        created_by: 'solo-owner',
+        deletion_status: 'none',
+      };
+      await build({
+        tasks: { data: existing },
+        // Tek admin: talep edenin kendisi
+        workspaces: { data: { owner_id: 'solo-owner' } },
+        workspace_members: {
+          data: { role: 'Admin' },
+          listData: [{ user_id: 'solo-owner', role: 'Admin' }],
+        },
+      });
+
+      await expect(
+        service.requestOrDelete('ws-1', 't1', 'solo-owner'),
+      ).rejects.toThrow('onaylayabilecek başka kimse yok');
+    });
+  });
 });

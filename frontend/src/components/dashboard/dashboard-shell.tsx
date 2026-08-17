@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { getCurrentUserDisplayLabel } from "@/app/actions/current-user";
 import { AppHeader } from "@/components/dashboard/app-header";
 import { Sidebar } from "@/components/sidebar";
+import { WorkspacePresenceProvider } from "@/components/workspace-presence-provider";
 import { syncAuthCookiesFromStorage } from "@/lib/auth-session";
 
 export function DashboardShell({
@@ -52,22 +53,31 @@ export function DashboardShell({
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
-      <Sidebar
-        collapsed={isSidebarCollapsed}
-        onCollapsedChange={setIsSidebarCollapsed}
-        mobileOpen={isMobileNavOpen}
-        onMobileOpenChange={setIsMobileNavOpen}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <AppHeader
-          userName={userName}
-          userEmail={userEmail}
-          isLoadingUser={isLoadingUser}
-          onOpenMobileNav={() => setIsMobileNavOpen(true)}
-        />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
-      </div>
-    </div>
+    // Presence sağlayıcısı shell seviyesinde: kullanıcı dashboard'da olmasa da
+    // (projeler, kişisel alan, ayarlar…) çevrimiçi olarak görünür.
+    // useWorkspaces → useSearchParams kullandığı için Suspense sınırı gerekli.
+    <Suspense fallback={null}>
+      <WorkspacePresenceProvider>
+        <div className="flex min-h-screen bg-background text-foreground">
+          <Sidebar
+            collapsed={isSidebarCollapsed}
+            onCollapsedChange={setIsSidebarCollapsed}
+            mobileOpen={isMobileNavOpen}
+            onMobileOpenChange={setIsMobileNavOpen}
+          />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <AppHeader
+              userName={userName}
+              userEmail={userEmail}
+              isLoadingUser={isLoadingUser}
+              onOpenMobileNav={() => setIsMobileNavOpen(true)}
+            />
+            <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+              {children}
+            </main>
+          </div>
+        </div>
+      </WorkspacePresenceProvider>
+    </Suspense>
   );
 }

@@ -1283,8 +1283,28 @@ export function PersonalWorkspace({
                 return (
                   <li
                     key={todo.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={todo.isCompleted}
+                    // Satırın herhangi bir yerine tıklamak tamamlanmayı
+                    // değiştirir; checkbox ve sil butonu kendi olaylarını
+                    // durdurur (aşağıdaki stopPropagation'lar).
+                    onClick={() => {
+                      if (todoActionId === todo.id) return;
+                      startTransition(() => {
+                        void handleToggleTodo(todo);
+                      });
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      if (todoActionId === todo.id) return;
+                      startTransition(() => {
+                        void handleToggleTodo(todo);
+                      });
+                    }}
                     className={cn(
-                      "flex items-start gap-2 rounded-md border border-border bg-card px-2.5 py-2 shadow-sm",
+                      "flex cursor-pointer items-start gap-2 rounded-md border border-border bg-card px-2.5 py-2 shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                       todo.isCompleted && "opacity-70",
                     )}
                   >
@@ -1292,6 +1312,7 @@ export function PersonalWorkspace({
                       type="checkbox"
                       checked={todo.isCompleted}
                       disabled={todoActionId === todo.id}
+                      onClick={(event) => event.stopPropagation()}
                       onChange={() => {
                         startTransition(() => {
                           void handleToggleTodo(todo);
@@ -1325,7 +1346,10 @@ export function PersonalWorkspace({
                       size="icon-sm"
                       variant="ghost"
                       disabled={todoActionId === todo.id}
-                      onClick={() => {
+                      onClick={(event) => {
+                        // Satır tıklaması tamamlanmayı değiştiriyor — silme
+                        // butonu onu tetiklemesin.
+                        event.stopPropagation();
                         startTransition(() => {
                           void handleDeleteTodo(todo.id);
                         });

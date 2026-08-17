@@ -159,6 +159,9 @@ class TasksNotifier
     TaskPriority priority = TaskPriority.medium,
     String? assigneeId,
     String? dueDate,
+    /// Birincil atanana EK atananlar (task_assignees) — görev oluşturulurken
+    /// seçilir; yalnızca admin/OWNER uygulayabilir (backend de doğrular).
+    List<String> extraAssigneeIds = const [],
   }) async {
     final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
     if (workspaceId == null) {
@@ -180,6 +183,23 @@ class TasksNotifier
             projectId: arg,
           ),
         );
+
+    final extras = {
+      for (final id in extraAssigneeIds)
+        if (id.trim().isNotEmpty && id != assigneeId) id.trim(),
+    }.toList();
+    if (extras.isNotEmpty) {
+      try {
+        await ref.read(taskRepositoryProvider).setAssignees(
+              workspaceId: workspaceId,
+              taskId: created.id,
+              userIds: extras,
+            );
+      } catch (error) {
+        // Görev oluştu; yalnızca ek atama başarısız oldu — görevi geri alma.
+        debugPrint('[createTask] setAssignees: $error');
+      }
+    }
     final current = state.valueOrNull ?? const ProjectTasksState(items: []);
     state = AsyncData(
       current.copyWith(

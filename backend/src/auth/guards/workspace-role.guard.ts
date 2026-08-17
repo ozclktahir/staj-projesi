@@ -37,25 +37,60 @@ export class WorkspaceRoleGuard implements CanActivate {
       throw new ForbiddenException('Bu workspace\'e erişim izniniz yok');
     }
 
-    const { data: membership, error } = await this.supabaseService
-      .getClient()
-      .from('workspace_members')
-      .select('role')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', userId)
-      .maybeSingle();
+    // Yetki kontrolü RLS'ye takılmamalı: `SUPABASE_KEY` ortama göre anon veya
+    // service_role olabiliyor. Anon anahtarla `workspaces`/`workspace_members`
+    // okumaları boş dönüp herkesi (sahip dahil) engellerdi — service role
+    // istemcisi varsa onu tercih ediyoruz.
+    const client =
+      this.supabaseService.getAdminClient() ?? this.supabaseService.getClient();
+
+    const [membershipResult, ownerResult] = await Promise.all([
+      client
+        .from('workspace_members')
+        .select('role')
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', userId)
+        .maybeSingle(),
+      // Workspace'in gerçek sahibi her zaman OWNER sayılır. Aksi hâlde
+      // workspace_members satırı olmayan (ör. eski kayıtlar veya
+      // 'OWNER' rolünü reddeden CHECK kısıtı yüzünden insert'i düşen)
+      // bir sahip kendi çalışma alanında 403 alıyordu — üye rolü
+      // değiştirme bu yüzden sessizce başarısız oluyordu.
+      client
+        .from('workspaces')
+        .select('id')
+        .eq('id', workspaceId)
+        .eq('owner_id', userId)
+        .maybeSingle(),
+    ]);
+
+    const membershipRole =
+      typeof membershipResult.data?.role === 'string'
+        ? membershipResult.data.role
+        : null;
+    // Sahiplik iki yoldan gelebilir: workspaces.owner_id VEYA
+    // workspace_members.role = 'OWNER' (şemaya göre biri ya da diğeri dolu).
+    const isOwner =
+      Boolean(ownerResult.data?.id) ||
+      (membershipRole ?? '').toLowerCase() === 'owner';
 
     // Üyelik zorunlu: @Roles olmasa bile workspace üyesi olmayan herkes engellenir.
-    if (error || !membership) {
+    if (!isOwner && (membershipResult.error || !membershipRole)) {
       throw new ForbiddenException('Bu workspace\'e erişim izniniz yok');
     }
 
-    if (
-      requiredRoles &&
-      requiredRoles.length > 0 &&
-      !requiredRoles.includes(membership.role)
-    ) {
-      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    if (requiredRoles && requiredRoles.length > 0) {
+      const effectiveRole = isOwner ? 'OWNER' : (membershipRole as string);
+      const allowed = requiredRoles.some(
+        (role) => role.toLowerCase() === effectiveRole.toLowerCase(),
+      );
+      // Sahip, Admin gerektiren her uca da erişebilir.
+      const ownerCoversAdmin =
+        isOwner && requiredRoles.some((role) => role.toLowerCase() === 'admin');
+
+      if (!allowed && !ownerCoversAdmin) {
+        throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+      }
     }
 
     return true;

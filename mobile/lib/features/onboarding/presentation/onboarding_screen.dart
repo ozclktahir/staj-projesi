@@ -13,11 +13,20 @@ import '../../workspace/providers/workspace_provider.dart';
 /// davet-öncelikli onboarding parity — bkz. OnboardingGate/PROGRESS.md
 /// "12 Ağustos 2026" madde 8). Hiç davet yoksa veya hepsi
 /// kabul/reddedilince workspace oluşturma formuna düşer.
-class OnboardingScreen extends ConsumerWidget {
+class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
+  /// Bekleyen daveti olan kullanıcı yine de kendi çalışma alanını kurmak
+  /// isterse (web'deki OnboardingGate ile aynı kaçış yolu).
+  var _forceCreateForm = false;
+
+  @override
+  Widget build(BuildContext context) {
     final invitationsAsync = ref.watch(myInvitationsProvider);
     final pending = invitationsAsync.valueOrNull
             ?.where((invite) => invite.isPending)
@@ -33,22 +42,37 @@ class OnboardingScreen extends ConsumerWidget {
       );
     }
 
-    if (pending.isNotEmpty) {
+    if (pending.isNotEmpty && !_forceCreateForm) {
       return AuthSplitShell(
         child: AuthFormCard(
-          child: _PendingInvitesList(invitations: pending),
+          child: _PendingInvitesList(
+            invitations: pending,
+            onCreateOwnInstead: () =>
+                setState(() => _forceCreateForm = true),
+          ),
         ),
       );
     }
 
-    return const AuthSplitShell(child: _CreateWorkspaceForm());
+    return AuthSplitShell(
+      child: _CreateWorkspaceForm(
+        pendingInviteCount: pending.length,
+        onBackToInvites: pending.isNotEmpty
+            ? () => setState(() => _forceCreateForm = false)
+            : null,
+      ),
+    );
   }
 }
 
 class _PendingInvitesList extends ConsumerWidget {
-  const _PendingInvitesList({required this.invitations});
+  const _PendingInvitesList({
+    required this.invitations,
+    required this.onCreateOwnInstead,
+  });
 
   final List<InvitationDto> invitations;
+  final VoidCallback onCreateOwnInstead;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -78,6 +102,13 @@ class _PendingInvitesList extends ConsumerWidget {
           _InviteCard(invitation: invite),
           const SizedBox(height: 12),
         ],
+        TextButton(
+          onPressed: onCreateOwnInstead,
+          child: const Text(
+            'Daveti şimdilik beklet, kendi çalışma alanımı oluşturayım',
+            textAlign: TextAlign.center,
+          ),
+        ),
       ],
     );
   }
@@ -170,7 +201,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                           width: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Kabul et'),
+                      : const Text('Çalışma alanına katıl'),
                 ),
               ),
             ],
@@ -182,7 +213,13 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
 }
 
 class _CreateWorkspaceForm extends ConsumerStatefulWidget {
-  const _CreateWorkspaceForm();
+  const _CreateWorkspaceForm({
+    this.pendingInviteCount = 0,
+    this.onBackToInvites,
+  });
+
+  final int pendingInviteCount;
+  final VoidCallback? onBackToInvites;
 
   @override
   ConsumerState<_CreateWorkspaceForm> createState() =>
@@ -289,6 +326,15 @@ class _CreateWorkspaceFormState extends ConsumerState<_CreateWorkspaceForm> {
                 submitting ? 'Oluşturuluyor…' : 'Çalışma alanını oluştur',
               ),
             ),
+            if (widget.onBackToInvites != null) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: submitting ? null : widget.onBackToInvites,
+                child: Text(
+                  'Bekleyen davetime geri dön (${widget.pendingInviteCount})',
+                ),
+              ),
+            ],
           ],
         ),
       ),

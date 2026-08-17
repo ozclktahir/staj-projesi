@@ -14,13 +14,24 @@ function buildContext(params: Record<string, string>, userId?: string) {
 }
 
 describe('WorkspaceRoleGuard', () => {
-  function build(membershipRole: string | null, requiredRoles?: string[]) {
+  function build(
+    membershipRole: string | null,
+    requiredRoles?: string[],
+    options: { isOwner?: boolean } = {},
+  ) {
     const client = createSupabaseClientMock({
       workspace_members: {
         data: membershipRole ? { role: membershipRole } : null,
       },
+      workspaces: {
+        data: options.isOwner ? { id: 'ws-1' } : null,
+      },
     });
-    const supabaseService = { getClient: jest.fn(() => client) };
+    const supabaseService = {
+      getClient: jest.fn(() => client),
+      // Guard artık RLS'yi bypass eden istemciyi tercih ediyor
+      getAdminClient: jest.fn(() => client),
+    };
     const reflector = {
       getAllAndOverride: jest.fn(() => requiredRoles),
     } as unknown as Reflector;
@@ -82,6 +93,45 @@ describe('WorkspaceRoleGuard', () => {
   it('kullanıcı kimliği yoksa ForbiddenException fırlatır', async () => {
     const guard = build('Admin', undefined);
     const ctx = buildContext({ workspaceId: 'ws-1' }, undefined);
+
+    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  // ── 17 Ağustos 2026: rol değiştirme 403 hatası (bkz. PROGRESS.md madde 9) ──
+
+  it('workspaces.owner_id sahibi, workspace_members satırı OLMASA bile Admin ucuna erişir', async () => {
+    const guard = build(null, ['Admin', 'OWNER'], { isOwner: true });
+    const ctx = buildContext({ workspaceId: 'ws-1' }, 'owner-1');
+
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+  });
+
+  it('sahip, yalnızca Admin isteyen bir rotaya da erişir', async () => {
+    const guard = build(null, ['Admin'], { isOwner: true });
+    const ctx = buildContext({ workspaceId: 'ws-1' }, 'owner-1');
+
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+  });
+
+  it('rol karşılaştırması büyük/küçük harfe duyarsızdır (admin ≡ Admin)', async () => {
+    const guard = build('admin', ['Admin']);
+    const ctx = buildContext({ workspaceId: 'ws-1' }, 'u-1');
+
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+  });
+
+  it('OWNER rolü Admin gerektiren rotada kabul edilir', async () => {
+    const guard = build('OWNER', ['Admin']);
+    const ctx = buildContext({ workspaceId: 'ws-1' }, 'u-1');
+
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+  });
+
+  it('sahip olmayan ve üye olmayan kullanıcı hâlâ engellenir', async () => {
+    const guard = build(null, ['Admin'], { isOwner: false });
+    const ctx = buildContext({ workspaceId: 'ws-1' }, 'stranger');
 
     await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
       ForbiddenException,

@@ -15,6 +15,7 @@ import '../../notifications/presentation/notifications_sheet.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../personal/presentation/personal_screen.dart';
 import '../data/project_dto.dart';
+import '../providers/home_tab_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/workspace_capabilities_provider.dart';
 import '../providers/workspace_provider.dart';
@@ -32,7 +33,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   static const _wideBreakpoint = 900.0;
 
-  var _index = 0;
+  int get _index => ref.watch(homeTabProvider);
+  set _index(int value) => ref.read(homeTabProvider.notifier).state = value;
 
   Future<void> _invite(String workspaceId) async {
     final sent = await showInviteMemberDialog(
@@ -52,7 +54,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _selectNav(int index, {bool closeDrawer = false}) {
     if (closeDrawer) Navigator.of(context).pop();
-    setState(() => _index = index);
+    _index = index;
   }
 
   @override
@@ -331,7 +333,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       bottomNavigationBar: (!wide && active != null)
           ? NavigationBar(
               selectedIndex: _index,
-              onDestinationSelected: (value) => setState(() => _index = value),
+              onDestinationSelected: (value) => _index = value,
               destinations: [
                 NavigationDestination(
                   icon: const Icon(Icons.dashboard_outlined),
@@ -357,7 +359,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 NavigationRail(
                   selectedIndex: _index,
                   onDestinationSelected: (value) =>
-                      setState(() => _index = value),
+                      _index = value,
                   labelType: NavigationRailLabelType.all,
                   backgroundColor: scheme.surface,
                   indicatorColor: scheme.primary.withValues(alpha: 0.15),

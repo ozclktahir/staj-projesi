@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../auth/providers/auth_provider.dart';
 import '../../workspace/presentation/assignee_picker_field.dart';
+import '../../workspace/presentation/extra_assignees_field.dart';
 import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../../workspace/providers/workspace_provider.dart';
 import '../data/task_dto.dart';
@@ -22,6 +23,7 @@ Future<bool?> showCreateTaskDialog({
   final userId = ref.read(authProvider).userId;
   final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
   String? assigneeId = caps.isAdmin ? null : userId;
+  var extraAssigneeIds = <String>[];
   var priority = TaskPriority.medium;
   var status = TaskStatus.todo;
   DateTime? dueDate;
@@ -214,9 +216,27 @@ Future<bool?> showCreateTaskDialog({
                         enabled: !submitting,
                         allowUnassigned: !isReassign,
                         labelText: isReassign ? 'Yeni atanan kişi' : 'Atanan',
-                        onChanged: (value) =>
-                            setLocal(() => assigneeId = value),
+                        onChanged: (value) => setLocal(() {
+                          assigneeId = value;
+                          // Birincil atanan ek listede kalmasın (tekrar olurdu)
+                          extraAssigneeIds = [
+                            for (final id in extraAssigneeIds)
+                              if (id != value) id,
+                          ];
+                        }),
                       ),
+                      // Çoklu atama artık görev OLUŞTURULURKEN de sorulur
+                      // (web CreateTaskModal ile parite).
+                      if (!isReassign && caps.isAdmin) ...[
+                        const SizedBox(height: 16),
+                        ExtraAssigneesField(
+                          selectedIds: extraAssigneeIds,
+                          primaryAssigneeId: assigneeId,
+                          enabled: !submitting,
+                          onChanged: (next) =>
+                              setLocal(() => extraAssigneeIds = next),
+                        ),
+                      ],
                       if (errorText != null) ...[
                         const SizedBox(height: 16),
                         Text(
@@ -309,6 +329,7 @@ Future<bool?> showCreateTaskDialog({
                                   dueDate: dueDate
                                       ?.toUtc()
                                       .toIso8601String(),
+                                  extraAssigneeIds: extraAssigneeIds,
                                 );
                             if (dialogContext.mounted) {
                               Navigator.of(dialogContext).pop(ok);

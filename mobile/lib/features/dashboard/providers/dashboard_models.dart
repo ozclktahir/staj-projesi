@@ -72,9 +72,16 @@ class DashboardData {
     // statik üye sayısına düşülür, hazır olunca gerçek zamanlı sayı kullanılır.
     int? onlineCount,
   }) {
+    // Sayaçlara yalnızca GERÇEKTEN aktif görevler girer: sahiplenme onayı
+    // bekleyen (pending) veya reddedilmiş (rejected) görevler "toplam görev"
+    // gibi KPI'lara sayılmaz — web'deki isCountableTask ile aynı kural
+    // (bkz. frontend/src/app/actions/analytics.ts).
     final topLevel = [
       for (final task in tasks)
-        if (task.parentTaskId == null || task.parentTaskId!.isEmpty) task,
+        if ((task.parentTaskId == null || task.parentTaskId!.isEmpty) &&
+            !task.assignmentStatus.isPending &&
+            !task.assignmentStatus.isRejected)
+          task,
     ];
 
     final now = DateTime.now();
@@ -153,8 +160,13 @@ class DashboardData {
         .toList()
       ..sort((a, b) => b.total.compareTo(a.total));
 
-    final total = remote?.totalTasks ?? topLevel.length;
-    final completedFinal = remote?.completedTasks ?? completed;
+    // Sayaçlar için ÖNCE yerel hesap kullanılır: `remote` (get_workspace_statistics
+    // RPC'si) assignment_status'ü bilmediği için onay bekleyen görevleri de
+    // sayıyordu. Görev listesi hiç çekilemediyse (403/ağ hatası) RPC'ye düşülür.
+    final hasLocalTasks = tasks.isNotEmpty;
+    final total = hasLocalTasks ? topLevel.length : (remote?.totalTasks ?? 0);
+    final completedFinal =
+        hasLocalTasks ? completed : (remote?.completedTasks ?? 0);
     final completionRate =
         total == 0 ? 0.0 : ((completedFinal / total) * 1000).round() / 10;
 
@@ -164,9 +176,10 @@ class DashboardData {
     return DashboardData(
       totalTasks: total,
       completedTasks: completedFinal,
-      inProgressTasks: remote?.inProgressTasks ?? inProgress,
-      todoTasks: remote?.todoTasks ?? todo,
-      overdueTasks: remote?.overdueTasks ?? overdue,
+      inProgressTasks:
+          hasLocalTasks ? inProgress : (remote?.inProgressTasks ?? 0),
+      todoTasks: hasLocalTasks ? todo : (remote?.todoTasks ?? 0),
+      overdueTasks: hasLocalTasks ? overdue : (remote?.overdueTasks ?? 0),
       completionRate: completionRate,
       activeMembers: activeMembers,
       byPriority: [

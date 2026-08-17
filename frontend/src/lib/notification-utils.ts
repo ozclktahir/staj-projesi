@@ -27,6 +27,9 @@ export type NotificationKind =
   | "task_assigned"
   | "task_claim_request"
   | "task_deletion_request"
+  | "task_comment"
+  | "project_event"
+  | "member_event"
   | "due_date_warning"
   | "generic";
 
@@ -75,6 +78,30 @@ export function getNotificationKind(n: NotificationItem): NotificationKind {
   ) {
     return "due_date_warning";
   }
+  if (
+    t === "task_comment" ||
+    t === "comment_added" ||
+    t === "new_comment" ||
+    t === "mention"
+  ) {
+    return "task_comment";
+  }
+  if (
+    t === "project_created" ||
+    t === "project_updated" ||
+    t === "project_deleted" ||
+    t === "project_assigned"
+  ) {
+    return "project_event";
+  }
+  if (
+    t === "member_joined" ||
+    t === "member_removed" ||
+    t === "role_changed" ||
+    t === "member_left"
+  ) {
+    return "member_event";
+  }
   return "generic";
 }
 
@@ -101,19 +128,87 @@ export function isActionableTaskNotification(n: NotificationItem): boolean {
   );
 }
 
-export function taskLinkFromNotification(n: NotificationItem): string | null {
-  if (n.link?.trim()) return n.link.trim();
-  const meta = n.payload ?? n.metadata;
+function metaString(
+  meta: Record<string, unknown> | null,
+  ...keys: string[]
+): string | null {
   if (!meta) return null;
-  const projectId =
-    (typeof meta.project_id === "string" && meta.project_id) || null;
-  const workspaceId =
-    n.workspaceId ||
-    (typeof meta.workspace_id === "string" ? meta.workspace_id : null);
-  if (!projectId) return null;
-  const base = `/project/${projectId}`;
-  if (workspaceId) {
-    return `${base}?workspaceId=${encodeURIComponent(workspaceId)}`;
+  for (const key of keys) {
+    const value = meta[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
   }
-  return base;
+  return null;
+}
+
+function withParams(
+  path: string,
+  params: Record<string, string | null | undefined>,
+): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) search.set(key, value);
+  }
+  const qs = search.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
+/**
+ * Bildirime tıklandığında gidilecek gerçek hedef.
+ *
+ * `n.link` sütunu tarihsel olarak yalnızca `/project/{id}` tutuyor (görev
+ * kimliği yok), bu yüzden ÖNCE metadata'dan tam hedefi kurarız; yalnızca hiçbir
+ * şey çıkaramazsak kayıtlı link'e düşeriz. `taskId` query'sini
+ * `ProjectTaskBoard` okuyup görev detay panelini açar.
+ */
+export function notificationHref(n: NotificationItem): string | null {
+  const meta = n.payload ?? n.metadata;
+  const kind = getNotificationKind(n);
+  const workspaceId =
+    n.workspaceId || metaString(meta, "workspace_id") || null;
+  const projectId = metaString(meta, "project_id");
+  const taskId = metaString(meta, "task_id");
+
+  switch (kind) {
+    case "workspace_invite":
+      // Davet ekranı: workspace biliniyorsa doğrudan o alana, yoksa onboarding.
+      return workspaceId
+        ? withParams("/", { workspaceId })
+        : "/onboarding";
+
+    case "member_event":
+      return withParams("/members", { workspaceId });
+
+    case "project_event":
+      return projectId
+        ? withParams(`/project/${projectId}`, { workspaceId })
+        : withParams("/projects", { workspaceId });
+
+    case "task_assigned":
+    case "task_claim_request":
+    case "task_deletion_request":
+    case "task_comment":
+    case "due_date_warning": {
+      if (projectId) {
+        return withParams(`/project/${projectId}`, { workspaceId, taskId });
+      }
+      // Projesi çözülemeyen görev bildirimi → kişisel alandaki görev listesi
+      if (taskId) return withParams("/personal", { workspaceId });
+      break;
+    }
+
+    default:
+      break;
+  }
+
+  if (projectId) {
+    return withParams(`/project/${projectId}`, { workspaceId, taskId });
+  }
+  if (n.link?.trim()) return n.link.trim();
+  if (workspaceId) return withParams("/", { workspaceId });
+  return null;
+}
+
+/** Geriye dönük ad — bkz. {@link notificationHref}. */
+export function taskLinkFromNotification(n: NotificationItem): string | null {
+  return notificationHref(n);
 }

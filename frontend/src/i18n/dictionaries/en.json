@@ -75,7 +75,9 @@
     "nav": "Pages",
     "projects": "Projects",
     "tasks": "Tasks",
-    "members": "Members"
+    "members": "Members",
+    "notes": "Personal notes",
+    "todos": "Personal to-dos"
   },
   "dashboard": {
     "prevPage": "Previous page",
@@ -470,7 +472,11 @@
     "reassignFailed": "Reassignment failed",
     "rejectedBy": "This task was previously rejected by {name}",
     "hide": "Hide",
-    "countItems": "{n} items"
+    "countItems": "{n} items",
+    "extraAssignees": "Additional assignees (multiple)",
+    "extraAssigneesHint": "Members who can see this task in addition to the primary assignee.",
+    "noMembers": "No members found.",
+    "primary": "primary assignee"
   },
   "loading": {
     "generic": "Loading…",
@@ -503,5 +509,8 @@
     "tasks": "Tasks",
     "tasksHint": "Click cards to open the detail panel. Change status quickly.",
     "created": "Created"
+  },
+  "taskDetail": {
+    "priorityReadOnly": "Priority is set when the task is created and cannot be changed later."
   }
 }

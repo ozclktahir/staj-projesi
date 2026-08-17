@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   CheckSquare,
   FolderKanban,
+  ListTodo,
+  NotebookPen,
   Search,
   Users,
 } from "lucide-react";
@@ -102,6 +104,8 @@ export function GlobalSearchCommand() {
   const projects = hits.filter((h) => h.type === "project");
   const tasks = hits.filter((h) => h.type === "task");
   const members = hits.filter((h) => h.type === "member");
+  const notes = hits.filter((h) => h.type === "note");
+  const todos = hits.filter((h) => h.type === "todo");
 
   return (
     <>
@@ -208,6 +212,39 @@ export function GlobalSearchCommand() {
                   onSelect={() => go(hit.href)}
                 >
                   <Users className="size-4" />
+                  <span className="min-w-0 flex-1 truncate">{hit.title}</span>
+                  {hit.subtitle ? (
+                    <CommandShortcut>{hit.subtitle}</CommandShortcut>
+                  ) : null}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
+
+          {notes.length > 0 ? (
+            <CommandGroup heading={t("search.notes")}>
+              {notes.map((hit) => (
+                <CommandItem
+                  key={hit.id}
+                  value={`note-${hit.title}-${hit.id}`}
+                  onSelect={() => go(hit.href)}
+                >
+                  <NotebookPen className="size-4" />
+                  <span className="min-w-0 flex-1 truncate">{hit.title}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
+
+          {todos.length > 0 ? (
+            <CommandGroup heading={t("search.todos")}>
+              {todos.map((hit) => (
+                <CommandItem
+                  key={hit.id}
+                  value={`todo-${hit.title}-${hit.id}`}
+                  onSelect={() => go(hit.href)}
+                >
+                  <ListTodo className="size-4" />
                   <span className="min-w-0 flex-1 truncate">{hit.title}</span>
                   {hit.subtitle ? (
                     <CommandShortcut>{hit.subtitle}</CommandShortcut>

@@ -13,6 +13,7 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
+import { isCountableTask } from "@/lib/task-counting";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 
 export type AnalyticsSummary = {
@@ -111,6 +112,7 @@ type TaskRow = {
   project_id: string | null;
   parent_task_id: string | null;
   deleted_at: string | null;
+  assignment_status?: unknown;
 };
 
 function computeFromRows(
@@ -120,7 +122,7 @@ function computeFromRows(
     projectNameById: Map<string, string>;
   },
 ): AnalyticsData {
-  const topLevel = rows.filter((r) => !r.parent_task_id && !r.deleted_at);
+  const topLevel = rows.filter(isCountableTask);
 
   const statusCounts: Record<TaskStatus, number> = {
     TODO: 0,
@@ -289,7 +291,7 @@ async function fetchTaskRows(
   let query = supabase
     .from("tasks")
     .select(
-      "id, status, priority, due_date, assignee_id, assigned_to, project_id, parent_task_id, deleted_at",
+      "id, status, priority, due_date, assignee_id, assigned_to, project_id, parent_task_id, deleted_at, assignment_status",
     )
     .limit(2000);
 
@@ -302,6 +304,27 @@ async function fetchTaskRows(
   }
 
   let { data, error } = await query;
+
+  // assignment_status sütunu yoksa (migration uygulanmamış) onsuz devam et
+  if (error?.message?.includes("assignment_status")) {
+    let retry = supabase
+      .from("tasks")
+      .select(
+        "id, status, priority, due_date, assignee_id, assigned_to, project_id, parent_task_id, deleted_at",
+      )
+      .limit(2000);
+    if (filters.projectId) {
+      retry = retry.eq("project_id", filters.projectId);
+    } else if (filters.workspaceId) {
+      retry = retry.eq("workspace_id", filters.workspaceId);
+    }
+    const result = await retry;
+    data = (result.data ?? []).map((r) => ({
+      ...r,
+      assignment_status: null,
+    })) as typeof data;
+    error = result.error;
+  }
 
   if (error?.message?.includes("deleted_at")) {
     let retry = supabase
@@ -319,7 +342,8 @@ async function fetchTaskRows(
     data = (result.data ?? []).map((r) => ({
       ...r,
       deleted_at: null,
-    })) as TaskRow[];
+      assignment_status: null,
+    })) as typeof data;
     error = result.error;
   }
 
@@ -379,7 +403,7 @@ function buildWorkloadMap(rows: TaskRow[]): Map<
 > {
   const map = new Map<string, { total: number; completed: number }>();
   for (const row of rows) {
-    if (row.parent_task_id || row.deleted_at) continue;
+    if (!isCountableTask(row)) continue;
     const assignee =
       (typeof row.assignee_id === "string" && row.assignee_id) ||
       (typeof row.assigned_to === "string" && row.assigned_to) ||

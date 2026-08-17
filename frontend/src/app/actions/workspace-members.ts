@@ -1,7 +1,10 @@
 "use server";
 
-import { revalidateTag } from "next/cache";
-import { getCachedWorkspaceMembers } from "@/lib/data-cache";
+import { revalidatePath, revalidateTag, updateTag } from "next/cache";
+import {
+  getCachedWorkspaceMembers,
+  readWorkspaceMembers,
+} from "@/lib/data-cache";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 import type { WorkspaceMemberOption } from "@/lib/member-labels";
@@ -12,6 +15,15 @@ export type GetWorkspaceMembersResult =
 
 export async function getWorkspaceMembers(
   workspaceId: string | null | undefined,
+  options?: {
+    /**
+     * true → 5 dakikalık `unstable_cache` katmanını atlayıp doğrudan DB'den
+     * okur. Üye yönetimi ekranı bunu kullanır: rol değiştirdikten sonra
+     * sayfa yenilendiğinde bayat rol görünüyordu ("rol değiştirme çalışmıyor"
+     * şikâyetinin asıl sebebi buydu).
+     */
+    fresh?: boolean;
+  },
 ): Promise<GetWorkspaceMembersResult> {
   try {
     const wsId = workspaceId?.trim() ?? "";
@@ -46,19 +58,28 @@ export async function getWorkspaceMembers(
       };
     }
 
-    const cached = await getCachedWorkspaceMembers(
-      wsId,
-      user.id,
-      accessToken,
-      roleCtx.isAdmin,
-      roleCtx.isOwner,
-      roleCtx.role,
-    );
+    const payload = options?.fresh
+      ? await readWorkspaceMembers(
+          wsId,
+          user.id,
+          accessToken,
+          roleCtx.isAdmin,
+          roleCtx.isOwner,
+          roleCtx.role,
+        )
+      : await getCachedWorkspaceMembers(
+          wsId,
+          user.id,
+          accessToken,
+          roleCtx.isAdmin,
+          roleCtx.isOwner,
+          roleCtx.role,
+        );
 
     return {
       success: true,
-      isAdmin: cached.isAdmin,
-      members: cached.members,
+      isAdmin: payload.isAdmin,
+      members: payload.members,
     };
   } catch (error) {
     console.error("[getWorkspaceMembers] catch:", error);
@@ -71,9 +92,21 @@ export async function getWorkspaceMembers(
   }
 }
 
-/** Üye listesi cache'ini invalid et (davet kabul / rol değişimi sonrası). */
+/**
+ * Üye listesi cache'ini invalid et (davet kabul / rol değişimi sonrası).
+ *
+ * `updateTag` = anında geçersiz kıl (read-your-own-writes); `revalidateTag(...,"max")`
+ * yalnızca "bayat" işaretlediği için rol değişikliğinden sonra sayfa hâlâ eski
+ * rolü gösterebiliyordu.
+ */
 export async function invalidateWorkspaceMembersCache(workspaceId: string) {
   const id = workspaceId?.trim();
   if (!id) return;
-  revalidateTag(`workspace-members-${id}`, "max");
+  try {
+    updateTag(`workspace-members-${id}`);
+  } catch {
+    // Server Action dışından çağrıldıysa updateTag kullanılamaz
+    revalidateTag(`workspace-members-${id}`, "max");
+  }
+  revalidatePath("/members");
 }

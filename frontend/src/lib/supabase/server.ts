@@ -17,6 +17,7 @@ import {
   loadProfilesByIds,
 } from "@/lib/member-labels";
 import { PAGE_SIZE, resolvePage, type PageQuery } from "@/lib/query-limits";
+import { isCountableTask } from "@/lib/task-counting";
 import {
   getMemberVisibleProjectIds,
   resolveWorkspaceRole,
@@ -414,15 +415,33 @@ export async function getDashboardTaskStats(
 
     let { data, error } = await auth.supabase
       .from("tasks")
-      .select("id, status, project_id")
+      .select("id, status, project_id, assignment_status")
       .eq("workspace_id", ws)
       .is("deleted_at", null);
 
-    if (error?.message?.includes("deleted_at")) {
-      ({ data, error } = await auth.supabase
+    if (error?.message?.includes("assignment_status")) {
+      const retry = await auth.supabase
         .from("tasks")
         .select("id, status, project_id")
-        .eq("workspace_id", ws));
+        .eq("workspace_id", ws)
+        .is("deleted_at", null);
+      data = (retry.data ?? []).map((r) => ({
+        ...r,
+        assignment_status: null,
+      })) as typeof data;
+      error = retry.error;
+    }
+
+    if (error?.message?.includes("deleted_at")) {
+      const retry = await auth.supabase
+        .from("tasks")
+        .select("id, status, project_id")
+        .eq("workspace_id", ws);
+      data = (retry.data ?? []).map((r) => ({
+        ...r,
+        assignment_status: null,
+      })) as typeof data;
+      error = retry.error;
     }
 
     if (error || !data) {
@@ -430,14 +449,20 @@ export async function getDashboardTaskStats(
       return empty;
     }
 
+    // Sahiplenme onayı bekleyen (pending) / reddedilen görevler sayılmaz —
+    // ortak kural: lib/task-counting.ts
+    const countable = (data as Record<string, unknown>[]).filter(
+      isCountableTask,
+    );
+
     let inProgress = 0;
     let done = 0;
-    for (const row of data) {
+    for (const row of countable) {
       if (row.status === "IN_PROGRESS") inProgress += 1;
       if (row.status === "DONE") done += 1;
     }
 
-    return { total: data.length, inProgress, done };
+    return { total: countable.length, inProgress, done };
   } catch (error) {
     console.error("[getDashboardTaskStats]", error);
     return empty;

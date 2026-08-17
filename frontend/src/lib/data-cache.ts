@@ -25,8 +25,66 @@ type CachedMembersPayload = {
 };
 
 /**
+ * Workspace üyelerini DOĞRUDAN (cache'siz) okur. Rol değişikliği gibi
+ * "yazdığını hemen gör" gereken ekranlar bunu kullanır.
+ */
+export async function readWorkspaceMembers(
+  workspaceId: string,
+  userId: string,
+  accessToken: string,
+  isAdmin: boolean,
+  isOwner: boolean,
+  role: string | null,
+): Promise<CachedMembersPayload> {
+  const supabase = createTokenClient(accessToken);
+  if (!supabase) {
+    return { members: [], isAdmin, role, isOwner };
+  }
+
+  const { data: rows, error } = await supabase
+    .from("workspace_members")
+    .select("user_id, role")
+    .eq("workspace_id", workspaceId);
+
+  if (error) {
+    console.error("[readWorkspaceMembers]", error.message);
+    return { members: [], isAdmin, role, isOwner };
+  }
+
+  const memberRows = [...(rows ?? [])];
+  const userIds = memberRows.map((r) => r.user_id as string).filter(Boolean);
+
+  if (isOwner && !userIds.includes(userId)) {
+    memberRows.push({ user_id: userId, role: "OWNER" });
+    userIds.push(userId);
+  }
+
+  const profileById = await loadProfilesByIds(supabase, userIds);
+
+  const members: WorkspaceMemberOption[] = memberRows.map((row) => {
+    const uid = row.user_id as string;
+    const profile = profileById.get(uid) ?? null;
+    const fields = resolveMemberDisplayFields(profile, null);
+    return {
+      id: uid,
+      email: fields.email,
+      role: (row.role as string | null) ?? null,
+      fullName: fields.fullName,
+      avatarUrl: fields.avatarUrl,
+      displayName: fields.displayName,
+    };
+  });
+
+  // Görüntüleme herkese açık (view-only); rol değiştirme/çıkarma gibi
+  // düzenleme işlemleri istemci tarafında (MembersTable) `isAdmin`
+  // ile ayrıca kısıtlanır — bkz. members-table.tsx.
+
+  return { members, isAdmin, role, isOwner };
+}
+
+/**
  * Workspace üyeleri — sık okunan, seyrek değişen veri (5 dk cache).
- * Tag: `workspace-members:{workspaceId}`
+ * Tag: `workspace-members-{workspaceId}`
  */
 export function getCachedWorkspaceMembers(
   workspaceId: string,
@@ -37,54 +95,15 @@ export function getCachedWorkspaceMembers(
   role: string | null,
 ): Promise<CachedMembersPayload> {
   return unstable_cache(
-    async (): Promise<CachedMembersPayload> => {
-      const supabase = createTokenClient(accessToken);
-      if (!supabase) {
-        return { members: [], isAdmin, role, isOwner };
-      }
-
-      const { data: rows, error } = await supabase
-        .from("workspace_members")
-        .select("user_id, role")
-        .eq("workspace_id", workspaceId);
-
-      if (error) {
-        console.error("[getCachedWorkspaceMembers]", error.message);
-        return { members: [], isAdmin, role, isOwner };
-      }
-
-      const memberRows = [...(rows ?? [])];
-      const userIds = memberRows
-        .map((r) => r.user_id as string)
-        .filter(Boolean);
-
-      if (isOwner && !userIds.includes(userId)) {
-        memberRows.push({ user_id: userId, role: "OWNER" });
-        userIds.push(userId);
-      }
-
-      const profileById = await loadProfilesByIds(supabase, userIds);
-
-      let members: WorkspaceMemberOption[] = memberRows.map((row) => {
-        const uid = row.user_id as string;
-        const profile = profileById.get(uid) ?? null;
-        const fields = resolveMemberDisplayFields(profile, null);
-        return {
-          id: uid,
-          email: fields.email,
-          role: (row.role as string | null) ?? null,
-          fullName: fields.fullName,
-          avatarUrl: fields.avatarUrl,
-          displayName: fields.displayName,
-        };
-      });
-
-      // Görüntüleme herkese açık (view-only); rol değiştirme/çıkarma gibi
-      // düzenleme işlemleri istemci tarafında (MembersTable) `isAdmin`
-      // ile ayrıca kısıtlanır — bkz. members-table.tsx.
-
-      return { members, isAdmin, role, isOwner };
-    },
+    () =>
+      readWorkspaceMembers(
+        workspaceId,
+        userId,
+        accessToken,
+        isAdmin,
+        isOwner,
+        role,
+      ),
     [`workspace-members`, workspaceId, userId, isAdmin ? "admin" : "member"],
     {
       revalidate: 300,

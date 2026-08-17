@@ -7,12 +7,13 @@ import 'package:go_router/go_router.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../data/search_hit_dto.dart';
+import '../providers/home_tab_provider.dart';
 import '../providers/search_provider.dart';
 import '../providers/workspace_provider.dart';
 
 /// Dokunmatik arama ekranı — web'deki Cmd/Ctrl+K komut paletinin mobil
 /// karşılığı (klavye kısayolu yerine AppBar'daki arama ikonuyla açılır).
-/// Aynı amaç: proje/görev/üye arasında çapraz arama.
+/// Aynı amaç: proje/görev/üye + kişisel not/görev arasında çapraz arama.
 class GlobalSearchScreen extends ConsumerStatefulWidget {
   const GlobalSearchScreen({super.key});
 
@@ -52,6 +53,11 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
         }
       case SearchHitType.member:
         context.push(AppRoutes.members);
+      case SearchHitType.note:
+      case SearchHitType.todo:
+        // Kişisel not/görev bir rota değil, ana ekrandaki Kişisel Alan sekmesi.
+        ref.read(homeTabProvider.notifier).state = HomeTab.personal;
+        context.pop();
       case SearchHitType.unknown:
         break;
     }
@@ -65,6 +71,10 @@ class _GlobalSearchScreenState extends ConsumerState<GlobalSearchScreen> {
         return Icons.task_alt_outlined;
       case SearchHitType.member:
         return Icons.person_outline;
+      case SearchHitType.note:
+        return Icons.sticky_note_2_outlined;
+      case SearchHitType.todo:
+        return Icons.checklist_outlined;
       case SearchHitType.unknown:
         return Icons.search;
     }

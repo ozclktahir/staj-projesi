@@ -34,8 +34,8 @@ import {
   invitationIdFromNotification,
   isActionableTaskNotification,
   isWorkspaceInviteNotification,
+  notificationHref,
   taskIdFromNotification,
-  taskLinkFromNotification,
   type NotificationItem,
   type PendingInvitationItem,
 } from "@/lib/notification-utils";
@@ -591,6 +591,31 @@ export function InviteNotificationsMenu({
     });
   };
 
+  /**
+   * Bildirimin hedefine git. Bildirim başka bir workspace'e aitse önce aktif
+   * workspace'i oraya çeviririz; aksi hâlde hedef sayfa "bu alana erişiminiz
+   * yok" ile açılırdı.
+   */
+  const navigateToNotification = useCallback(
+    (n: NotificationItem) => {
+      const href = notificationHref(n);
+      if (!href) return;
+
+      const meta = n.payload ?? n.metadata;
+      const workspaceId =
+        n.workspaceId ||
+        (meta && typeof meta.workspace_id === "string"
+          ? meta.workspace_id
+          : null);
+      if (workspaceId) writeActiveWorkspaceId(workspaceId);
+
+      setOpen(false);
+      router.push(href);
+      router.refresh();
+    },
+    [router],
+  );
+
   const handleNotificationClick = (n: NotificationItem) => {
     if (!n.isRead) {
       startTransition(() => {
@@ -615,11 +640,7 @@ export function InviteNotificationsMenu({
       });
     }
 
-    const href = taskLinkFromNotification(n);
-    if (href) {
-      setOpen(false);
-      router.push(href);
-    }
+    navigateToNotification(n);
   };
 
   return (
@@ -838,12 +859,18 @@ export function InviteNotificationsMenu({
                         <Icon className="size-4" />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          {n.title || "Bildirim"}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {n.message}
-                        </p>
+                        <button
+                          type="button"
+                          onClick={() => navigateToNotification(n)}
+                          className="w-full text-left"
+                        >
+                          <p className="text-sm font-medium text-foreground hover:underline">
+                            {n.title || "Bildirim"}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {n.message}
+                          </p>
+                        </button>
                         <p className="mt-1 text-[10px] text-muted-foreground/80">
                           {formatRelativeTime(n.createdAt, locale)}
                         </p>

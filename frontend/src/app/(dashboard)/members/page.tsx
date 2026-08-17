@@ -31,7 +31,8 @@ async function MembersContent({
   }
 
   const [membersResult, me] = await Promise.all([
-    getWorkspaceMembers(workspaceId),
+    // fresh: rol değişikliği sonrası bayat cache göstermesin
+    getWorkspaceMembers(workspaceId, { fresh: true }),
     getCurrentUserDisplayLabel(),
   ]);
 

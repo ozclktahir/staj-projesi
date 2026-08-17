@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ActivityLogItem } from "@/app/actions/activity-logs";
 import type { AnalyticsData } from "@/app/actions/analytics";
 import type { UpcomingDeadlineItem } from "@/types/personal-workspace";
+import { AnalyticsLiveRefresh } from "@/components/analytics/analytics-live-refresh";
 import { AnalyticsStatCards } from "@/components/analytics/analytics-stat-cards";
 import { QuickActivityFeed } from "@/components/analytics/quick-activity-feed";
 import { UpcomingDeadlines } from "@/components/analytics/upcoming-deadlines";
@@ -119,6 +120,7 @@ export function AnalyticsDashboard({
 
   return (
     <div className="flex w-full flex-col gap-4">
+      <AnalyticsLiveRefresh workspaceId={workspaceId} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">

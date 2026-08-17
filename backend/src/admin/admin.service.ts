@@ -10,6 +10,40 @@ export class AdminService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
   /**
+   * Workspace'teki yönetici sayısı — rol karşılaştırması BÜYÜK/küçük harf
+   * duyarsız ('Admin' / 'admin' / 'OWNER' hepsi sayılır) ve `workspaces.owner_id`
+   * sahibi, workspace_members satırı olmasa bile dahil edilir. Önceki
+   * `.eq('role', 'Admin')` sayımı bu iki durumu kaçırıp "tek yönetici" korumasını
+   * yanlış tetikliyordu.
+   */
+  private async countWorkspaceAdmins(workspaceId: string): Promise<number> {
+    const client = this.supabaseService.getClient();
+
+    const [{ data: members }, { data: workspace }] = await Promise.all([
+      client
+        .from('workspace_members')
+        .select('user_id, role')
+        .eq('workspace_id', workspaceId),
+      client
+        .from('workspaces')
+        .select('owner_id')
+        .eq('id', workspaceId)
+        .maybeSingle(),
+    ]);
+
+    const adminIds = new Set<string>();
+    for (const row of members ?? []) {
+      const role = String(row.role ?? '').toLowerCase();
+      if ((role === 'admin' || role === 'owner') && row.user_id) {
+        adminIds.add(String(row.user_id));
+      }
+    }
+    if (workspace?.owner_id) adminIds.add(String(workspace.owner_id));
+
+    return adminIds.size;
+  }
+
+  /**
    * Workspace özet istatistikleri: toplam üye, aktif görev ve proje sayısı.
    */
   async getStats(workspaceId: string) {
@@ -82,18 +116,10 @@ export class AdminService {
       throw new NotFoundException('Kullanıcı bu çalışma alanında bulunamadı.');
     }
 
-    if (targetMember.role === 'Admin') {
-      const { count, error: adminCountError } = await client
-        .from('workspace_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('workspace_id', workspaceId)
-        .eq('role', 'Admin');
-
-      if (adminCountError) {
-        throw new BadRequestException(adminCountError.message);
-      }
-
-      if ((count ?? 0) <= 1) {
+    const targetRoleLower = String(targetMember.role ?? '').toLowerCase();
+    if (targetRoleLower === 'admin' || targetRoleLower === 'owner') {
+      const adminCount = await this.countWorkspaceAdmins(workspaceId);
+      if (adminCount <= 1) {
         throw new BadRequestException(
           'Workspace\'in tek yöneticisi silinemez. Önce yetki devri yapın',
         );
@@ -160,20 +186,9 @@ export class AdminService {
       throw new BadRequestException('Workspace sahibinin rolü değiştirilemez.');
     }
 
-    if (
-      (currentRole === 'Admin' || currentRole.toUpperCase() === 'ADMIN') &&
-      role === 'Member'
-    ) {
-      const { count, error: adminCountError } = await client
-        .from('workspace_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('workspace_id', workspaceId)
-        .eq('role', 'Admin');
-
-      if (adminCountError) {
-        throw new BadRequestException(adminCountError.message);
-      }
-      if ((count ?? 0) <= 1) {
+    if (currentRole.toUpperCase() === 'ADMIN' && role === 'Member') {
+      const adminCount = await this.countWorkspaceAdmins(workspaceId);
+      if (adminCount <= 1) {
         throw new BadRequestException(
           'Workspace\'in tek yöneticisinin rolü düşürülemez.',
         );

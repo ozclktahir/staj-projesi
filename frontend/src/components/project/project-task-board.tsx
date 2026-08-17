@@ -6,7 +6,6 @@ import {
   useEffect,
   useMemo,
   useOptimistic,
-  useRef,
   useState,
   useTransition,
   type CSSProperties,
@@ -365,9 +364,23 @@ const TaskCard = memo(function TaskCard({
       {...listeners}
       role="button"
       tabIndex={0}
-      onClick={() => onOpen(task.id)}
+      onClick={(event) => {
+        // Kart içindeki (veya Radix portal'ı üzerinden React ağacında karta
+        // bağlı kalan) menü/silme/durum kontrollerinden gelen tıklamalar
+        // detay panelini AÇMAMALI — bkz. data-card-stop işaretleyicisi.
+        if (
+          event.target instanceof Element &&
+          event.target.closest("[data-card-stop]")
+        ) {
+          return;
+        }
+        onOpen(task.id);
+      }}
       onKeyDown={(e) => {
         if (e.key !== "Enter" && e.key !== " ") return;
+        if (e.target instanceof Element && e.target.closest("[data-card-stop]")) {
+          return;
+        }
         e.preventDefault();
         onOpen(task.id);
       }}
@@ -425,6 +438,7 @@ const TaskCard = memo(function TaskCard({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
+                data-card-stop
                 aria-label={t("projectBoard.taskMenu")}
                 onClick={(event: MouseEvent) => event.stopPropagation()}
                 className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -432,7 +446,19 @@ const TaskCard = memo(function TaskCard({
                 <MoreHorizontal className="size-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            {/*
+              Radix menüyü bir portal'a basar; DOM'da kartın dışındadır ama
+              React olay ağacında hâlâ kartın altındadır — bu yüzden "Sil"e
+              tıklamak kartın onClick'ini de tetikliyordu (görev detayı
+              kendiliğinden açılıyordu). stopPropagation + data-card-stop
+              ikilisi bu sızıntıyı kapatır.
+            */}
+            <DropdownMenuContent
+              align="end"
+              className="w-44"
+              data-card-stop
+              onClick={(event) => event.stopPropagation()}
+            >
               <DropdownMenuItem
                 className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                 onSelect={(event) => {
@@ -459,6 +485,7 @@ const TaskCard = memo(function TaskCard({
         </span>
         <select
           aria-label={t("projectBoard.taskStatus")}
+          data-card-stop
           value={task.status}
           disabled={updating || claimPending}
           onClick={(event) => event.stopPropagation()}
@@ -581,11 +608,9 @@ export function ProjectTaskBoard({
     IN_PROGRESS: { ...DEFAULT_COLUMN_PREFS },
     DONE: { ...DEFAULT_COLUMN_PREFS },
   });
-  const pendingDeletesRef = useRef<Map<string, ProjectTask>>(new Map());
 
   type TaskOptimisticAction =
     | { type: "remove"; id: string }
-    | { type: "restore"; task: ProjectTask }
     | { type: "status"; id: string; status: TaskStatus };
 
   const [optimisticTasks, applyTaskOptimistic] = useOptimistic(
@@ -594,9 +619,6 @@ export function ProjectTaskBoard({
       switch (action.type) {
         case "remove":
           return state.filter((t) => t.id !== action.id);
-        case "restore":
-          if (state.some((t) => t.id === action.task.id)) return state;
-          return [action.task, ...state];
         case "status":
           return state.map((t) =>
             t.id === action.id ? { ...t, status: action.status } : t,
@@ -783,13 +805,15 @@ export function ProjectTaskBoard({
     workspaceId,
   ]);
 
+  /**
+   * Görev panodan kaldırılır (silme ONAYLANDIĞINDA realtime/detay panelinden
+   * tetiklenir). Silme talebi göndermek görevi panodan kaldırmaz — artık her
+   * silme onaydan geçtiği için "iyimser kaldır + hata olursa geri koy" yolu
+   * kaldırıldı.
+   */
   const removeTaskFromBoard = useCallback(
     (taskId: string) => {
-      setTasks((prev) => {
-        const found = prev.find((task) => task.id === taskId);
-        if (found) pendingDeletesRef.current.set(taskId, found);
-        return prev.filter((task) => task.id !== taskId);
-      });
+      setTasks((prev) => prev.filter((task) => task.id !== taskId));
       startTransition(() => {
         applyTaskOptimistic({ type: "remove", id: taskId });
       });
@@ -798,30 +822,6 @@ export function ProjectTaskBoard({
       }
     },
     [selectedTaskId],
-  );
-
-  const restoreTaskToBoard = useCallback(
-    (task: { id: string; title: string }) => {
-      const restored =
-        pendingDeletesRef.current.get(task.id) ??
-        ({
-          id: task.id,
-          title: task.title,
-          status: "TODO",
-          priority: "MEDIUM",
-          project_id: projectId,
-        } as ProjectTask);
-      pendingDeletesRef.current.delete(task.id);
-
-      setTasks((prev) => {
-        if (prev.some((t) => t.id === restored.id)) return prev;
-        return [restored, ...prev];
-      });
-      startTransition(() => {
-        applyTaskOptimistic({ type: "restore", task: restored });
-      });
-    },
-    [projectId],
   );
 
   const handleStatusChange = useCallback(
@@ -989,8 +989,17 @@ export function ProjectTaskBoard({
             if (!next) setTaskToDelete(null);
           }}
           task={taskToDelete}
-          onDeleted={removeTaskFromBoard}
-          onDeleteFailed={restoreTaskToBoard}
+          onApprovalRequested={(taskId, deletionStatus) => {
+            // Görev silinmedi — panoda kalsın, yalnızca "onay bekleniyor"
+            // rozetini göster.
+            setTasks((prev) =>
+              prev.map((task) =>
+                task.id === taskId
+                  ? { ...task, deletion_status: deletionStatus }
+                  : task,
+              ),
+            );
+          }}
         />
       ) : null}
     </>

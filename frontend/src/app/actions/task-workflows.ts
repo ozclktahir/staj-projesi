@@ -10,7 +10,6 @@ import {
   type TaskAssignmentStatus,
   type TaskDeletionStatus,
 } from "@/lib/supabase/types";
-import { purgeAndDeleteTask } from "@/lib/task-delete";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -121,13 +120,6 @@ async function insertNotification(
   }
 }
 
-async function hardOrSoftDeleteTask(
-  supabase: SupabaseClient,
-  taskId: string,
-): Promise<{ error: { message: string } | null }> {
-  return purgeAndDeleteTask(supabase, taskId);
-}
-
 async function taskHasProgress(
   supabase: SupabaseClient,
   taskId: string,
@@ -173,10 +165,72 @@ export type TaskDeletionPreview = {
   success: true;
   hasProgress: boolean;
   isAdmin: boolean;
-  requiresApproval: boolean;
+  /** Her zaman true — silme ASLA onaysız gerçekleşmez (bkz. resolveDeletionApprover). */
+  requiresApproval: true;
   approvalTarget: "admin" | "assignee" | null;
   message: string;
 } | { success: false; error: string };
+
+type DeletionApprover =
+  | {
+      ok: true;
+      userIds: string[];
+      target: "admin" | "assignee";
+      deletionStatus: TaskDeletionStatus;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Silme talebini kimin onaylayacağını belirler.
+ *
+ * Kural (16→17 Ağustos değişikliği): görevin durumu ne olursa olsun — hiç
+ * dokunulmamış, hiç aktivitesi olmayan bir görev bile — silme HER ZAMAN ikinci
+ * bir kişinin onayından geçer. Önceki davranışta "ilerleme yoksa doğrudan sil"
+ * kestirmesi vardı ve bu, silme davranışını göreve göre tutarsız yapıyordu.
+ *
+ * Onaylayan zinciri:
+ *  1. Atanan kullanıcı (talep eden değilse)
+ *  2. Diğer admin/owner'lar (talep eden hariç)
+ * Hiçbiri yoksa silme reddedilir — tek kişilik workspace'te görev silinemez,
+ * bu bilinçli bir sonuçtur ("onaysız silme yok" kuralının doğal bedeli).
+ */
+async function resolveDeletionApprover(
+  supabase: SupabaseClient,
+  params: {
+    workspaceId: string;
+    requesterId: string;
+    assignee: string | null;
+  },
+): Promise<DeletionApprover> {
+  const { workspaceId, requesterId, assignee } = params;
+
+  if (assignee && assignee !== requesterId) {
+    return {
+      ok: true,
+      userIds: [assignee],
+      target: "assignee",
+      deletionStatus: "pending_user_approval",
+    };
+  }
+
+  const adminIds = (await getWorkspaceAdminIds(supabase, workspaceId)).filter(
+    (uid) => uid !== requesterId,
+  );
+  if (adminIds.length > 0) {
+    return {
+      ok: true,
+      userIds: adminIds,
+      target: "admin",
+      deletionStatus: "pending_admin_approval",
+    };
+  }
+
+  return {
+    ok: false,
+    error:
+      "Silme işlemi onay gerektirir ancak bu çalışma alanında onaylayabilecek başka kimse yok. Önce görevi bir üyeye atayın veya ikinci bir yönetici ekleyin.",
+  };
+}
 
 /** Silme modalı için önizleme — UI uyarı metni */
 export async function getTaskDeletionPreview(
@@ -218,26 +272,39 @@ export async function getTaskDeletionPreview(
       typeof existing.status === "string" ? existing.status : null,
     );
 
-    if (!hasProgress) {
-      return {
-        success: true,
-        hasProgress: false,
-        isAdmin,
-        requiresApproval: false,
-        approvalTarget: null,
-        message: "Bu görevde ilerleme yok; silme işlemi doğrudan gerçekleşir.",
-      };
+    const assignee =
+      (typeof existing.assignee_id === "string" && existing.assignee_id) ||
+      (typeof existing.assigned_to === "string" && existing.assigned_to) ||
+      null;
+
+    let approvalTarget: "admin" | "assignee" | null = null;
+    let message =
+      "Silme işlemi onay gerektirir; görev onaylanana kadar silinmez.";
+
+    if (workspaceId) {
+      const approver = await resolveDeletionApprover(supabase, {
+        workspaceId,
+        requesterId: user.id,
+        assignee,
+      });
+      if (approver.ok) {
+        approvalTarget = approver.target;
+        message =
+          approver.target === "assignee"
+            ? "Silme talebi göreve atanan kullanıcıya iletilecek. Onaylanana kadar görev silinmez."
+            : "Silme talebi yöneticilere iletilecek. Onaylanana kadar görev silinmez.";
+      } else {
+        message = approver.error;
+      }
     }
 
     return {
       success: true,
-      hasProgress: true,
+      hasProgress,
       isAdmin,
       requiresApproval: true,
-      approvalTarget: isAdmin ? "assignee" : "admin",
-      message: isAdmin
-        ? "Bu görevde ilerleme olduğu için silme talebi atanan kullanıcıya iletilecektir."
-        : "Bu görevde ilerleme olduğu için silme talebi yöneticiye iletilecektir.",
+      approvalTarget,
+      message,
     };
   } catch (error) {
     return {
@@ -252,10 +319,13 @@ export async function getTaskDeletionPreview(
 }
 
 /**
- * Silme iş akışı (kurşun geçirmez):
- * - İlerleme yok → doğrudan sil
- * - İlerleme + üye → pending_admin_approval + admin bildirimi (ASLA silme)
- * - İlerleme + admin → pending_user_approval + atanan bildirimi (ASLA silme)
+ * Silme iş akışı — TEK KURAL: onaysız silme yoktur.
+ *
+ * Görevin durumu (dokunulmamış / ilerlemiş), talep edenin rolü ya da başka
+ * hiçbir koşul bu kuralı esnetmez. Talep her zaman `deletion_status`
+ * (pending_user_approval | pending_admin_approval) olarak işaretlenir ve
+ * onaylayana bildirim gider; gerçek silme yalnızca
+ * `respondToTaskDeletion(..., "accept")` içinde gerçekleşir.
  */
 export async function requestOrDeleteTask(
   taskId: string,
@@ -330,114 +400,26 @@ export async function requestOrDeleteTask(
       };
     }
 
-    const hasProgress = await taskHasProgress(
-      supabase,
-      id,
-      typeof existing.status === "string" ? existing.status : null,
-    );
-
-    // ── Durum A: İlerleme yok → doğrudan sil ──
-    if (!hasProgress) {
-      const actorName = await resolveActorDisplayName(supabase, user);
-      await logActivity(supabase, {
-        workspaceId,
-        projectId,
-        taskId: id,
-        userId: currentUserId,
-        actionType: "task_deleted",
-        actorName,
-        details: { task_title: title, mode: "direct_no_progress" },
-      });
-
-      const { error } = await hardOrSoftDeleteTask(supabase, id);
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      revalidateTaskPaths(projectId);
-      return {
-        success: true,
-        taskId: id,
-        projectId,
-        mode: "deleted",
-        message: "Görev silindi.",
-      };
+    // Onaylayacak kişiyi belirle — bulunamazsa hiçbir şey değiştirmeden dur.
+    const approver = await resolveDeletionApprover(supabase, {
+      workspaceId,
+      requesterId: currentUserId,
+      assignee,
+    });
+    if (!approver.ok) {
+      return { success: false, error: approver.error };
     }
 
-    // ── Durum B: İlerleme var → ASLA doğrudan silme ──
     const actorName = await resolveActorDisplayName(supabase, user);
     const link = projectId
       ? `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`
       : null;
     const requestedAt = new Date().toISOString();
 
-    if (isAdmin) {
-      // Admin → kullanıcı onayı zorunlu
-      if (!assignee) {
-        return {
-          success: false,
-          error:
-            "Bu görevde ilerleme var ancak atanan kullanıcı yok. Onaylı silme için önce bir kullanıcı atayın.",
-        };
-      }
-
-      const { error } = await supabase
-        .from("tasks")
-        .update({
-          deletion_status: "pending_user_approval" satisfies TaskDeletionStatus,
-          deletion_requested_by: currentUserId,
-          deletion_requested_at: requestedAt,
-        })
-        .eq("id", id);
-
-      if (error) {
-        if (
-          error.message.includes("deletion_status") ||
-          error.message.includes("deletion_requested")
-        ) {
-          return {
-            success: false,
-            error:
-              "Silme onay sütunları henüz yok. add_task_approval_workflows.sql migration'ını Supabase'te çalıştırın.",
-          };
-        }
-        return { success: false, error: error.message };
-      }
-
-      await insertNotification(supabase, {
-        workspaceId,
-        userId: assignee,
-        type: "task_deletion_request",
-        title: "Silme onayı gerekli",
-        message: `${actorName} (Admin), '${title}' görevini silmek istiyor. Onaylıyor musun?`,
-        link,
-        payload: {
-          task_id: id,
-          project_id: projectId,
-          workspace_id: workspaceId,
-          task_title: title,
-          action: "deletion_user_approval",
-          requested_by: currentUserId,
-        },
-      });
-
-      revalidateTaskPaths(projectId);
-      return {
-        success: true,
-        taskId: id,
-        projectId,
-        mode: "approval_requested",
-        deletionStatus: "pending_user_approval",
-        message:
-          "Silme isteği atanan kullanıcıya gönderildi. Onay bekleniyor — görev silinmedi.",
-      };
-    }
-
-    // Üye → admin onayı zorunlu (görev SİLİNMEZ)
     const { error } = await supabase
       .from("tasks")
       .update({
-        deletion_status: "pending_admin_approval" satisfies TaskDeletionStatus,
+        deletion_status: approver.deletionStatus,
         deletion_requested_by: currentUserId,
         deletion_requested_at: requestedAt,
       })
@@ -457,43 +439,25 @@ export async function requestOrDeleteTask(
       return { success: false, error: error.message };
     }
 
-    const adminIds = (await getWorkspaceAdminIds(supabase, workspaceId)).filter(
-      (uid) => uid !== currentUserId,
-    );
-
-    if (adminIds.length === 0) {
-      // Rollback pending status — onaylayacak admin yok
-      await supabase
-        .from("tasks")
-        .update({
-          deletion_status: "none",
-          deletion_requested_by: null,
-          deletion_requested_at: null,
-        })
-        .eq("id", id);
-
-      return {
-        success: false,
-        error:
-          "Onaylayacak yönetici bulunamadı. Silme isteği oluşturulamadı; görev silinmedi.",
-      };
-    }
-
+    const requesterLabel = isAdmin ? `${actorName} (Admin)` : actorName;
     await Promise.all(
-      adminIds.map((adminId) =>
+      approver.userIds.map((userId) =>
         insertNotification(supabase, {
           workspaceId,
-          userId: adminId,
+          userId,
           type: "task_deletion_request",
           title: "Silme onayı gerekli",
-          message: `${actorName}, '${title}' görevini silmek için onay istiyor.`,
+          message: `${requesterLabel}, '${title}' görevini silmek istiyor. Onaylıyor musun?`,
           link,
           payload: {
             task_id: id,
             project_id: projectId,
             workspace_id: workspaceId,
             task_title: title,
-            action: "deletion_admin_approval",
+            action:
+              approver.target === "assignee"
+                ? "deletion_user_approval"
+                : "deletion_admin_approval",
             requested_by: currentUserId,
           },
         }),
@@ -506,9 +470,11 @@ export async function requestOrDeleteTask(
       taskId: id,
       projectId,
       mode: "approval_requested",
-      deletionStatus: "pending_admin_approval",
+      deletionStatus: approver.deletionStatus,
       message:
-        "Silme isteği yöneticilere iletildi. Onay bekleniyor — görev silinmedi.",
+        approver.target === "assignee"
+          ? "Silme isteği atanan kullanıcıya gönderildi. Onay bekleniyor — görev silinmedi."
+          : "Silme isteği yöneticilere iletildi. Onay bekleniyor — görev silinmedi.",
     };
   } catch (error) {
     return {

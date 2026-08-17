@@ -46,13 +46,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
-  TASK_PRIORITIES,
   TASK_STATUSES,
   type ProjectTask,
   type Subtask,
   type TaskAttachment,
   type TaskComment,
-  type TaskPriority,
   type TaskStatus,
 } from "@/lib/supabase/types";
 import { localizedPriority, localizedStatus } from "@/lib/localized-labels";
@@ -90,7 +88,6 @@ export function TaskDetailSheet({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
   const [assigneeId, setAssigneeId] = useState("");
   const [members, setMembers] = useState<WorkspaceMemberOption[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -123,7 +120,6 @@ export function TaskDetailSheet({
     setTitle(next.title);
     setDescription(next.description ?? "");
     setDueDate(toDateInputValue(next.due_date));
-    setPriority(next.priority);
     setAssigneeId(next.assignee_id ?? "");
   }, []);
 
@@ -490,12 +486,13 @@ export function TaskDetailSheet({
     if (!task) return;
     setSaving(true);
 
+    // priority BİLEREK gönderilmiyor — görev detayından öncelik değiştirme
+    // özelliği kaldırıldı (oluşturma formunda belirlenir).
     const result = await updateTask({
       taskId: task.id,
       title,
       description,
       due_date: dueDate ? new Date(`${dueDate}T12:00:00`).toISOString() : null,
-      priority,
       assigneeId: assigneeId || null,
     });
 
@@ -699,24 +696,18 @@ export function TaskDetailSheet({
           <div className="flex flex-1 flex-col gap-6 px-4 py-5">
             <section className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
+                {/*
+                  Öncelik yalnızca görev oluşturulurken belirlenir; detayda
+                  salt-okunur gösterilir (düzenleme bilinçli olarak kaldırıldı).
+                */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="task-priority" className="text-xs">
-                    Öncelik
-                  </Label>
-                  <select
-                    id="task-priority"
-                    value={priority}
-                    onChange={(e) =>
-                      setPriority(e.target.value as TaskPriority)
-                    }
-                    className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-sm"
+                  <Label className="text-xs">Öncelik</Label>
+                  <div
+                    className="flex h-9 w-full items-center rounded-lg border border-border bg-muted/40 px-3 text-sm text-foreground"
+                    title={t("taskDetail.priorityReadOnly")}
                   >
-                    {TASK_PRIORITIES.map((value) => (
-                      <option key={value} value={value}>
-                        {localizedPriority(t, value)}
-                      </option>
-                    ))}
-                  </select>
+                    {localizedPriority(t, task.priority ?? "MEDIUM")}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="task-due" className="text-xs">
@@ -1019,13 +1010,8 @@ export function TaskDetailSheet({
               }
             : null
         }
-        onDeleted={(deletedId) => {
-          invalidateCachedTask(deletedId);
-          onOpenChange(false);
-          onTaskDeleted?.(deletedId);
-          router.refresh();
-        }}
         onApprovalRequested={(taskId, deletionStatus) => {
+          invalidateCachedTask(taskId);
           setTask((prev) =>
             prev && prev.id === taskId
               ? { ...prev, deletion_status: deletionStatus }

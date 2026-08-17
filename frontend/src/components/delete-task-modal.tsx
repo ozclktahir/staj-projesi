@@ -23,11 +23,11 @@ type DeleteTaskModalProps = {
     title: string;
     deletion_status?: TaskDeletionStatus | null;
   } | null;
-  /** true ise metinler admin silme onayı diline kayar */
+  /**
+   * Artık yalnızca çağıranların mevcut API'sini bozmamak için duruyor —
+   * silme her zaman onaydan geçtiği için modal metinleri role göre değişmiyor.
+   */
   isAdmin?: boolean;
-  onDeleted?: (taskId: string) => void;
-  /** Optimistic silme geri alınırsa */
-  onDeleteFailed?: (task: { id: string; title: string }) => void;
   onApprovalRequested?: (
     taskId: string,
     deletionStatus: TaskDeletionStatus,
@@ -38,14 +38,13 @@ export function DeleteTaskModal({
   open,
   onOpenChange,
   task,
-  isAdmin = false,
-  onDeleted,
-  onDeleteFailed,
   onApprovalRequested,
 }: DeleteTaskModalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [previewMessage, setPreviewMessage] = useState<string | null>(null);
-  const [requiresApproval, setRequiresApproval] = useState(false);
+  const [approvalTarget, setApprovalTarget] = useState<
+    "admin" | "assignee" | null
+  >(null);
   const [, startTransition] = useTransition();
 
   const pending =
@@ -55,7 +54,7 @@ export function DeleteTaskModal({
   useEffect(() => {
     if (!open || !task?.id || pending) {
       setPreviewMessage(null);
-      setRequiresApproval(false);
+      setApprovalTarget(null);
       return;
     }
 
@@ -65,10 +64,10 @@ export function DeleteTaskModal({
       if (cancelled) return;
       if (!preview.success) {
         setPreviewMessage(null);
-        setRequiresApproval(false);
+        setApprovalTarget(null);
         return;
       }
-      setRequiresApproval(preview.requiresApproval);
+      setApprovalTarget(preview.approvalTarget);
       setPreviewMessage(preview.message);
     })();
 
@@ -77,61 +76,42 @@ export function DeleteTaskModal({
     };
   }, [open, task?.id, pending]);
 
+  /**
+   * Silme ARTIK hiçbir durumda doğrudan gerçekleşmez — her zaman onay isteği
+   * gönderilir (bkz. requestOrDeleteTask). Bu yüzden eskiden burada bulunan
+   * "iyimser doğrudan silme" yolu kaldırıldı; görev, onaylanana kadar panoda
+   * "onay bekleniyor" rozetiyle durmaya devam eder.
+   */
   const onConfirm = () => {
     if (!task?.id || pending) return;
 
     const taskSnapshot = { id: task.id, title: task.title };
-    const optimisticDirectDelete = !requiresApproval;
-
-    if (optimisticDirectDelete) {
-      onDeleted?.(taskSnapshot.id);
-      onOpenChange(false);
-    }
-
     setIsDeleting(true);
     startTransition(() => {
       void (async () => {
         try {
-          if (requiresApproval) {
-            toast.message(
-              isAdmin
-                ? "Bu görevde ilerleme olduğu için silme talebi kullanıcıya iletilecektir."
-                : "Bu görevde ilerleme olduğu için silme talebi yöneticiye iletilecektir.",
-            );
-          }
-
           const result = await deleteTask(taskSnapshot.id);
           if (!result.success) {
             console.error("[DeleteTaskModal]", result.error);
-            if (optimisticDirectDelete) onDeleteFailed?.(taskSnapshot);
             toast.error(result.error);
             return;
           }
 
-          if (result.mode === "approval_requested") {
-            if (optimisticDirectDelete) onDeleteFailed?.(taskSnapshot);
-            toast.success(result.message);
-            onApprovalRequested?.(
-              taskSnapshot.id,
-              result.deletionStatus ??
-                (isAdmin ? "pending_user_approval" : "pending_admin_approval"),
-            );
-            if (!optimisticDirectDelete) onOpenChange(false);
-            return;
-          }
-
-          toast.success(result.message || "Görev başarıyla silindi");
-          if (!optimisticDirectDelete) {
-            onOpenChange(false);
-            onDeleted?.(taskSnapshot.id);
-          }
+          toast.success(result.message);
+          onApprovalRequested?.(
+            taskSnapshot.id,
+            result.deletionStatus ??
+              (approvalTarget === "assignee"
+                ? "pending_user_approval"
+                : "pending_admin_approval"),
+          );
+          onOpenChange(false);
         } catch (error) {
           const message =
             error instanceof Error
               ? error.message
               : "Görev silinirken bir hata oluştu.";
           console.error("[DeleteTaskModal] catch:", error);
-          if (optimisticDirectDelete) onDeleteFailed?.(taskSnapshot);
           toast.error(message);
         } finally {
           setIsDeleting(false);
@@ -145,28 +125,17 @@ export function DeleteTaskModal({
       <DialogContent className="rounded-lg border border-border bg-card sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-destructive">
-            {pending
-              ? "Onay Bekleniyor"
-              : requiresApproval
-                ? isAdmin
-                  ? "Silme Onayı İste"
-                  : "Silme İsteği Gönder"
-                : "Görevi Sil"}
+            {pending ? "Onay Bekleniyor" : "Silme İsteği Gönder"}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {pending ? (
               <>Bu görev için zaten bir silme onayı bekleniyor.</>
             ) : previewMessage ? (
               <>{previewMessage}</>
-            ) : isAdmin ? (
-              <>
-                Görevde ilerleme varsa atanan kullanıcıdan onay istenir; yoksa
-                doğrudan silinir.
-              </>
             ) : (
               <>
-                Görevde ilerleme varsa yöneticilerden onay istenir; henüz
-                dokunulmamış görevler doğrudan silinir.
+                Görevler yalnızca ikinci bir kişinin onayıyla silinir. Bu istek
+                onaylanana kadar görev yerinde kalır.
               </>
             )}
             {task?.title ? (
@@ -198,11 +167,9 @@ export function DeleteTaskModal({
           >
             {isDeleting
               ? "İşleniyor..."
-              : requiresApproval
-                ? isAdmin
-                  ? "Kullanıcıdan Onay İste"
-                  : "Yöneticiye İstek Gönder"
-                : "Sil"}
+              : approvalTarget === "assignee"
+                ? "Atanan Kişiden Onay İste"
+                : "Yöneticiden Onay İste"}
           </Button>
         </DialogFooter>
       </DialogContent>

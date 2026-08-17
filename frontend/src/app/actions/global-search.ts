@@ -1,11 +1,12 @@
 "use server";
 
+import { loadProfilesByIds, resolveMemberDisplayFields } from "@/lib/member-labels";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 
 export type GlobalSearchHit = {
   id: string;
-  type: "project" | "task" | "member";
+  type: "project" | "task" | "member" | "note" | "todo";
   title: string;
   subtitle?: string | null;
   href: string;
@@ -14,6 +15,11 @@ export type GlobalSearchHit = {
 export type GlobalSearchResult =
   | { success: true; hits: GlobalSearchHit[] }
   | { success: false; error: string; hits: [] };
+
+/** PostgREST `or=` filtresinde virgül/parantez ayırıcı olduğu için temizlenir. */
+function sanitizeForOr(value: string): string {
+  return value.replace(/[(),]/g, " ").trim();
+}
 
 export async function globalSearch(params: {
   workspaceId: string;
@@ -41,29 +47,69 @@ export async function globalSearch(params: {
     }
 
     const like = `%${q}%`;
+    const orLike = `%${sanitizeForOr(q)}%`;
     const hits: GlobalSearchHit[] = [];
 
-    const [projectsRes, tasksRes, membersRes] = await Promise.all([
+    const [
+      projectsRes,
+      tasksRes,
+      memberRowsRes,
+      ownerRes,
+      notesRes,
+      todosRes,
+    ] = await Promise.all([
+      // Proje: ad VE açıklama üzerinde ara
       supabase
         .from("projects")
         .select("id, name, description")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
-        .ilike("name", like)
+        .or(`name.ilike.${orLike},description.ilike.${orLike}`)
         .limit(8),
+      // Görev: başlık VE açıklama üzerinde ara (RLS görünürlüğü sınırlar)
       supabase
         .from("tasks")
-        .select("id, title, project_id, status")
+        .select("id, title, description, project_id, status")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
-        .ilike("title", like)
+        .or(`title.ilike.${orLike},description.ilike.${orLike}`)
         .limit(10),
+      // NOT: `profiles:user_id(...)` embed'i şemada FK ilişkisi olmadığı için
+      // PGRST200 ile HER ZAMAN hata veriyordu → üye araması hiç sonuç
+      // döndürmüyordu. Profilleri ayrı sorguyla (loadProfilesByIds) çekiyoruz.
       supabase
         .from("workspace_members")
-        .select("user_id, role, profiles:user_id(id, email, full_name)")
+        .select("user_id, role")
         .eq("workspace_id", workspaceId)
-        .limit(40),
+        .limit(100),
+      // Workspace sahibi workspace_members'ta olmayabilir — ayrıca ekle
+      supabase
+        .from("workspaces")
+        .select("owner_id")
+        .eq("id", workspaceId)
+        .maybeSingle(),
+      // Kişisel notlar (yalnızca kendi kayıtları — RLS zaten sınırlar)
+      supabase
+        .from("personal_notes")
+        .select("id, title, content")
+        .eq("user_id", user.id)
+        .or(`title.ilike.${orLike},content.ilike.${orLike}`)
+        .limit(6),
+      // Kişisel görevler (todo)
+      supabase
+        .from("personal_todos")
+        .select("id, task, is_completed")
+        .eq("user_id", user.id)
+        .ilike("task", like)
+        .limit(6),
     ]);
+
+    if (projectsRes.error) {
+      console.warn("[globalSearch] projects:", projectsRes.error.message);
+    }
+    if (tasksRes.error) {
+      console.warn("[globalSearch] tasks:", tasksRes.error.message);
+    }
 
     for (const row of projectsRes.data ?? []) {
       hits.push({
@@ -71,7 +117,7 @@ export async function globalSearch(params: {
         type: "project",
         title: String(row.name ?? "Proje"),
         subtitle: (row.description as string | null) ?? null,
-        href: `/project/${row.id}`,
+        href: `/project/${row.id}?workspaceId=${encodeURIComponent(workspaceId)}`,
       });
     }
 
@@ -82,35 +128,85 @@ export async function globalSearch(params: {
         type: "task",
         title: String(row.title ?? "Görev"),
         subtitle: String(row.status ?? ""),
+        // taskId → proje panosu görev detay panelini otomatik açar
         href: projectId
-          ? `/project/${projectId}?taskId=${row.id}`
-          : `/projects`,
+          ? `/project/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}&taskId=${row.id}`
+          : `/projects?workspaceId=${encodeURIComponent(workspaceId)}`,
       });
     }
 
-    const qLower = q.toLowerCase();
-    for (const row of membersRes.data ?? []) {
-      const profile = row.profiles as
-        | { id?: string; email?: string | null; full_name?: string | null }
-        | { id?: string; email?: string | null; full_name?: string | null }[]
-        | null;
-      const p = Array.isArray(profile) ? profile[0] : profile;
-      const name = (p?.full_name ?? p?.email ?? row.user_id ?? "").toString();
-      const email = (p?.email ?? "").toString();
-      if (
-        !name.toLowerCase().includes(qLower) &&
-        !email.toLowerCase().includes(qLower)
-      ) {
-        continue;
+    // ── Üyeler ──
+    const memberRows = memberRowsRes.data ?? [];
+    const roleByUserId = new Map<string, string | null>();
+    for (const row of memberRows) {
+      if (typeof row.user_id === "string") {
+        roleByUserId.set(row.user_id, (row.role as string | null) ?? null);
       }
+    }
+    const ownerId =
+      typeof ownerRes.data?.owner_id === "string"
+        ? ownerRes.data.owner_id
+        : null;
+    if (ownerId && !roleByUserId.has(ownerId)) {
+      roleByUserId.set(ownerId, "OWNER");
+    }
+
+    if (memberRowsRes.error) {
+      console.warn(
+        "[globalSearch] workspace_members:",
+        memberRowsRes.error.message,
+      );
+    }
+
+    const memberIds = [...roleByUserId.keys()];
+    if (memberIds.length > 0) {
+      const profileById = await loadProfilesByIds(supabase, memberIds);
+      const qLower = q.toLocaleLowerCase("tr-TR");
+      let memberHits = 0;
+
+      for (const uid of memberIds) {
+        if (memberHits >= 8) break;
+        const profile = profileById.get(uid) ?? null;
+        const fields = resolveMemberDisplayFields(profile, null);
+        const name = (fields.fullName || fields.displayName || "").toString();
+        const email = (fields.email ?? "").toString();
+        if (
+          !name.toLocaleLowerCase("tr-TR").includes(qLower) &&
+          !email.toLocaleLowerCase("tr-TR").includes(qLower)
+        ) {
+          continue;
+        }
+        hits.push({
+          id: uid,
+          type: "member",
+          title: name || email || "Üye",
+          subtitle: roleByUserId.get(uid) ?? null,
+          href: `/members?workspaceId=${encodeURIComponent(workspaceId)}`,
+        });
+        memberHits++;
+      }
+    }
+
+    // ── Kişisel notlar / görevler ──
+    for (const row of notesRes.data ?? []) {
+      const content = (row.content as string | null) ?? null;
       hits.push({
-        id: String(row.user_id),
-        type: "member",
-        title: name || email || "Üye",
-        subtitle: row.role ? String(row.role) : null,
-        href: `/members`,
+        id: String(row.id),
+        type: "note",
+        title: String(row.title ?? "Not"),
+        subtitle: content ? content.slice(0, 60) : null,
+        href: "/personal",
       });
-      if (hits.filter((h) => h.type === "member").length >= 8) break;
+    }
+
+    for (const row of todosRes.data ?? []) {
+      hits.push({
+        id: String(row.id),
+        type: "todo",
+        title: String(row.task ?? "Görev"),
+        subtitle: row.is_completed ? "Tamamlandı" : null,
+        href: "/personal",
+      });
     }
 
     return { success: true, hits };

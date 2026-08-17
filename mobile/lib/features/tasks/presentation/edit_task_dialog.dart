@@ -25,7 +25,6 @@ Future<TaskDto?> showEditTaskDialog({
   String? assigneeId = caps.isAdmin
       ? task.effectiveAssigneeId
       : (task.effectiveAssigneeId ?? userId);
-  var priority = task.priority;
   DateTime? dueDate = task.dueDate != null
       ? DateTime.tryParse(task.dueDate!)?.toLocal()
       : null;
@@ -74,27 +73,9 @@ Future<TaskDto?> showEditTaskDialog({
                           labelText: 'Açıklama',
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<TaskPriority>(
-                        initialValue: priority,
-                        decoration: const InputDecoration(
-                          labelText: 'Öncelik',
-                        ),
-                        items: [
-                          for (final value in TaskPriority.values)
-                            DropdownMenuItem(
-                              value: value,
-                              child: Text(value.label),
-                            ),
-                        ],
-                        onChanged: submitting
-                            ? null
-                            : (value) {
-                                if (value != null) {
-                                  setLocal(() => priority = value);
-                                }
-                              },
-                      ),
+                      // Öncelik yalnızca görev OLUŞTURULURKEN belirlenir;
+                      // görev detayından sonradan değiştirilemez (web ile
+                      // aynı kural — bkz. task-detail-sheet.tsx).
                       const SizedBox(height: 16),
                       OutlinedButton.icon(
                         onPressed: submitting
@@ -175,7 +156,6 @@ Future<TaskDto?> showEditTaskDialog({
                                   dto: UpdateTaskDto(
                                     title: titleController.text,
                                     description: descriptionController.text,
-                                    priority: priority,
                                     assigneeId: clearAssignee
                                         ? null
                                         : resolvedAssignee,

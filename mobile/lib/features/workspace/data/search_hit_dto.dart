@@ -1,4 +1,4 @@
-enum SearchHitType { project, task, member, unknown }
+enum SearchHitType { project, task, member, note, todo, unknown }
 
 /// Web `GlobalSearchHit` parity (bkz. `global-search.ts`).
 class SearchHitDto {
@@ -34,6 +34,10 @@ class SearchHitDto {
         return SearchHitType.task;
       case 'member':
         return SearchHitType.member;
+      case 'note':
+        return SearchHitType.note;
+      case 'todo':
+        return SearchHitType.todo;
       default:
         return SearchHitType.unknown;
     }

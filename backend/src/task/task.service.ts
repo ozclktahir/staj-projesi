@@ -437,71 +437,34 @@ export class TaskService {
     const projectId =
       typeof existing.project_id === 'string' ? existing.project_id : null;
 
-    // Dual approval zorunlu — ilerleme olsa da olmasa da doğrudan silme yok.
+    // Dual approval zorunlu — görevin durumu (dokunulmamış / ilerlemiş) ya da
+    // talep edenin rolü fark etmeksizin doğrudan silme YOKTUR. Onaylayan
+    // zinciri web'deki resolveDeletionApprover ile birebir aynı:
+    //   1) atanan kullanıcı (talep eden değilse)
+    //   2) diğer admin/owner'lar (talep eden hariç)
+    // Hiçbiri yoksa hiçbir şey değiştirmeden hata döneriz.
     const requestedAt = new Date().toISOString();
 
-    if (isAdmin) {
-      if (!assignee) {
-        throw new BadRequestException(
-          'Onaylı silme için önce göreve bir kullanıcı atayın.',
-        );
-      }
+    const useAssignee = Boolean(assignee && assignee !== actorUserId);
+    const adminIds = (await this.getWorkspaceAdminIds(workspaceId)).filter(
+      (id) => id !== actorUserId,
+    );
 
-      const { error } = await client
-        .from('tasks')
-        .update({
-          deletion_status: 'pending_user_approval',
-          deletion_requested_by: actorUserId,
-          deletion_requested_at: requestedAt,
-        })
-        .eq('id', taskId);
-
-      if (error) {
-        if (
-          error.message.includes('deletion_status') ||
-          error.message.includes('deletion_requested')
-        ) {
-          throw new BadRequestException(
-            'Silme onay sütunları henüz yok. Migration gerekli.',
-          );
-        }
-        throw new BadRequestException(error.message);
-      }
-
-      await this.notificationService.create(workspaceId, {
-        user_id: assignee,
-        type: 'task_deletion_request',
-        title: 'Silme onayı gerekli',
-        message: `Yönetici, '${title}' görevini silmek istiyor. Görev tamamlandı mı, sileyim mi?`,
-        metadata: {
-          task_id: taskId,
-          project_id: projectId,
-          workspace_id: workspaceId,
-          task_title: title,
-          action: 'deletion_user_approval',
-          requested_by: actorUserId,
-        },
-      });
-
-      this.notificationGateway.emitToWorkspace(workspaceId, 'task_updated', {
-        id: taskId,
-        deletion_status: 'pending_user_approval',
-      });
-
-      return {
-        mode: 'approval_requested' as const,
-        message:
-          'Silme isteği atanan kullanıcıya gönderildi. Onay bekleniyor — görev silinmedi.',
-        taskId,
-        projectId,
-        deletionStatus: 'pending_user_approval',
-      };
+    if (!useAssignee && adminIds.length === 0) {
+      throw new BadRequestException(
+        'Silme işlemi onay gerektirir ancak bu çalışma alanında onaylayabilecek başka kimse yok. Önce görevi bir üyeye atayın veya ikinci bir yönetici ekleyin.',
+      );
     }
+
+    const approverIds = useAssignee ? [assignee as string] : adminIds;
+    const deletionStatus = useAssignee
+      ? 'pending_user_approval'
+      : 'pending_admin_approval';
 
     const { error } = await client
       .from('tasks')
       .update({
-        deletion_status: 'pending_admin_approval',
+        deletion_status: deletionStatus,
         deletion_requested_by: actorUserId,
         deletion_requested_at: requestedAt,
       })
@@ -519,37 +482,22 @@ export class TaskService {
       throw new BadRequestException(error.message);
     }
 
-    const adminIds = (await this.getWorkspaceAdminIds(workspaceId)).filter(
-      (id) => id !== actorUserId,
-    );
-
-    if (adminIds.length === 0) {
-      await client
-        .from('tasks')
-        .update({
-          deletion_status: 'none',
-          deletion_requested_by: null,
-          deletion_requested_at: null,
-        })
-        .eq('id', taskId);
-      throw new BadRequestException(
-        'Onaylayacak yönetici bulunamadı. Silme isteği oluşturulamadı; görev silinmedi.',
-      );
-    }
-
+    const requesterLabel = isAdmin ? 'Yönetici' : 'Kullanıcı';
     await Promise.all(
-      adminIds.map((adminId) =>
+      approverIds.map((approverId) =>
         this.notificationService.create(workspaceId, {
-          user_id: adminId,
+          user_id: approverId,
           type: 'task_deletion_request',
           title: 'Silme onayı gerekli',
-          message: `Kullanıcı '${title}' görevini silmek istiyor.`,
+          message: `${requesterLabel}, '${title}' görevini silmek istiyor. Onaylıyor musun?`,
           metadata: {
             task_id: taskId,
             project_id: projectId,
             workspace_id: workspaceId,
             task_title: title,
-            action: 'deletion_admin_approval',
+            action: useAssignee
+              ? 'deletion_user_approval'
+              : 'deletion_admin_approval',
             requested_by: actorUserId,
           },
         }),
@@ -558,16 +506,17 @@ export class TaskService {
 
     this.notificationGateway.emitToWorkspace(workspaceId, 'task_updated', {
       id: taskId,
-      deletion_status: 'pending_admin_approval',
+      deletion_status: deletionStatus,
     });
 
     return {
       mode: 'approval_requested' as const,
-      message:
-        'Silme isteği yöneticilere gönderildi. Onay bekleniyor — görev silinmedi.',
+      message: useAssignee
+        ? 'Silme isteği atanan kullanıcıya gönderildi. Onay bekleniyor — görev silinmedi.'
+        : 'Silme isteği yöneticilere gönderildi. Onay bekleniyor — görev silinmedi.',
       taskId,
       projectId,
-      deletionStatus: 'pending_admin_approval',
+      deletionStatus,
     };
   }
 

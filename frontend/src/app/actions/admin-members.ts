@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidateTag } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { ACCESS_TOKEN_COOKIE } from "@/lib/auth-session";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
@@ -72,7 +72,9 @@ export async function removeWorkspaceMember(params: {
       };
     }
 
-    revalidateTag(`workspace-members-${workspaceId}`, "max");
+    updateTag(`workspace-members-${workspaceId}`);
+    revalidatePath("/members");
+    revalidatePath("/");
     return {
       success: true,
       message: body?.message
@@ -147,7 +149,9 @@ export async function updateWorkspaceMemberRole(params: {
       };
     }
 
-    revalidateTag(`workspace-members-${workspaceId}`, "max");
+    updateTag(`workspace-members-${workspaceId}`);
+    revalidatePath("/members");
+    revalidatePath("/");
     return {
       success: true,
       message: body?.message
