@@ -72,7 +72,6 @@ export class WorkspaceController {
 
   @Post(':id/invite')
   @Roles('OWNER', 'Admin')
-  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({
     summary: 'Belirtilen çalışma alanına yeni bir üye davet eder',
   })
@@ -133,7 +132,6 @@ export class WorkspaceController {
   }
 
   @Delete(':id')
-  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Çalışma alanını siler (yalnızca OWNER)' })
   @ApiResponse({ status: 200, description: 'Çalışma alanı silindi.' })
   @ApiResponse({

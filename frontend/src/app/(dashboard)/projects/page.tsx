@@ -21,18 +21,21 @@ async function ProjectsContent({
   const params = await searchParams;
   const workspaceId = await resolveActiveWorkspaceId(params.workspaceId ?? null);
 
-  // Üçü de birbirinden bağımsız — tek Promise.all ile paralel (önceden stats,
-  // projects'in sonucunu (projectIds) beklediği için 2 aşamalı bir waterfall'du).
-  const [{ userName, projects }, auth, stats] = await Promise.all([
+  // getAuthenticatedUser() React cache()'li — burada bir kez await etmek
+  // internal çağrıları (getCurrentUserProjects/getDashboardTaskStats'ın
+  // kendi içindeki auth okumaları) YAVAŞLATMAZ, hepsi aynı cache'lenmiş
+  // promise'i paylaşır. Asıl kazanç: resolveWorkspaceRole artık projects/
+  // stats'la AYNI Promise.all'da paralel — önceden bu üçü bitene kadar
+  // beklenip SONRA sıralı çalıştırılıyordu (23 Ağustos 2026 canlı
+  // profillemesinde /projects en yavaş SSR sayfası olarak bulundu).
+  const auth = await getAuthenticatedUser();
+  const [{ userName, projects }, stats, roleCtx] = await Promise.all([
     getCurrentUserProjects(workspaceId),
-    getAuthenticatedUser(),
     getDashboardTaskStats(workspaceId),
-  ]);
-
-  const roleCtx =
     workspaceId && auth
-      ? await resolveWorkspaceRole(auth.supabase, workspaceId, auth.user.id)
-      : null;
+      ? resolveWorkspaceRole(auth.supabase, workspaceId, auth.user.id)
+      : Promise.resolve(null),
+  ]);
 
   const canCreateProject = Boolean(roleCtx?.isAdmin);
 

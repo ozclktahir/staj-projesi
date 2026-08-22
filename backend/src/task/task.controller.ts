@@ -8,8 +8,10 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -34,7 +36,6 @@ export class TaskController {
 
   @Post()
   @Roles('OWNER', 'Admin', 'Member')
-  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Çalışma alanı içinde yeni bir görev oluşturur' })
   @ApiResponse({ status: 201, description: 'Görev başarıyla oluşturuldu.' })
   @ApiResponse({
@@ -61,13 +62,18 @@ export class TaskController {
     @Param('workspaceId') workspaceId: string,
     @GetUser() user: { id: string },
     @Query() filterDto: GetTasksFilterDto,
+    @Req() request: Request & { workspaceRole?: { isAdmin: boolean } },
   ) {
-    return this.taskService.findAll(workspaceId, user.id, filterDto);
+    return this.taskService.findAll(
+      workspaceId,
+      user.id,
+      filterDto,
+      request.workspaceRole?.isAdmin,
+    );
   }
 
   @Get('rejected')
   @Roles('OWNER', 'Admin')
-  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Reddedilmiş (claim rejected) görevleri listeler' })
   listRejected(
     @Param('workspaceId') workspaceId: string,
@@ -83,7 +89,6 @@ export class TaskController {
 
   @Get('deleted')
   @Roles('OWNER', 'Admin', 'Member')
-  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Soft-delete edilmiş (çöp kutusu) görevleri listeler' })
   @ApiResponse({ status: 200, description: 'Arşivlenmiş görevler listelendi.' })
   listDeleted(@Param('workspaceId') workspaceId: string) {
@@ -103,7 +108,6 @@ export class TaskController {
 
   @Post(':id/reassign')
   @Roles('OWNER', 'Admin')
-  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({
     summary: 'Reddedilmiş görevi yeni bir üyeye yeniden atar',
   })
@@ -124,7 +128,6 @@ export class TaskController {
 
   @Patch(':id/restore')
   @Roles('OWNER', 'Admin', 'Member')
-  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({
     summary: 'Soft-delete edilmiş görevi çöp kutusundan geri getirir',
   })
@@ -147,7 +150,6 @@ export class TaskController {
 
   @Patch(':id')
   @Roles('OWNER', 'Admin', 'Member')
-  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({ summary: 'Belirtilen görevi günceller' })
   @ApiResponse({ status: 200, description: 'Görev başarıyla güncellendi.' })
   @ApiResponse({
@@ -167,7 +169,6 @@ export class TaskController {
 
   @Delete(':id')
   @Roles('OWNER', 'Admin', 'Member')
-  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
   @ApiOperation({
     summary:
       'Görevi siler veya ilerleme varsa dual silme onayı başlatır (web requestOrDeleteTask)',

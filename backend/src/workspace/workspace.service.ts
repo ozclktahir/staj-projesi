@@ -403,11 +403,16 @@ export class WorkspaceService {
     // PostgREST `or=` filtresinde virgül/parantez ayırıcıdır — temizle.
     const orLike = `%${q.replace(/[(),]/g, ' ').trim()}%`;
 
-    const { data: authData } = await client.auth.getUser(accessToken);
-    const userId = authData?.user?.id ?? null;
-
-    const [projectsRes, tasksRes, memberRowsRes, ownerRes, notesRes, todosRes] =
+    // Kişisel not/todo sorguları userId'ye bağımlı olduğundan, önceden
+    // auth.getUser() SIRALI (workspace-scoped sorgulardan önce) atılıyordu
+    // — 23 Ağustos 2026 canlı profillemesinde bu ucun en yavaş backend
+    // endpoint'i olduğu görüldü. auth.getUser() artık workspace-scoped 4
+    // sorguyla AYNI Promise.all'da paralel çalışıyor; userId'ye bağımlı
+    // olan not/todo sorguları ise userId bilindikten sonra ikinci (kısa)
+    // bir paralel turda atılıyor.
+    const [authResult, projectsRes, tasksRes, memberRowsRes, ownerRes] =
       await Promise.all([
+        client.auth.getUser(accessToken),
         client
           .from('projects')
           .select('id, name, description')
@@ -435,23 +440,28 @@ export class WorkspaceService {
           .select('owner_id')
           .eq('id', workspaceId)
           .maybeSingle(),
-        userId
-          ? client
-              .from('personal_notes')
-              .select('id, title, content')
-              .eq('user_id', userId)
-              .or(`title.ilike.${orLike},content.ilike.${orLike}`)
-              .limit(6)
-          : Promise.resolve({ data: [], error: null }),
-        userId
-          ? client
-              .from('personal_todos')
-              .select('id, task, is_completed')
-              .eq('user_id', userId)
-              .ilike('task', like)
-              .limit(6)
-          : Promise.resolve({ data: [], error: null }),
       ]);
+
+    const userId = authResult.data?.user?.id ?? null;
+
+    const [notesRes, todosRes] = await Promise.all([
+      userId
+        ? client
+            .from('personal_notes')
+            .select('id, title, content')
+            .eq('user_id', userId)
+            .or(`title.ilike.${orLike},content.ilike.${orLike}`)
+            .limit(6)
+        : Promise.resolve({ data: [], error: null }),
+      userId
+        ? client
+            .from('personal_todos')
+            .select('id, task, is_completed')
+            .eq('user_id', userId)
+            .ilike('task', like)
+            .limit(6)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
 
     const hits: Array<{
       id: string;
@@ -575,23 +585,38 @@ export class WorkspaceService {
     }
     const client = this.supabaseService.createUserClient(accessToken);
 
-    const [{ data: workspace }, { data: membership, error: memberError }] =
-      await Promise.all([
-        client
-          .from('workspaces')
-          .select('owner_id')
-          .eq('id', workspaceId)
-          .maybeSingle(),
-        client
-          .from('workspace_members')
-          .select('role')
-          .eq('workspace_id', workspaceId)
-          .eq('user_id', userId)
-          .maybeSingle(),
-      ]);
+    // Üçü de birbirinden bağımsız (hiçbiri diğerinin sonucuna dayanmıyor)
+    // — "tüm üyeler" sorgusu önceden owner/membership kontrolünden SONRA,
+    // sıralı atılıyordu; 23 Ağustos 2026 canlı profillemesinde üye listesi
+    // ucunun en yavaş backend uçlarından biri olduğu görüldü. Artık tek
+    // Promise.all'da paralel.
+    const [
+      { data: workspace },
+      { data: membership, error: memberError },
+      { data: rows, error },
+    ] = await Promise.all([
+      client
+        .from('workspaces')
+        .select('owner_id')
+        .eq('id', workspaceId)
+        .maybeSingle(),
+      client
+        .from('workspace_members')
+        .select('role')
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', userId)
+        .maybeSingle(),
+      client
+        .from('workspace_members')
+        .select('user_id, role')
+        .eq('workspace_id', workspaceId),
+    ]);
 
     if (memberError) {
       throw new BadRequestException(memberError.message);
+    }
+    if (error) {
+      throw new BadRequestException(error.message);
     }
 
     const role = (membership?.role as string | null) ?? null;
@@ -605,15 +630,6 @@ export class WorkspaceService {
       .toUpperCase();
     const isAdmin =
       isOwner || normalized === 'ADMIN' || role === 'Admin';
-
-    const { data: rows, error } = await client
-      .from('workspace_members')
-      .select('user_id, role')
-      .eq('workspace_id', workspaceId);
-
-    if (error) {
-      throw new BadRequestException(error.message);
-    }
 
     const memberRows = [...(rows ?? [])] as Array<{
       user_id: string;

@@ -23,6 +23,17 @@ type ProjectDetailPageProps = {
   searchParams: Promise<{ workspaceId?: string }>;
 };
 
+/** getAuthenticatedUser() React cache()'li — burada tekrar çağırmak ekstra
+ * ağ maliyeti getirmez, aynı istek içindeki diğer çağrılarla aynı
+ * cache'lenmiş promise'i paylaşır. Bu sarmalayıcı, rol kontrolünü
+ * `project` sorgusunu beklemeden Promise.all içinde paralel başlatabilmek
+ * için var. */
+async function resolveRoleForCurrentUser(workspaceId: string) {
+  const auth = await getAuthenticatedUser();
+  if (!auth) return null;
+  return resolveWorkspaceRole(auth.supabase, workspaceId, auth.user.id);
+}
+
 async function ProjectTaskBoardSection({
   projectId,
   workspaceId,
@@ -48,9 +59,17 @@ export default async function ProjectDetailPage({
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const workspaceId = await resolveActiveWorkspaceId(sp.workspaceId ?? null);
 
-  const [project, auth] = await Promise.all([
+  // `workspaceId` bu noktada zaten biliniyorsa (yaygın durum — uygulama
+  // içi linkler hep withWorkspaceQuery ile workspaceId taşır), rol kontrolü
+  // `project` sorgusunu beklemeden AYNI Promise.all'da paralel başlar.
+  // Yalnızca workspaceId hiç bilinmiyorsa (nadir — project.workspace_id'ye
+  // fallback gerekiyorsa) eski sıralı yol kullanılır. 23 Ağustos 2026 canlı
+  // profillemesinde bu sayfanın rol kontrolünün project'ten SONRA, sıralı
+  // çalıştığı görüldü.
+  const [project, auth, roleCtxFromKnownWorkspace] = await Promise.all([
     getProjectById(id),
     getAuthenticatedUser(),
+    workspaceId ? resolveRoleForCurrentUser(workspaceId) : Promise.resolve(null),
   ]);
 
   if (!project) {
@@ -66,8 +85,9 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const roleCtx =
-    effectiveWorkspaceId && auth
+  const roleCtx = workspaceId
+    ? roleCtxFromKnownWorkspace
+    : effectiveWorkspaceId && auth
       ? await resolveWorkspaceRole(
           auth.supabase,
           effectiveWorkspaceId,

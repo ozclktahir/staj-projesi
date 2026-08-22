@@ -11,21 +11,57 @@ import 'workspace_access_bus.dart';
 
 /// Merkezi Dio istemcisi — JWT + silent refresh + 401/403 yakalama.
 class ApiClient {
-  ApiClient({
-    required this._secureStorage,
-    Dio? dio,
-  }) : _dio = dio ??
-            Dio(
-              BaseOptions(
-                baseUrl: ApiConstants.baseUrl,
-                connectTimeout: ApiConstants.connectTimeout,
-                receiveTimeout: ApiConstants.receiveTimeout,
-                headers: const {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                },
-              ),
-            ) {
+  ApiClient({required this._secureStorage, Dio? dio})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              baseUrl: ApiConstants.baseUrl,
+              connectTimeout: ApiConstants.connectTimeout,
+              receiveTimeout: ApiConstants.receiveTimeout,
+              headers: const {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+            ),
+          ) {
+    // Yalnızca debug build'lerde: her isteğin süresini loglar (performans
+    // profillemesi için — 23 Ağustos 2026). Release/prod build'i hiç
+    // etkilemez, kDebugMode'da derleme zamanında tamamen elenir.
+    if (kDebugMode) {
+      _dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            options.extra['__t0'] = DateTime.now();
+            handler.next(options);
+          },
+          onResponse: (response, handler) {
+            final t0 = response.requestOptions.extra['__t0'] as DateTime?;
+            if (t0 != null) {
+              final ms = DateTime.now().difference(t0).inMilliseconds;
+              debugPrint(
+                '[Dio] ${response.requestOptions.method} '
+                '${response.requestOptions.path} -> '
+                '${response.statusCode} (${ms}ms)',
+              );
+            }
+            handler.next(response);
+          },
+          onError: (error, handler) {
+            final t0 = error.requestOptions.extra['__t0'] as DateTime?;
+            if (t0 != null) {
+              final ms = DateTime.now().difference(t0).inMilliseconds;
+              debugPrint(
+                '[Dio] ${error.requestOptions.method} '
+                '${error.requestOptions.path} -> ERROR (${ms}ms): '
+                '${error.message}',
+              );
+            }
+            handler.next(error);
+          },
+        ),
+      );
+    }
     _dio.interceptors.add(
       QueuedInterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -71,14 +107,12 @@ class ApiClient {
 
   void updateAccessToken(String? token) {
     final trimmed = token?.trim();
-    _memoryAccessToken =
-        (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+    _memoryAccessToken = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
   }
 
   void updateRefreshToken(String? token) {
     final trimmed = token?.trim();
-    _memoryRefreshToken =
-        (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+    _memoryRefreshToken = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
   }
 
   Future<bool> _tryRefreshAndRetry(
@@ -207,9 +241,7 @@ class ApiClient {
     if (!_looksLikeWorkspaceAccessError(message)) return;
 
     final workspaceId = _workspaceIdFromPath(error.requestOptions.path);
-    debugPrint(
-      '[ApiClient] workspace 403 → bus (workspaceId=$workspaceId)',
-    );
+    debugPrint('[ApiClient] workspace 403 → bus (workspaceId=$workspaceId)');
     WorkspaceAccessBus.instance.notifyForbidden(workspaceId);
   }
 

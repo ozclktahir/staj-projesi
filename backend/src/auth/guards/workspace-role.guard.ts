@@ -93,6 +93,19 @@ export class WorkspaceRoleGuard implements CanActivate {
       }
     }
 
+    // Burada zaten hesaplanan rol bilgisini request'e ekliyoruz — servis
+    // katmanının (ör. TaskService.findAll) aynı workspace_members/owner
+    // sorgusunu bir daha ATMASINA gerek kalmasın diye (23 Ağustos 2026
+    // performans profillemesinde bulundu: task listesi ucu, guard'ın az
+    // önce hesapladığı "admin mi" bilgisini isWorkspaceAdmin() ile ikinci
+    // kez, sıralı olarak sorguluyordu). Kullanan taraf isteğe bağlı —
+    // yoksa servisler kendi hesaplamasına düşer (bkz. TaskService.findAll).
+    request.workspaceRole = {
+      isOwner,
+      role: membershipRole,
+      isAdmin: isOwner || (membershipRole ?? '').toUpperCase() === 'ADMIN',
+    };
+
     return true;
   }
 

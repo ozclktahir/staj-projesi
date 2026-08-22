@@ -82,6 +82,14 @@ export class TaskService {
     workspaceId: string,
     actorUserId: string,
     filterDto: GetTasksFilterDto,
+    // WorkspaceRoleGuard bu isteğin guard aşamasında zaten aynı rolü
+    // hesaplamış olabilir (request.workspaceRole) — verilmişse burada
+    // ikinci bir owner/membership sorgusu ATILMAZ. Verilmemişse (ör.
+    // testlerde doğrudan servis çağrılıyorsa) eskisi gibi kendi hesaplar.
+    // 23 Ağustos 2026 canlı profillemesinde bulundu: task listesi ucu,
+    // guard'ın hesapladığı bilgiyi göz ardı edip aynı sorguyu sıralı
+    // olarak tekrarlıyordu.
+    precomputedIsAdmin?: boolean,
   ) {
     const client = this.supabaseService.getClient();
     const { search, status, priority, assignee_id, parent_task_id, projectId } =
@@ -97,7 +105,9 @@ export class TaskService {
 
     // Member/Guest: yalnızca kendine atanmış (veya kendi oluşturduğu)
     // görevleri görebilir; OWNER/Admin workspace'teki tüm görevleri görür.
-    const isAdmin = await this.isWorkspaceAdmin(workspaceId, actorUserId);
+    const isAdmin =
+      precomputedIsAdmin ??
+      (await this.isWorkspaceAdmin(workspaceId, actorUserId));
     if (!isAdmin) {
       query = query.or(
         `assignee_id.eq.${actorUserId},assigned_to.eq.${actorUserId},created_by.eq.${actorUserId}`,
