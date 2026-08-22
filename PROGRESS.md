@@ -864,3 +864,12 @@ Test kullanıcısı: `ozclk.tahir+claudetest1786910138@gmail.com` — Supabase A
 **Yeni dosyalar:** `database/migrations/revert_task_assignees_to_single.sql`.
 **Silinen dosyalar:** `frontend/src/app/actions/task-assignees.ts`, `frontend/src/components/task/assignees-field.tsx`, `backend/src/task/dto/set-task-assignees.dto.ts`, `mobile/lib/features/tasks/presentation/assignees_field.dart`, `mobile/lib/features/tasks/providers/task_assignees_provider.dart`, `mobile/test/assignees_field_test.dart`.
 **Geri getirilen dosyalar (git geçmişinden):** `mobile/lib/features/workspace/presentation/assignee_picker_field.dart`.
+
+
+### [23 Ağustos 2026] - Mobil: production APK'nın fiziksel cihaza güncellenmesi
+
+> Bir önceki paketteki (22 Ağustos) mobil değişiklikler o oturumda fiziksel bir cihaz bağlı olmadığı için yalnızca `flutter analyze`/`flutter test` ile doğrulanabilmişti. Kullanıcı bu oturumda cihazı (2201116TG, Android 11) USB ile bağlayıp uygulamanın güncellenmesini istedi.
+
+`flutter devices` ile cihaz doğrulandı, ardından `flutter build apk --release --dart-define=API_BASE_URL=https://staj-projesi-api.onrender.com` ile prod API'sine bağlı bir release APK derlendi (58.3MB) ve `flutter install -d OVSCCI8TSCZD9PXW` ile cihazdaki eski sürümün üzerine kuruldu (eski sürüm otomatik kaldırılıp yenisi kuruldu, ~10sn). Bu, 15/16 Ağustos'taki GitHub Releases dağıtımından **farklı** — yalnızca yerel bir kurulum, GitHub Release'e ayrıca yüklenmedi.
+
+Kurulan sürüm 22 Ağustos'taki tüm paketi içeriyor: çoklu görev atamasının geri alınması (tekli atama seçici), mobil global aramaya "Komutlar" bölümü, bildirim "okundu" senkronu, dashboard'da tıklanabilir "Aktif Üyeler" paneli, `project_provider.dart` performans düzeltmesi. Kullanıcının cihazda elle test etmesi bekleniyor — bu oturumda ekrana dokunup gezinme aracı yoktu, yalnızca derleme/kurulumun başarılı olduğu doğrulanabildi.
