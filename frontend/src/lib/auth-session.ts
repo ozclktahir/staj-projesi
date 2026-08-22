@@ -64,6 +64,26 @@ export function isJwtExpired(token: string | null | undefined): boolean {
   }
 }
 
+/** JWT `exp` claim'ini ms cinsinden döner (yenileme zamanlamak için). */
+export function getAccessTokenExpiryMs(
+  token: string | null | undefined,
+): number | null {
+  if (!token || token.trim() === "") return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2 || !parts[1]) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(
+      base64.length + ((4 - (base64.length % 4)) % 4),
+      "=",
+    );
+    const payload = JSON.parse(atob(padded)) as { exp?: number };
+    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 export function resolveUserDisplayName(
   user?: StoredAuthUser | null,
 ): string {

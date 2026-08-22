@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArchiveRestore, Plus } from "lucide-react";
 import { createTask } from "@/app/actions/create-task";
@@ -16,7 +16,8 @@ import {
   getCachedWorkspaceMembers,
   setCachedWorkspaceMembers,
 } from "@/lib/client-cache";
-import { cleanText, emailLocalPart } from "@/lib/member-labels";
+import { AssigneesField } from "@/components/task/assignees-field";
+import { COMMAND_CREATE_TASK, COMMAND_PARAM } from "@/lib/command-actions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -69,17 +70,19 @@ export function CreateTaskModal({
 }: CreateTaskModalProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>("TODO");
   const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
-  const [assigneeId, setAssigneeId] = useState("");
+  /** Sıralı: ilk id birincil atanan (assignee_id), geri kalanı ek atanan (task_assignees). */
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState("");
   const [members, setMembers] = useState<WorkspaceMemberOption[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [extraAssigneeIds, setExtraAssigneeIds] = useState<string[]>([]);
 
   const [rejectedTasks, setRejectedTasks] = useState<RejectedTaskItem[]>([]);
   const [selectedRejectedId, setSelectedRejectedId] = useState("");
@@ -94,7 +97,7 @@ export function CreateTaskModal({
       setMembers(cached.members);
       setIsAdmin(cached.isAdmin);
       if (!cached.isAdmin && cached.members[0]) {
-        setAssigneeId(cached.members[0].id);
+        setAssigneeIds([cached.members[0].id]);
       }
       return;
     }
@@ -111,7 +114,7 @@ export function CreateTaskModal({
       setMembers(result.members);
       setIsAdmin(result.isAdmin);
       if (!result.isAdmin && result.members[0]) {
-        setAssigneeId(result.members[0].id);
+        setAssigneeIds([result.members[0].id]);
       }
     });
   }, [open, workspaceId]);
@@ -127,13 +130,24 @@ export function CreateTaskModal({
     });
   }, [open, isAdmin, projectId]);
 
+  // Komut paleti (Cmd/Ctrl+K) → "Yeni görev oluştur" köprüsü: palet bu
+  // projenin sayfasına `?cmd=create-task` ile yönlendirir, bu efekt modalı
+  // açıp parametreyi temizler (bkz. lib/command-actions.ts).
+  useEffect(() => {
+    if (searchParams.get(COMMAND_PARAM) !== COMMAND_CREATE_TASK) return;
+    setOpen(true);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(COMMAND_PARAM);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [searchParams, pathname, router]);
+
   const resetForm = () => {
     setTitle("");
     setDescription("");
     setStatus("TODO");
     setPriority("MEDIUM");
-    setAssigneeId("");
-    setExtraAssigneeIds([]);
+    setAssigneeIds([]);
     setDueDate("");
     setSelectedRejectedId("");
     setRejectedNote(null);
@@ -152,7 +166,7 @@ export function CreateTaskModal({
     setDescription(task.description ?? "");
     setPriority(normalizePriority(task.priority));
     setDueDate(toDateInputValue(task.due_date));
-    setAssigneeId("");
+    setAssigneeIds([]);
     setRejectedNote(
       t("taskModal.rejectedBy", { name: task.rejected_by_name }),
     );
@@ -163,15 +177,16 @@ export function CreateTaskModal({
     setIsSubmitting(true);
 
     try {
+      const primaryAssigneeId = assigneeIds[0] ?? "";
       if (selectedRejectedId) {
-        if (!assigneeId) {
+        if (!primaryAssigneeId) {
           toast.error(t("taskModal.needAssignee"));
           return;
         }
         const result = await reassignRejectedTask({
           taskId: selectedRejectedId,
           projectId,
-          assigneeId,
+          assigneeId: primaryAssigneeId,
           dueDate: dueDate || null,
         });
         if (!result.success) {
@@ -186,9 +201,8 @@ export function CreateTaskModal({
           description,
           status,
           priority,
-          assigneeId: assigneeId || null,
-          // Birincil atanan ek listeye de yazılmasın — tekrar olurdu.
-          extraAssigneeIds: extraAssigneeIds.filter((id) => id !== assigneeId),
+          assigneeId: primaryAssigneeId || null,
+          extraAssigneeIds: assigneeIds.slice(1),
         });
 
         if (!result.success) {
@@ -377,103 +391,26 @@ export function CreateTaskModal({
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="task-assignee">
-                {isReassignMode
+            <AssigneesField
+              id="task-assignees"
+              label={
+                isReassignMode
                   ? t("taskModal.newAssignee")
-                  : t("taskModal.assignee")}
-              </Label>
-              <select
-                id="task-assignee"
-                value={assigneeId}
-                onChange={(event) => setAssigneeId(event.target.value)}
-                disabled={isSubmitting || (!isAdmin && members.length <= 1)}
-                className={fieldClassName}
-                required={isReassignMode}
-              >
-                <option value="">
-                  {isReassignMode
-                    ? t("taskModal.pickPerson")
-                    : t("taskModal.unassigned")}
-                </option>
-                {members.map((member) => {
-                  const label =
-                    cleanText(member.fullName) ||
-                    cleanText(member.displayName) ||
-                    emailLocalPart(member.email) ||
-                    cleanText(member.email) ||
-                    "";
-                  if (!label) return null;
-                  return (
-                    <option key={member.id} value={member.id}>
-                      {label}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-
-            {/*
-              Çoklu atama artık görev OLUŞTURULURKEN de sorulur (önceden
-              yalnızca görev detayında düzenlenebiliyordu). Görev detayındaki
-              düzenleme özelliği yerinde duruyor.
-            */}
-            {!isReassignMode && isAdmin ? (
-              <div className="space-y-2">
-                <Label>
-                  {t("taskModal.extraAssignees")} ({extraAssigneeIds.length})
-                </Label>
-                <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border-2 border-border p-2 dark:border">
-                  {members.length === 0 ? (
-                    <p className="px-1 py-1 text-xs text-muted-foreground">
-                      {t("taskModal.noMembers")}
-                    </p>
-                  ) : (
-                    members.map((member) => {
-                      const label =
-                        cleanText(member.fullName) ||
-                        cleanText(member.displayName) ||
-                        emailLocalPart(member.email) ||
-                        cleanText(member.email) ||
-                        "";
-                      if (!label) return null;
-                      const checked = extraAssigneeIds.includes(member.id);
-                      const isPrimary = assigneeId === member.id;
-                      return (
-                        <label
-                          key={member.id}
-                          className={cn(
-                            "flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50",
-                            isPrimary && "opacity-50",
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={isSubmitting || isPrimary}
-                            onChange={() =>
-                              setExtraAssigneeIds((prev) =>
-                                checked
-                                  ? prev.filter((v) => v !== member.id)
-                                  : [...prev, member.id],
-                              )
-                            }
-                            className="size-3.5 rounded border-border accent-primary"
-                          />
-                          <span className="truncate text-foreground">
-                            {label}
-                            {isPrimary ? ` — ${t("taskModal.primary")}` : ""}
-                          </span>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {t("taskModal.extraAssigneesHint")}
-                </p>
-              </div>
-            ) : null}
+                  : t("taskModal.assignees")
+              }
+              members={members}
+              selectedIds={assigneeIds}
+              onChange={setAssigneeIds}
+              canMultiSelect={isAdmin && !isReassignMode}
+              disabled={
+                isSubmitting || (!isAdmin && !isReassignMode && members.length <= 1)
+              }
+              hint={
+                !isReassignMode && isAdmin
+                  ? t("taskModal.assigneesHint")
+                  : undefined
+              }
+            />
 
             {isReassignMode ? (
               <div className="space-y-2">
@@ -504,7 +441,7 @@ export function CreateTaskModal({
                 disabled={
                   isSubmitting ||
                   !title.trim() ||
-                  (isReassignMode && !assigneeId)
+                  (isReassignMode && !assigneeIds[0])
                 }
                 className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
               >

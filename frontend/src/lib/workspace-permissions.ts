@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isAdminRole } from "@/lib/rbac";
 
@@ -11,8 +12,16 @@ export type WorkspaceRoleContext = {
   isAdmin: boolean;
 };
 
-/** Workspace sahibi veya workspace_members.role üzerinden rol çözümler (workspace-scoped RBAC). */
-export async function resolveWorkspaceRole(
+/**
+ * Workspace sahibi veya workspace_members.role üzerinden rol çözümler (workspace-scoped RBAC).
+ *
+ * `cache()` ile sarıldı: aynı istek (ör. `/project/[id]` sayfa render'ı)
+ * içinde aynı (supabase, workspaceId, userId) argümanlarıyla birden fazla
+ * çağrılıyor (page.tsx + getProjectById + getProjectTasks) — her biri ayrı
+ * bir Supabase round-trip'ti. React'ın per-request memoizasyonu tekrar eden
+ * çağrıları tek sorguya indirir.
+ */
+export const resolveWorkspaceRole = cache(async function resolveWorkspaceRole(
   supabase: SupabaseClient,
   workspaceId: string,
   userId: string,
@@ -54,7 +63,7 @@ export async function resolveWorkspaceRole(
     isOwner: false,
     isAdmin: isAdminRole(role),
   };
-}
+});
 
 /**
  * MEMBER için görünür proje ID'leri:
@@ -150,6 +159,11 @@ export async function getMemberVisibleProjectIds(
         ids.add(row.project_id);
       }
     }
+    // Select başarılı (hata yok) — sonuç boş olsa bile bu geçerli bir
+    // cevaptır, sonraki fallback'leri denemeye gerek yok. `projectAttempts`
+    // döngüsündeki davranışla aynı; önceden burada break olmadığı için her
+    // Member/proje sayfası yüklemesinde 4 sorgu da sırayla çalışıyordu.
+    break;
   }
 
   console.log("[getMemberVisibleProjectIds]", {

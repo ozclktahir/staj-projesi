@@ -3,13 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../auth/providers/auth_provider.dart';
-import '../../workspace/presentation/assignee_picker_field.dart';
-import '../../workspace/presentation/extra_assignees_field.dart';
 import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../../workspace/providers/workspace_provider.dart';
 import '../data/task_dto.dart';
 import '../data/task_repository.dart';
 import '../providers/task_provider.dart';
+import 'assignees_field.dart';
 
 Future<bool?> showCreateTaskDialog({
   required BuildContext context,
@@ -22,8 +21,11 @@ Future<bool?> showCreateTaskDialog({
   final caps = ref.read(workspaceCapabilitiesProvider);
   final userId = ref.read(authProvider).userId;
   final workspaceId = ref.read(workspaceProvider).activeWorkspace?.id;
-  String? assigneeId = caps.isAdmin ? null : userId;
-  var extraAssigneeIds = <String>[];
+  // Sıralı seçim: ilk id birincil atanan (assignee_id), geri kalanı ek
+  // atanan (task_assignees) — bkz. AssigneesField.
+  var selectedAssigneeIds = <String>[
+    if (!caps.isAdmin && userId != null && userId.isNotEmpty) userId,
+  ];
   var priority = TaskPriority.medium;
   var status = TaskStatus.todo;
   DateTime? dueDate;
@@ -113,7 +115,7 @@ Future<bool?> showCreateTaskDialog({
                                                     selected.dueDate!,
                                                   )?.toLocal()
                                               : null;
-                                          assigneeId = null;
+                                          selectedAssigneeIds = [];
                                         }
                                       }
                                     });
@@ -211,32 +213,21 @@ Future<bool?> showCreateTaskDialog({
                         label: Text(dateLabel),
                       ),
                       const SizedBox(height: 16),
-                      AssigneePickerField(
-                        value: assigneeId,
-                        enabled: !submitting,
-                        allowUnassigned: !isReassign,
-                        labelText: isReassign ? 'Yeni atanan kişi' : 'Atanan',
-                        onChanged: (value) => setLocal(() {
-                          assigneeId = value;
-                          // Birincil atanan ek listede kalmasın (tekrar olurdu)
-                          extraAssigneeIds = [
-                            for (final id in extraAssigneeIds)
-                              if (id != value) id,
-                          ];
-                        }),
-                      ),
                       // Çoklu atama artık görev OLUŞTURULURKEN de sorulur
-                      // (web CreateTaskModal ile parite).
-                      if (!isReassign && caps.isAdmin) ...[
-                        const SizedBox(height: 16),
-                        ExtraAssigneesField(
-                          selectedIds: extraAssigneeIds,
-                          primaryAssigneeId: assigneeId,
-                          enabled: !submitting,
-                          onChanged: (next) =>
-                              setLocal(() => extraAssigneeIds = next),
-                        ),
-                      ],
+                      // (web CreateTaskModal ile parite) — tek bileşen hem
+                      // birincil hem ek atananları yönetir.
+                      AssigneesField(
+                        selectedIds: selectedAssigneeIds,
+                        canMultiSelect: caps.isAdmin && !isReassign,
+                        enabled: !submitting,
+                        labelText:
+                            isReassign ? 'Yeni atanan kişi' : 'Atananlar',
+                        helperText: (!isReassign && caps.isAdmin)
+                            ? 'Birincil atanana ek olarak bu görevi görebilecek üyeler.'
+                            : null,
+                        onChanged: (next) =>
+                            setLocal(() => selectedAssigneeIds = next),
+                      ),
                       if (errorText != null) ...[
                         const SizedBox(height: 16),
                         Text(
@@ -264,8 +255,7 @@ Future<bool?> showCreateTaskDialog({
                           if (!(formKey.currentState?.validate() ?? false)) {
                             return;
                           }
-                          if (isReassign &&
-                              (assigneeId == null || assigneeId!.isEmpty)) {
+                          if (isReassign && selectedAssigneeIds.isEmpty) {
                             setLocal(
                               () => errorText = 'Yeni atanan kişi seçin.',
                             );
@@ -289,7 +279,7 @@ Future<bool?> showCreateTaskDialog({
                                   .reassignRejectedTask(
                                     workspaceId: wsId,
                                     taskId: rejectedTaskId!,
-                                    assigneeId: assigneeId!,
+                                    assigneeId: selectedAssigneeIds.first,
                                     dueDate:
                                         dueDate?.toUtc().toIso8601String(),
                                   );
@@ -302,9 +292,17 @@ Future<bool?> showCreateTaskDialog({
                               return;
                             }
 
+                            final primaryAssigneeId =
+                                selectedAssigneeIds.isNotEmpty
+                                    ? selectedAssigneeIds.first
+                                    : null;
                             final resolvedAssignee = caps.isAdmin
-                                ? assigneeId
-                                : (assigneeId ?? userId);
+                                ? primaryAssigneeId
+                                : (primaryAssigneeId ?? userId);
+                            final extraAssigneeIds =
+                                selectedAssigneeIds.length > 1
+                                    ? selectedAssigneeIds.sublist(1)
+                                    : const <String>[];
                             final trimmedTitle = titleController.text.trim();
                             if (trimmedTitle.isEmpty) {
                               setLocal(() {

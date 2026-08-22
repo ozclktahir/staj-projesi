@@ -73,11 +73,18 @@
     "searching": "Aranıyor…",
     "empty": "Sonuç bulunamadı.",
     "nav": "Sayfalar",
+    "commands": "Komutlar",
     "projects": "Projeler",
     "tasks": "Görevler",
     "members": "Üyeler",
     "notes": "Kişisel Notlar",
     "todos": "Kişisel Görevler"
+  },
+  "commands": {
+    "createTask": "Yeni Görev Oluştur",
+    "createWorkspace": "Yeni Workspace Oluştur",
+    "inviteMember": "Üye Davet Et",
+    "toggleTheme": "Temayı Değiştir (Açık/Koyu)"
   },
   "dashboard": {
     "prevPage": "Önceki sayfa",
@@ -251,6 +258,13 @@
     "activeMembers": "Aktif Üyeler",
     "activeMembersHint": "Çalışma alanındaki kişiler",
     "activeMembersLiveHint": "Şu anda çevrimiçi",
+    "onlineMembersTitle": "Çevrimiçi Üyeler",
+    "onlineMembersAriaLabel": "Çevrimiçi üyeleri göster",
+    "onlineMembersCount": "{n} kişi çevrimiçi",
+    "onlineMembersEmpty": "Şu anda çevrimiçi kimse yok",
+    "onlineMembersLoading": "Üyeler yükleniyor…",
+    "onlineMembersError": "Üyeler yüklenemedi",
+    "onlineMembersNotReady": "Canlı veri henüz hazır değil",
     "statusDistribution": "Durum Dağılımı",
     "statusDesc": "Yapılacak · Devam ediyor · Tamamlandı",
     "priorityDensity": "Öncelik Yoğunluğu",
@@ -476,7 +490,9 @@
     "extraAssignees": "Ek Atananlar (çoklu)",
     "extraAssigneesHint": "Birincil atanana ek olarak bu görevi görebilecek üyeler.",
     "noMembers": "Üye bulunamadı.",
-    "primary": "birincil atanan"
+    "primary": "birincil atanan",
+    "assignees": "Atanan Kişiler",
+    "assigneesHint": "İlk seçilen kişi birincil atanan olur; admin birden fazla kişi seçebilir."
   },
   "loading": {
     "generic": "Yükleniyor…",

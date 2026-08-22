@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -42,26 +44,33 @@ class DashboardNotifier extends AutoDisposeAsyncNotifier<DashboardData> {
     final presence = ref.watch(workspacePresenceProvider);
     final onlineCount = presence.ready ? presence.onlineCount : null;
 
-    WorkspaceStatisticsDto? remote;
-    try {
-      remote = await ref
-          .read(dashboardRepositoryProvider)
-          .fetchStatistics(workspaceId);
-    } catch (_) {
-      remote = null;
+    // İstatistik ve görev listesi birbirinden bağımsız — sıra yerine
+    // paralel çekiliyor (2 ayrı Dio isteği aynı anda gider). Her birinin
+    // kendi hata yakalaması korunuyor.
+    Future<WorkspaceStatisticsDto?> loadStatistics() async {
+      try {
+        return await ref
+            .read(dashboardRepositoryProvider)
+            .fetchStatistics(workspaceId);
+      } catch (_) {
+        return null;
+      }
     }
 
-    List<TaskDto> tasks = const [];
-    try {
-      tasks = await ref.read(taskRepositoryProvider).fetchTasks(
-            workspaceId: workspaceId,
-            limit: 200,
-          );
-    } on TaskException catch (error) {
-      // 403 / ağ hatalarında ekranı düşürme
-      debugPrint('[Dashboard] tasks fetch: $error');
-      tasks = const [];
+    Future<List<TaskDto>> loadTasks() async {
+      try {
+        return await ref.read(taskRepositoryProvider).fetchTasks(
+              workspaceId: workspaceId,
+              limit: 200,
+            );
+      } on TaskException catch (error) {
+        // 403 / ağ hatalarında ekranı düşürme
+        debugPrint('[Dashboard] tasks fetch: $error');
+        return const [];
+      }
     }
+
+    final (remote, tasks) = await (loadStatistics(), loadTasks()).wait;
 
     return DashboardData.fromTasks(
       List<TaskDto>.from(tasks),

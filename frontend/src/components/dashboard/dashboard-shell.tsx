@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { getCurrentUserDisplayLabel } from "@/app/actions/current-user";
 import { AppHeader } from "@/components/dashboard/app-header";
+import { AuthTokenRefreshProvider } from "@/components/auth-token-refresh-provider";
 import { Sidebar } from "@/components/sidebar";
 import { WorkspacePresenceProvider } from "@/components/workspace-presence-provider";
 import { syncAuthCookiesFromStorage } from "@/lib/auth-session";
@@ -57,6 +58,7 @@ export function DashboardShell({
     // (projeler, kişisel alan, ayarlar…) çevrimiçi olarak görünür.
     // useWorkspaces → useSearchParams kullandığı için Suspense sınırı gerekli.
     <Suspense fallback={null}>
+      <AuthTokenRefreshProvider />
       <WorkspacePresenceProvider>
         <div className="flex min-h-screen bg-background text-foreground">
           <Sidebar

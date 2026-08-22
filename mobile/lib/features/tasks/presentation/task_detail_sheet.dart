@@ -10,13 +10,13 @@ import '../data/task_repository.dart';
 import '../data/task_scope.dart';
 import '../data/update_task_dto.dart';
 import '../../activity/presentation/activity_log_panel.dart';
-import '../../workspace/data/workspace_member_dto.dart';
 import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../providers/comment_provider.dart';
 import '../providers/file_provider.dart';
 import '../providers/subtask_provider.dart';
 import '../providers/task_assignees_provider.dart';
 import '../providers/task_provider.dart';
+import 'assignees_field.dart';
 import 'edit_task_dialog.dart';
 import 'task_actions.dart';
 import 'task_card.dart';
@@ -391,9 +391,12 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
                     status: _status,
                     busy: _busy,
                     scope: scope,
+                    projectId: widget.projectId,
                     onEdit: _edit,
                     onStatusSelected: _changeStatus,
                     onDelete: _delete,
+                    onTaskUpdated: (updated) =>
+                        setState(() => _task = updated),
                   ),
                   scope != null
                       ? TaskSubtasksPanel(
@@ -430,9 +433,11 @@ class _DetailsTab extends ConsumerWidget {
     required this.status,
     required this.busy,
     required this.scope,
+    required this.projectId,
     required this.onEdit,
     required this.onStatusSelected,
     required this.onDelete,
+    required this.onTaskUpdated,
   });
 
   final TaskDto task;
@@ -440,9 +445,11 @@ class _DetailsTab extends ConsumerWidget {
   final TaskStatus status;
   final bool busy;
   final TaskScope? scope;
+  final String projectId;
   final VoidCallback onEdit;
   final ValueChanged<TaskStatus> onStatusSelected;
   final VoidCallback onDelete;
+  final ValueChanged<TaskDto> onTaskUpdated;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -487,12 +494,18 @@ class _DetailsTab extends ConsumerWidget {
               ),
         ),
         const SizedBox(height: 20),
-        _FieldLabel(text: 'Atanan'),
-        const SizedBox(height: 6),
-        Text(assigneeLabel, style: Theme.of(context).textTheme.bodyMedium),
-        if (scope != null) ...[
-          const SizedBox(height: 16),
-          _ExtraAssigneesSection(scope: scope!),
+        if (scope != null)
+          _AssigneesSection(
+            task: task,
+            assigneeLabel: assigneeLabel,
+            scope: scope!,
+            projectId: projectId,
+            onTaskUpdated: onTaskUpdated,
+          )
+        else ...[
+          _FieldLabel(text: 'Atanan'),
+          const SizedBox(height: 6),
+          Text(assigneeLabel, style: Theme.of(context).textTheme.bodyMedium),
         ],
         const SizedBox(height: 16),
         _FieldLabel(text: 'Teslim tarihi'),
@@ -598,31 +611,47 @@ class _DetailsTab extends ConsumerWidget {
   }
 }
 
-/// "Ek Atananlar" (task_assignees) — birincil "Atanan"a ek katman.
-/// Admin: düzenlenebilir çoklu seçim. Diğerleri: salt okunur rozet listesi.
-class _ExtraAssigneesSection extends ConsumerWidget {
-  const _ExtraAssigneesSection({required this.scope});
+/// "Atananlar" — birincil (`assignee_id`) + ek atananlar (`task_assignees`)
+/// TEK bölümde gösterilir, TEK "Düzenle" diyaloğuyla değiştirilir (bkz.
+/// `AssigneesField`). Önceden birincil yalnızca kalem simgesiyle açılan
+/// tam düzenleme diyaloğundan, ek atananlar ise burada ayrı bir
+/// mini-diyalogla değiştirilebiliyordu; artık ikisi de aynı bileşeni
+/// kullanıyor (kalem simgesindeki tam düzenleme diyaloğu da hâlâ ikisini
+/// birlikte değiştirebilir — bkz. edit_task_dialog.dart).
+class _AssigneesSection extends ConsumerWidget {
+  const _AssigneesSection({
+    required this.task,
+    required this.assigneeLabel,
+    required this.scope,
+    required this.projectId,
+    required this.onTaskUpdated,
+  });
 
+  final TaskDto task;
+  final String assigneeLabel;
   final TaskScope scope;
+  final String projectId;
+  final ValueChanged<TaskDto> onTaskUpdated;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final assigneesAsync = ref.watch(taskAssigneesProvider(scope));
-    final isAdmin = ref.watch(workspaceCapabilitiesProvider).isAdmin;
+    final theme = Theme.of(context);
+    final primaryId = task.effectiveAssigneeId;
+    final hasPrimary = primaryId != null && primaryId.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            _FieldLabel(text: 'Ek Atananlar'),
+            _FieldLabel(text: 'Atananlar'),
             const Spacer(),
-            if (isAdmin)
-              TextButton.icon(
-                onPressed: () => _editExtraAssignees(context, ref),
-                icon: const Icon(Icons.group_add_outlined, size: 16),
-                label: const Text('Düzenle'),
-              ),
+            TextButton.icon(
+              onPressed: () => _editAssignees(context, ref),
+              icon: const Icon(Icons.group_add_outlined, size: 16),
+              label: const Text('Düzenle'),
+            ),
           ],
         ),
         const SizedBox(height: 6),
@@ -634,39 +663,33 @@ class _ExtraAssigneesSection extends ConsumerWidget {
           ),
           error: (error, _) => Text(
             'Yüklenemedi.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                ),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
           ),
           data: (assignees) {
-            if (assignees.isEmpty) {
+            final extras = [
+              for (final assignee in assignees)
+                if (assignee.id != primaryId) assignee,
+            ];
+            if (!hasPrimary && extras.isEmpty) {
               return Text(
-                'Ek atanan yok.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                'Atanan yok.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               );
             }
             return Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final assignee in assignees)
-                  Chip(
-                    avatar: CircleAvatar(
-                      backgroundColor: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.15),
-                      foregroundColor: Theme.of(context).colorScheme.primary,
-                      child: Text(
-                        assignee.displayName.isNotEmpty
-                            ? assignee.displayName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    ),
-                    label: Text(assignee.displayName),
+                if (hasPrimary)
+                  _AssigneeChip(label: assigneeLabel, isPrimary: true),
+                for (final assignee in extras)
+                  _AssigneeChip(
+                    label: assignee.displayName,
+                    isPrimary: false,
                   ),
               ],
             );
@@ -676,44 +699,35 @@ class _ExtraAssigneesSection extends ConsumerWidget {
     );
   }
 
-  Future<void> _editExtraAssignees(BuildContext context, WidgetRef ref) async {
-    final members =
-        ref.read(workspaceMembersProvider).valueOrNull ?? const <WorkspaceMemberDto>[];
+  Future<void> _editAssignees(BuildContext context, WidgetRef ref) async {
+    final isAdmin = ref.read(workspaceCapabilitiesProvider).isAdmin;
+    final primaryId = task.effectiveAssigneeId;
     final current = ref.read(taskAssigneesProvider(scope)).valueOrNull ??
         const <TaskAssigneeOption>[];
-    final selected = {for (final a in current) a.id};
+    var selectedIds = <String>[
+      if (primaryId != null && primaryId.isNotEmpty) primaryId,
+      for (final assignee in current)
+        if (assignee.id != primaryId) assignee.id,
+    ];
 
-    final result = await showDialog<Set<String>>(
+    final result = await showDialog<List<String>>(
       context: context,
       builder: (dialogContext) {
-        var localSelected = {...selected};
         return StatefulBuilder(
           builder: (context, setLocal) {
             return AlertDialog(
-              title: const Text('Ek atananlar'),
+              title: const Text('Atananları düzenle'),
               content: SizedBox(
                 width: double.maxFinite,
-                child: members.isEmpty
-                    ? const Text('Çalışma alanında üye yok.')
-                    : ListView(
-                        shrinkWrap: true,
-                        children: [
-                          for (final member in members)
-                            CheckboxListTile(
-                              value: localSelected.contains(member.id),
-                              title: Text(member.label),
-                              onChanged: (checked) {
-                                setLocal(() {
-                                  if (checked == true) {
-                                    localSelected.add(member.id);
-                                  } else {
-                                    localSelected.remove(member.id);
-                                  }
-                                });
-                              },
-                            ),
-                        ],
-                      ),
+                child: AssigneesField(
+                  selectedIds: selectedIds,
+                  canMultiSelect: isAdmin,
+                  enabled: true,
+                  helperText: isAdmin
+                      ? 'Birincil atanana ek olarak bu görevi görebilecek üyeler.'
+                      : null,
+                  onChanged: (next) => setLocal(() => selectedIds = next),
+                ),
               ),
               actions: [
                 TextButton(
@@ -722,7 +736,7 @@ class _ExtraAssigneesSection extends ConsumerWidget {
                 ),
                 FilledButton(
                   onPressed: () =>
-                      Navigator.of(dialogContext).pop(localSelected),
+                      Navigator.of(dialogContext).pop(selectedIds),
                   child: const Text('Kaydet'),
                 ),
               ],
@@ -734,16 +748,75 @@ class _ExtraAssigneesSection extends ConsumerWidget {
 
     if (result == null || !context.mounted) return;
 
+    final newPrimaryId = result.isNotEmpty ? result.first : null;
+    final newExtras =
+        result.length > 1 ? result.sublist(1) : const <String>[];
+
+    if (newPrimaryId != primaryId) {
+      try {
+        final clearAssignee = newPrimaryId == null || newPrimaryId.isEmpty;
+        final dto = UpdateTaskDto(
+          assigneeId: clearAssignee ? null : newPrimaryId,
+          clearAssignee: clearAssignee,
+        );
+        final updated = projectId.isNotEmpty
+            ? await ref
+                .read(tasksProvider(projectId).notifier)
+                .updateTask(taskId: task.id, dto: dto)
+            : await ref.read(taskRepositoryProvider).updateTask(
+                  workspaceId: scope.workspaceId,
+                  taskId: task.id,
+                  dto: dto,
+                );
+        if (projectId.isEmpty) {
+          ref.invalidate(personalTasksProvider);
+        }
+        onTaskUpdated(updated);
+      } catch (error) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(content: Text('Atanan güncellenemedi: $error')),
+          );
+        return;
+      }
+    }
+
+    if (!isAdmin) return;
     try {
       await ref
           .read(taskAssigneesProvider(scope).notifier)
-          .setAssignees(result.toList());
+          .setAssignees(newExtras);
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text('Kaydedilemedi: $error')));
     }
+  }
+}
+
+class _AssigneeChip extends StatelessWidget {
+  const _AssigneeChip({required this.label, required this.isPrimary});
+
+  final String label;
+  final bool isPrimary;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Chip(
+      avatar: CircleAvatar(
+        backgroundColor: scheme.primary.withValues(alpha: 0.15),
+        foregroundColor: scheme.primary,
+        child: Text(
+          label.isNotEmpty ? label[0].toUpperCase() : '?',
+          style: const TextStyle(fontSize: 11),
+        ),
+      ),
+      label: Text(isPrimary ? '$label — birincil' : label),
+    );
   }
 }
 

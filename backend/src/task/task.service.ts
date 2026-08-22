@@ -266,8 +266,21 @@ export class TaskService {
     return this.listAssignees(workspaceId, taskId);
   }
 
-  private isMissingAssigneesTable(error: { message?: string }): boolean {
-    return Boolean(error?.message?.includes('task_assignees'));
+  /**
+   * Yalnızca "tablo/kolon yok" hatasını yakalar — Postgres undefined_table
+   * (42P01) / undefined_column (42703) veya PostgREST'in şema-cache eşdeğeri.
+   * Önceden `message.includes('task_assignees')` kullanılıyordu; bu, gerçek
+   * bir RLS/izin/constraint hatasını da (mesajda tablo adı geçtiği için)
+   * yanlışlıkla "migration çalıştırılmamış" olarak yutuyordu.
+   */
+  private isMissingAssigneesTable(error: {
+    message?: string;
+    code?: string;
+  }): boolean {
+    if (error?.code === '42P01' || error?.code === '42703') return true;
+    return /relation .*task_assignees.* does not exist/i.test(
+      error?.message ?? '',
+    );
   }
 
   async update(
@@ -713,29 +726,27 @@ export class TaskService {
     userId: string,
   ): Promise<boolean> {
     const client = this.supabaseService.getClient();
-    const { data: workspace } = await client
-      .from('workspaces')
-      .select('owner_id')
-      .eq('id', workspaceId)
-      .maybeSingle();
+    // İki sorgu birbirinden bağımsız — WorkspaceRoleGuard'daki gibi paralel
+    // çalıştırılıyor (önceden sıralıydı, her çağrıda gereksiz ~2x gecikme).
+    const [{ data: workspace }, { data: membership }] = await Promise.all([
+      client
+        .from('workspaces')
+        .select('owner_id')
+        .eq('id', workspaceId)
+        .maybeSingle(),
+      client
+        .from('workspace_members')
+        .select('role')
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', userId)
+        .maybeSingle(),
+    ]);
     if (workspace?.owner_id === userId) return true;
-
-    const { data: membership } = await client
-      .from('workspace_members')
-      .select('role')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', userId)
-      .maybeSingle();
 
     const role = String(membership?.role ?? '')
       .trim()
       .toUpperCase();
-    return (
-      role === 'ADMIN' ||
-      role === 'OWNER' ||
-      membership?.role === 'Admin' ||
-      membership?.role === 'OWNER'
-    );
+    return role === 'ADMIN' || role === 'OWNER';
   }
 
   private async getWorkspaceAdminIds(workspaceId: string): Promise<string[]> {

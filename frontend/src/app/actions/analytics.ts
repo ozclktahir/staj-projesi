@@ -258,16 +258,20 @@ async function countWorkspaceMembers(
   >["supabase"],
   workspaceId: string,
 ): Promise<number> {
-  const { count: memberCount } = await supabase
-    .from("workspace_members")
-    .select("user_id", { count: "exact", head: true })
-    .eq("workspace_id", workspaceId);
-
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("owner_id")
-    .eq("id", workspaceId)
-    .maybeSingle();
+  // Üye sayısı ve workspace sahibi bağımsız sorgular — paralel çalıştır.
+  // 3. sorgu (owner-in-members kontrolü) owner_id'yi bildiğine bağlı, o yüzden
+  // sıralı kalmalı.
+  const [{ count: memberCount }, { data: workspace }] = await Promise.all([
+    supabase
+      .from("workspace_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("workspaces")
+      .select("owner_id")
+      .eq("id", workspaceId)
+      .maybeSingle(),
+  ]);
 
   let total = memberCount ?? 0;
   if (workspace?.owner_id) {
@@ -454,9 +458,13 @@ export async function getWorkspaceAnalytics(
           .filter((id): id is string => typeof id === "string"),
       ),
     ];
-    const projectNameById = await loadProjectNames(supabase, projectIds);
+    // Proje adları ve iş yükü zenginleştirmesi yalnızca rows/projectIds'e
+    // bağlı, birbirine değil — paralel çalıştır.
+    const [projectNameById, workload] = await Promise.all([
+      loadProjectNames(supabase, projectIds),
+      enrichWorkload(supabase, buildWorkloadMap(rows)),
+    ]);
     const base = computeFromRows(rows, { activeMembers, projectNameById });
-    const workload = await enrichWorkload(supabase, buildWorkloadMap(rows));
 
     return { success: true, data: { ...base, workload } };
   } catch (error) {

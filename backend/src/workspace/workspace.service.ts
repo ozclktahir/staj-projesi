@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { MailService } from '../mail/mail.service';
+import { NotificationService } from '../notification/notification.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
@@ -15,6 +16,7 @@ export class WorkspaceService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly mailService: MailService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -188,8 +190,11 @@ export class WorkspaceService {
       .maybeSingle();
 
     if (profile?.id) {
-      await client.from('notifications').insert({
-        workspace_id: workspaceId,
+      // Doğrudan insert yerine NotificationService.create() kullanılıyor:
+      // o hem DB'ye yazar hem NotificationGateway üzerinden emit eder.
+      // Eski doğrudan-insert yolu mobil/Socket.IO istemcilerine hiç haber
+      // vermiyordu (yalnızca web'in Supabase Realtime dinleyicisi görüyordu).
+      await this.notificationService.create(workspaceId, {
         user_id: profile.id,
         type: 'workspace_invite',
         title: 'Çalışma alanı daveti',
@@ -201,7 +206,6 @@ export class WorkspaceService {
           workspace_name: workspace?.name ?? null,
           role,
         },
-        is_read: false,
       });
     }
 
@@ -554,8 +558,12 @@ export class WorkspaceService {
   }
 
   /**
-   * Workspace üyelerini listeler (profil + rol).
-   * Admin/OWNER: tüm üyeler; Member/Guest: yalnızca kendisi (web parity).
+   * Workspace üyelerini listeler (profil + rol). RLS-scoped `client`
+   * (createUserClient) ile TÜM üyeler döner — rol bazlı bir filtre burada
+   * YOK; `fix_workspace_members_select_all.sql` (15 Ağustos 2026) sayesinde
+   * herkes birbirini görebiliyor (web'deki "üyeler sayfası herkese açık"
+   * ile parity). isAdmin/isOwner hesaplaması yalnızca sahibin kendi satırı
+   * eksikse eklemek için kullanılıyor (bkz. aşağıdaki push).
    */
   async listMembers(
     workspaceId: string,

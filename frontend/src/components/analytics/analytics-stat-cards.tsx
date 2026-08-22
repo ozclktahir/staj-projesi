@@ -8,11 +8,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { AnalyticsSummary } from "@/app/actions/analytics";
+import { OnlineMembersPopover } from "@/components/analytics/online-members-popover";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTranslation } from "@/i18n/use-translation";
 import { cn } from "@/lib/utils";
 
 type StatCard = {
+  id: "totalTasks" | "completionRate" | "overdueTasks" | "activeMembers";
   label: string;
   value: string;
   hint?: string;
@@ -24,14 +26,18 @@ type StatCard = {
 export function AnalyticsStatCards({
   summary,
   isMembersLive = false,
+  workspaceId = null,
 }: {
   summary: AnalyticsSummary;
   isMembersLive?: boolean;
+  /** "Aktif Üyeler" kartındaki çevrimiçi listesi açılır menüsü için gerekir. */
+  workspaceId?: string | null;
 }) {
   const { t } = useTranslation();
 
   const cards: StatCard[] = [
     {
+      id: "totalTasks",
       label: t("analytics.totalTasks"),
       value: String(summary.totalTasks),
       hint: t("analytics.totalTasksHint"),
@@ -41,6 +47,7 @@ export function AnalyticsStatCards({
         "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400",
     },
     {
+      id: "completionRate",
       label: t("analytics.completionRate"),
       value: `%${summary.completionRate}`,
       hint: t("analytics.completedHint", { n: summary.completedTasks }),
@@ -50,6 +57,7 @@ export function AnalyticsStatCards({
         "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
     },
     {
+      id: "overdueTasks",
       label: t("analytics.overdueTasks"),
       value: String(summary.overdueTasks),
       hint: t("analytics.overdueHint"),
@@ -58,6 +66,7 @@ export function AnalyticsStatCards({
       iconWrap: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400",
     },
     {
+      id: "activeMembers",
       label: t("analytics.activeMembers"),
       value: String(summary.activeMembers),
       hint: isMembersLive
@@ -72,15 +81,9 @@ export function AnalyticsStatCards({
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {cards.map((card) => (
-        <Card
-          key={card.label}
-          className={cn(
-            "rounded-lg border-2 py-3 shadow-sm dark:border",
-            card.accent,
-          )}
-        >
-          <CardContent className="flex items-center gap-2.5 px-3">
+      {cards.map((card) => {
+        const cardInner = (
+          <>
             <span
               className={cn(
                 "flex size-9 shrink-0 items-center justify-center rounded-lg",
@@ -102,9 +105,40 @@ export function AnalyticsStatCards({
                 </p>
               ) : null}
             </div>
-          </CardContent>
-        </Card>
-      ))}
+          </>
+        );
+
+        if (card.id === "activeMembers") {
+          return (
+            <OnlineMembersPopover key={card.id} workspaceId={workspaceId}>
+              <button
+                type="button"
+                aria-label={t("analytics.onlineMembersAriaLabel")}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-lg border-2 border-border bg-card px-3 py-3 text-left shadow-sm outline-none transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring dark:border",
+                  card.accent,
+                )}
+              >
+                {cardInner}
+              </button>
+            </OnlineMembersPopover>
+          );
+        }
+
+        return (
+          <Card
+            key={card.id}
+            className={cn(
+              "rounded-lg border-2 py-3 shadow-sm dark:border",
+              card.accent,
+            )}
+          >
+            <CardContent className="flex items-center gap-2.5 px-3">
+              {cardInner}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

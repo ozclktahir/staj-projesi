@@ -73,11 +73,18 @@
     "searching": "Searching…",
     "empty": "No results found.",
     "nav": "Pages",
+    "commands": "Commands",
     "projects": "Projects",
     "tasks": "Tasks",
     "members": "Members",
     "notes": "Personal notes",
     "todos": "Personal to-dos"
+  },
+  "commands": {
+    "createTask": "Create new task",
+    "createWorkspace": "Create new workspace",
+    "inviteMember": "Invite a member",
+    "toggleTheme": "Toggle theme (light/dark)"
   },
   "dashboard": {
     "prevPage": "Previous page",
@@ -251,6 +258,13 @@
     "activeMembers": "Active members",
     "activeMembersHint": "People in this workspace",
     "activeMembersLiveHint": "Currently online",
+    "onlineMembersTitle": "Online members",
+    "onlineMembersAriaLabel": "Show online members",
+    "onlineMembersCount": "{n} online",
+    "onlineMembersEmpty": "No one is online right now",
+    "onlineMembersLoading": "Loading members…",
+    "onlineMembersError": "Could not load members",
+    "onlineMembersNotReady": "Live data isn't ready yet",
     "statusDistribution": "Status distribution",
     "statusDesc": "To do · In progress · Done",
     "priorityDensity": "Priority density",
@@ -476,7 +490,9 @@
     "extraAssignees": "Additional assignees (multiple)",
     "extraAssigneesHint": "Members who can see this task in addition to the primary assignee.",
     "noMembers": "No members found.",
-    "primary": "primary assignee"
+    "primary": "primary assignee",
+    "assignees": "Assignees",
+    "assigneesHint": "The first person selected becomes the primary assignee; admins can pick more than one."
   },
   "loading": {
     "generic": "Loading…",

@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { logActionError } from "@/lib/action-result";
-import { cleanText, emailLocalPart, formatPersonName } from "@/lib/member-labels";
+import {
+  cleanText,
+  emailLocalPart,
+  formatPersonName,
+  loadProfilesByIds,
+} from "@/lib/member-labels";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import { resolveWorkspaceRole } from "@/lib/workspace-permissions";
 
@@ -11,6 +16,24 @@ export type TaskAssigneeOption = {
   displayName: string;
   avatarUrl: string | null;
 };
+
+/**
+ * Yalnızca gerçek "tablo/kolon yok" hatasını yakalar (migration henüz
+ * çalıştırılmamış). Önceden `message.includes("task_assignees")`
+ * kullanılıyordu — bu, tabloyu adıyla anan HER hatayı (ör. RLS reddi,
+ * FK/unique constraint ihlali, hatta PGRST200 "profiles" embed ilişki
+ * hatası) yanlışlıkla "migration yok" sayıp sessizce yutuyordu. Bu yüzden
+ * çoklu atama kaydediliyor ama okuma tarafı hep boş dönüyordu.
+ */
+function isMissingAssigneesTableError(error: {
+  message?: string | null;
+  code?: string | null;
+}): boolean {
+  if (error.code === "42P01" || error.code === "42703") return true;
+  return /relation .*task_assignees.* does not exist/i.test(
+    error.message ?? "",
+  );
+}
 
 export type GetTaskAssigneesResult =
   | { success: true; assignees: TaskAssigneeOption[] }
@@ -28,30 +51,38 @@ export async function getTaskAssignees(
     if (!auth) return { success: false, error: "Oturum bulunamadı.", assignees: [] };
 
     const { supabase } = auth;
+    // NOT: `profiles:user_id(...)` embed'i KULLANMA — task_assignees.user_id
+    // şemada `profiles`e değil `auth.users`e FK'lı, bu yüzden embed her zaman
+    // PGRST200 ("Could not find a relationship") ile hata veriyordu (aynı kök
+    // neden, global aramadaki üye sonuçlarını da kırmıştı — bkz. global-search.ts).
+    // Profilleri ayrı bir sorguyla (loadProfilesByIds) çekiyoruz.
     const { data, error } = await supabase
       .from("task_assignees")
-      .select("user_id, profiles:user_id(id, email, full_name, avatar_url, first_name, last_name)")
+      .select("user_id")
       .eq("task_id", id);
 
     if (error) {
-      if (error.message.includes("task_assignees")) {
+      if (isMissingAssigneesTableError(error)) {
         // Migration henüz uygulanmamış — sessizce boş dön (özellik opsiyonel).
         return { success: true, assignees: [] };
       }
       return { success: false, error: error.message, assignees: [] };
     }
 
-    const assignees: TaskAssigneeOption[] = (data ?? []).map((row) => {
-      const profile = (Array.isArray(row.profiles) ? row.profiles[0] : row.profiles) as
-        | Record<string, unknown>
-        | null;
+    const userIds = (data ?? [])
+      .map((row) => String(row.user_id))
+      .filter(Boolean);
+    const profiles = await loadProfilesByIds(supabase, userIds);
+
+    const assignees: TaskAssigneeOption[] = userIds.map((userId) => {
+      const profile = profiles.get(userId) ?? null;
       const displayName =
         formatPersonName(profile, null) ||
         cleanText(profile?.email as string | null) ||
         emailLocalPart(profile?.email as string | null) ||
-        String(row.user_id).slice(0, 8);
+        userId.slice(0, 8);
       return {
-        id: String(row.user_id),
+        id: userId,
         displayName,
         avatarUrl:
           typeof profile?.avatar_url === "string" ? profile.avatar_url : null,
@@ -117,7 +148,7 @@ export async function setTaskAssignees(
       .delete()
       .eq("task_id", id);
 
-    if (deleteError && !deleteError.message.includes("task_assignees")) {
+    if (deleteError && !isMissingAssigneesTableError(deleteError)) {
       return { success: false, error: deleteError.message };
     }
 
@@ -131,7 +162,7 @@ export async function setTaskAssignees(
       );
 
       if (insertError) {
-        if (insertError.message.includes("task_assignees")) {
+        if (isMissingAssigneesTableError(insertError)) {
           return {
             success: false,
             error:

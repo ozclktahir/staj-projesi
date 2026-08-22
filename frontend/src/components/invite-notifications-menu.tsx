@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { writeActiveWorkspaceId } from "@/hooks/use-workspaces";
+import { AUTH_TOKEN_REFRESHED_EVENT } from "@/lib/auth-token-refresh";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import { createAuthedRealtimeClient } from "@/lib/supabase/client";
 import {
@@ -131,6 +132,17 @@ export function InviteNotificationsMenu({
   );
   const [, startTransition] = useTransition();
   const knownIdsRef = useRef<Set<string>>(new Set());
+  // JWT sessizce yenilendiğinde artıyor — aşağıdaki realtime effect'i
+  // yeni token'la abone olmaya zorlar (eski client eski token'ı kullanmaya
+  // devam ederdi, bkz. lib/auth-token-refresh.ts).
+  const [tokenVersion, setTokenVersion] = useState(0);
+
+  useEffect(() => {
+    const onRefreshed = () => setTokenVersion((v) => v + 1);
+    window.addEventListener(AUTH_TOKEN_REFRESHED_EVENT, onRefreshed);
+    return () =>
+      window.removeEventListener(AUTH_TOKEN_REFRESHED_EVENT, onRefreshed);
+  }, []);
 
   type NotifOptimisticAction =
     | { type: "delete"; id: string }
@@ -272,7 +284,19 @@ export function InviteNotificationsMenu({
               toast.info(t("notifications.newInvite"));
             },
           )
-          .subscribe();
+          .subscribe((status, err) => {
+            // Önceden hiç izlenmiyordu — abonelik sessizce düşünce (süresi
+            // dolan JWT, ağ kopması) fark edilemiyordu. Token yenilendiğinde
+            // (tokenVersion) bu effect zaten yeniden çalışıp taze bir
+            // client/kanal kuracak; burada yalnızca teşhis için logluyoruz.
+            if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+              console.warn(
+                "[InviteNotificationsMenu] realtime status:",
+                status,
+                err,
+              );
+            }
+          });
       } catch (error) {
         console.warn("[InviteNotificationsMenu] realtime:", error);
       }
@@ -282,7 +306,7 @@ export function InviteNotificationsMenu({
       cancelled = true;
       if (channel) void client.removeChannel(channel);
     };
-  }, []);
+  }, [tokenVersion]);
 
   const feed = useMemo((): FeedItem[] => {
     const inviteIdsShown = new Set<string>();

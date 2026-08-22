@@ -171,7 +171,11 @@ export function AnalyticsDashboard({
       <div className="overflow-hidden" ref={emblaRef}>
         <div className="flex touch-pan-y">
           <div className="min-w-0 shrink-0 grow-0 basis-full pr-1">
-            <AnalyticsStatCards summary={summary} isMembersLive={presence.ready} />
+            <AnalyticsStatCards
+              summary={summary}
+              isMembersLive={presence.ready}
+              workspaceId={workspaceId}
+            />
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
               <StatusDonutCard data={data.byStatus} />
               <PriorityBarCard data={data.byPriority} />

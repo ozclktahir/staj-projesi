@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useState, type ComponentType } from "react";
+import { Suspense, useEffect, useState, type ComponentType } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Check,
   ChevronsUpDown,
@@ -48,6 +48,11 @@ import {
 import { useTranslation } from "@/i18n/use-translation";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { withWorkspaceQuery } from "@/lib/active-workspace";
+import {
+  COMMAND_CREATE_WORKSPACE,
+  COMMAND_INVITE_MEMBER,
+  COMMAND_PARAM,
+} from "@/lib/command-actions";
 import { isAdminRole } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 
@@ -125,6 +130,8 @@ function SidebarInner({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useTranslation();
   const {
     workspaces,
@@ -144,6 +151,32 @@ function SidebarInner({
   const canInvite = isAdminRole(activeWorkspace?.role);
   const isWorkspaceOwner =
     String(activeWorkspace?.role ?? "").toUpperCase() === "OWNER";
+
+  // Komut paleti (Cmd/Ctrl+K) → "Üye davet et" / "Yeni workspace oluştur"
+  // köprüsü: bu modallar yalnızca sidebar'ın yerel state'inde yaşıyor,
+  // palet buraya `?cmd=...` ile yönlendirip bu efektin modalı açmasını
+  // bekliyor (bkz. lib/command-actions.ts).
+  useEffect(() => {
+    const cmd = searchParams.get(COMMAND_PARAM);
+    if (!cmd || loading) return;
+
+    if (cmd === COMMAND_CREATE_WORKSPACE) {
+      setCreateOpen(true);
+    } else if (cmd === COMMAND_INVITE_MEMBER) {
+      if (canInvite) {
+        setInviteOpen(true);
+      } else {
+        toast.error("Üye davet etmek için yönetici olmalısınız.");
+      }
+    } else {
+      return;
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(COMMAND_PARAM);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [searchParams, loading, canInvite, pathname, router]);
 
   async function handleLeaveWorkspace() {
     if (!activeWorkspace || leaving) return;

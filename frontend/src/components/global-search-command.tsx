@@ -1,16 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import {
   CheckSquare,
   FolderKanban,
+  FolderPlus,
   ListTodo,
+  Moon,
   NotebookPen,
+  Plus,
   Search,
+  Sun,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { globalSearch, type GlobalSearchHit } from "@/app/actions/global-search";
+import {
+  COMMAND_CREATE_TASK,
+  COMMAND_CREATE_WORKSPACE,
+  COMMAND_INVITE_MEMBER,
+  withCommandParam,
+} from "@/lib/command-actions";
 import {
   CommandDialog,
   CommandEmpty,
@@ -36,6 +48,8 @@ const NAV_DEFS = [
 export function GlobalSearchCommand() {
   const { t } = useTranslation();
   const router = useRouter();
+  const pathname = usePathname();
+  const { resolvedTheme, setTheme } = useTheme();
   const { activeWorkspaceId } = useWorkspaces();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -95,6 +109,87 @@ export function GlobalSearchCommand() {
     [router, activeWorkspaceId],
   );
 
+  const runCommand = useCallback(
+    (action: () => void) => {
+      setOpen(false);
+      setQuery("");
+      action();
+    },
+    [],
+  );
+
+  // "Yeni görev oluştur" yalnızca bir proje sayfasındayken anlamlı (hangi
+  // projeye ekleneceği belirsiz olurdu) — bu yüzden bağlama duyarlı.
+  const currentProjectId = useMemo(() => {
+    const match = pathname?.match(/^\/project\/([^/?]+)/);
+    return match ? match[1] : null;
+  }, [pathname]);
+
+  const commandDefs = useMemo(() => {
+    const list: {
+      id: string;
+      label: string;
+      icon: typeof Plus;
+      run: () => void;
+    }[] = [];
+
+    if (currentProjectId) {
+      list.push({
+        id: "cmd-create-task",
+        label: t("commands.createTask"),
+        icon: Plus,
+        run: () =>
+          router.push(
+            withCommandParam(
+              withWorkspaceQuery(`/project/${currentProjectId}`, activeWorkspaceId),
+              COMMAND_CREATE_TASK,
+            ),
+          ),
+      });
+    }
+
+    list.push(
+      {
+        id: "cmd-invite-member",
+        label: t("commands.inviteMember"),
+        icon: UserPlus,
+        run: () =>
+          router.push(
+            withCommandParam(
+              withWorkspaceQuery(pathname || "/", activeWorkspaceId),
+              COMMAND_INVITE_MEMBER,
+            ),
+          ),
+      },
+      {
+        id: "cmd-create-workspace",
+        label: t("commands.createWorkspace"),
+        icon: FolderPlus,
+        run: () =>
+          router.push(
+            withCommandParam(
+              withWorkspaceQuery(pathname || "/", activeWorkspaceId),
+              COMMAND_CREATE_WORKSPACE,
+            ),
+          ),
+      },
+      {
+        id: "cmd-toggle-theme",
+        label: t("commands.toggleTheme"),
+        icon: resolvedTheme === "dark" ? Sun : Moon,
+        run: () => setTheme(resolvedTheme === "dark" ? "light" : "dark"),
+      },
+    );
+
+    return list;
+  }, [t, pathname, currentProjectId, activeWorkspaceId, resolvedTheme, setTheme, router]);
+
+  const filteredCommands = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return commandDefs;
+    return commandDefs.filter((c) => c.label.toLowerCase().includes(q));
+  }, [query, commandDefs]);
+
   const filteredNav = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return navHits;
@@ -150,6 +245,24 @@ export function GlobalSearchCommand() {
           <CommandEmpty>
             {pending ? t("search.searching") : t("search.empty")}
           </CommandEmpty>
+
+          {filteredCommands.length > 0 ? (
+            <CommandGroup heading={t("search.commands")}>
+              {filteredCommands.map((cmd) => {
+                const Icon = cmd.icon;
+                return (
+                  <CommandItem
+                    key={cmd.id}
+                    value={`cmd-${cmd.label}`}
+                    onSelect={() => runCommand(cmd.run)}
+                  >
+                    <Icon className="size-4" />
+                    <span>{cmd.label}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          ) : null}
 
           {filteredNav.length > 0 ? (
             <CommandGroup heading={t("search.nav")}>

@@ -22,6 +22,7 @@ import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { WorkspaceRoleGuard } from '../auth/guards/workspace-role.guard';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { GetTasksFilterDto } from './dto/get-tasks-filter.dto';
+import { SetTaskAssigneesDto } from './dto/set-task-assignees.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskService } from './task.service';
 
@@ -127,9 +128,9 @@ export class TaskController {
   setAssignees(
     @Param('workspaceId') workspaceId: string,
     @Param('id') id: string,
-    @Body() body: { user_ids: string[] },
+    @Body() dto: SetTaskAssigneesDto,
   ) {
-    return this.taskService.setAssignees(workspaceId, id, body?.user_ids ?? []);
+    return this.taskService.setAssignees(workspaceId, id, dto.user_ids ?? []);
   }
 
   @Post(':id/reassign')

@@ -13,16 +13,13 @@ import {
   getSubtasks,
   toggleSubtask,
 } from "@/app/actions/subtasks";
-import {
-  getTaskAssignees,
-  setTaskAssignees,
-  type TaskAssigneeOption,
-} from "@/app/actions/task-assignees";
+import { getTaskAssignees, setTaskAssignees } from "@/app/actions/task-assignees";
 import { updateTask } from "@/app/actions/update-task";
 import { updateTaskStatus } from "@/app/actions/update-task-status";
 import { getWorkspaceMembers } from "@/app/actions/workspace-members";
 import type { WorkspaceMemberOption } from "@/lib/member-labels";
 import { cleanText, emailLocalPart, formatPersonName } from "@/lib/member-labels";
+import { AssigneesField } from "@/components/task/assignees-field";
 import { DeleteTaskModal } from "@/components/delete-task-modal";
 import { TaskActivityFeed } from "@/components/task/task-activity-feed";
 import { TaskAttachments } from "@/components/task/task-attachments";
@@ -88,7 +85,6 @@ export function TaskDetailSheet({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [assigneeId, setAssigneeId] = useState("");
   const [members, setMembers] = useState<WorkspaceMemberOption[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
@@ -105,12 +101,8 @@ export function TaskDetailSheet({
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activityKey, setActivityKey] = useState(0);
-  const [extraAssignees, setExtraAssignees] = useState<TaskAssigneeOption[]>(
-    [],
-  );
-  const [selectedExtraAssigneeIds, setSelectedExtraAssigneeIds] = useState<
-    string[]
-  >([]);
+  /** Sıralı: ilk id birincil atanan (assignee_id), geri kalanı ek atanan (task_assignees). */
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [savingAssignees, setSavingAssignees] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(true);
   const [activityOpen, setActivityOpen] = useState(true);
@@ -120,7 +112,6 @@ export function TaskDetailSheet({
     setTitle(next.title);
     setDescription(next.description ?? "");
     setDueDate(toDateInputValue(next.due_date));
-    setAssigneeId(next.assignee_id ?? "");
   }, []);
 
   const loadAll = useCallback(
@@ -180,11 +171,14 @@ export function TaskDetailSheet({
       setAttachments(
         attachmentResult.success ? attachmentResult.attachments : [],
       );
-      const nextExtraAssignees = assigneesResult.success
-        ? assigneesResult.assignees
-        : [];
-      setExtraAssignees(nextExtraAssignees);
-      setSelectedExtraAssigneeIds(nextExtraAssignees.map((a) => a.id));
+      const extraIds = (assigneesResult.success ? assigneesResult.assignees : [])
+        .map((a) => a.id);
+      const primaryId = details.task.assignee_id?.trim() || null;
+      setAssigneeIds(
+        primaryId
+          ? [primaryId, ...extraIds.filter((id) => id !== primaryId)]
+          : extraIds,
+      );
       setLoading(false);
 
       if (
@@ -486,14 +480,15 @@ export function TaskDetailSheet({
     if (!task) return;
     setSaving(true);
 
-    // priority BİLEREK gönderilmiyor — görev detayından öncelik değiştirme
-    // özelliği kaldırıldı (oluşturma formunda belirlenir).
+    // priority ve assignee BİLEREK gönderilmiyor — öncelik yalnızca görev
+    // oluştururken belirlenir, atanan kişi(ler) artık ayrı "Atananları
+    // Kaydet" akışıyla (handleSaveAssignees, AssigneesField) yönetiliyor —
+    // tek bileşen / tek kaydetme akışı, iki yerden aynı alanı yazmayı önler.
     const result = await updateTask({
       taskId: task.id,
       title,
       description,
       due_date: dueDate ? new Date(`${dueDate}T12:00:00`).toISOString() : null,
-      assigneeId: assigneeId || null,
     });
 
     setSaving(false);
@@ -514,29 +509,56 @@ export function TaskDetailSheet({
       description: result.task.description,
       priority: result.task.priority,
       due_date: result.task.due_date,
-      assignee_id: result.task.assignee_id,
     });
     router.refresh();
   }
 
-  async function handleSaveExtraAssignees() {
+  async function handleSaveAssignees() {
     if (!task || savingAssignees) return;
     setSavingAssignees(true);
     try {
-      const result = await setTaskAssignees(
-        task.id,
-        selectedExtraAssigneeIds,
-      );
-      if (!result.success) {
-        toast.error(result.error);
-        return;
+      const nextPrimary = assigneeIds[0] ?? null;
+      const previousPrimary = task.assignee_id ?? null;
+
+      if (nextPrimary !== previousPrimary) {
+        const primaryResult = await updateTask({
+          taskId: task.id,
+          assigneeId: nextPrimary,
+        });
+        if (!primaryResult.success) {
+          toast.error(primaryResult.error);
+          return;
+        }
+        setCachedTask(primaryResult.task);
+        applyTaskToForm(primaryResult.task);
+        onTaskUpdated?.({
+          id: primaryResult.task.id,
+          assignee_id: primaryResult.task.assignee_id,
+        });
       }
-      setExtraAssignees(result.assignees);
-      setSelectedExtraAssigneeIds(result.assignees.map((a) => a.id));
+
+      // Ek atananlar (task_assignees) yalnızca admin tarafından
+      // düzenlenebilir — backend/RLS zaten aynı kuralı zorunlu kılıyor,
+      // burada gereksiz bir isteği baştan engelliyoruz.
+      if (isAdmin) {
+        const result = await setTaskAssignees(task.id, assigneeIds.slice(1));
+        if (!result.success) {
+          toast.error(result.error);
+          return;
+        }
+        const extraIds = result.assignees.map((a) => a.id);
+        setAssigneeIds(
+          nextPrimary
+            ? [nextPrimary, ...extraIds.filter((id) => id !== nextPrimary)]
+            : extraIds,
+        );
+      }
+
       toast.success("Atananlar güncellendi");
       setActivityKey((k) => k + 1);
+      router.refresh();
     } catch (error) {
-      console.error("[TaskDetailSheet] setTaskAssignees:", error);
+      console.error("[TaskDetailSheet] handleSaveAssignees:", error);
       toast.error("Atananlar güncellenirken bir hata oluştu.");
     } finally {
       setSavingAssignees(false);
@@ -724,111 +746,30 @@ export function TaskDetailSheet({
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="task-assignee" className="text-xs">
-                  Atanan Kişi
-                </Label>
-                <select
-                  id="task-assignee"
-                  value={assigneeId}
-                  onChange={(e) => setAssigneeId(e.target.value)}
-                  disabled={!isAdmin && members.length <= 1}
-                  className="flex h-9 w-full rounded-lg border border-border bg-background px-3 text-sm"
-                >
-                  <option value="">Atanmamış</option>
-                  {members.map((member) => {
-                    const label =
-                      cleanText(member.fullName) ||
-                      cleanText(member.displayName) ||
-                      emailLocalPart(member.email) ||
-                      cleanText(member.email) ||
-                      "";
-                    if (!label) return null;
-                    return (
-                      <option key={member.id} value={member.id}>
-                        {label}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs">
-                  Ek Atananlar (çoklu — {selectedExtraAssigneeIds.length})
-                </Label>
-                {isAdmin ? (
-                  <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
-                    {members.length === 0 ? (
-                      <p className="px-1 py-1 text-xs text-muted-foreground">
-                        Üye bulunamadı.
-                      </p>
-                    ) : (
-                      members.map((member) => {
-                        const label =
-                          cleanText(member.fullName) ||
-                          cleanText(member.displayName) ||
-                          emailLocalPart(member.email) ||
-                          cleanText(member.email) ||
-                          "";
-                        if (!label) return null;
-                        const checked = selectedExtraAssigneeIds.includes(
-                          member.id,
-                        );
-                        return (
-                          <label
-                            key={member.id}
-                            className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => {
-                                setSelectedExtraAssigneeIds((prev) =>
-                                  checked
-                                    ? prev.filter((v) => v !== member.id)
-                                    : [...prev, member.id],
-                                );
-                              }}
-                              className="size-3.5 rounded border-border accent-primary"
-                            />
-                            <span className="truncate text-foreground">
-                              {label}
-                            </span>
-                          </label>
-                        );
-                      })
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {extraAssignees.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        Ek atanan yok.
-                      </p>
-                    ) : (
-                      extraAssignees.map((a) => (
-                        <span
-                          key={a.id}
-                          className="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground"
-                        >
-                          {a.displayName}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                )}
-                {isAdmin ? (
+                <AssigneesField
+                  id="task-assignees"
+                  label={t("taskModal.assignees")}
+                  members={members}
+                  selectedIds={assigneeIds}
+                  onChange={setAssigneeIds}
+                  canMultiSelect={isAdmin}
+                  disabled={
+                    savingAssignees || (!isAdmin && members.length <= 1)
+                  }
+                  hint={isAdmin ? t("taskModal.assigneesHint") : undefined}
+                />
+                <div className="flex justify-end">
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
                     disabled={savingAssignees}
-                    onClick={() => void handleSaveExtraAssignees()}
+                    onClick={() => void handleSaveAssignees()}
                     className="rounded-lg"
                   >
                     {savingAssignees ? "Kaydediliyor…" : "Atananları Kaydet"}
                   </Button>
-                ) : null}
+                </div>
               </div>
 
               <div className="space-y-1.5">
