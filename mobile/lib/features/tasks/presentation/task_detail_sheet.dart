@@ -10,13 +10,10 @@ import '../data/task_repository.dart';
 import '../data/task_scope.dart';
 import '../data/update_task_dto.dart';
 import '../../activity/presentation/activity_log_panel.dart';
-import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../providers/comment_provider.dart';
 import '../providers/file_provider.dart';
 import '../providers/subtask_provider.dart';
-import '../providers/task_assignees_provider.dart';
 import '../providers/task_provider.dart';
-import 'assignees_field.dart';
 import 'edit_task_dialog.dart';
 import 'task_actions.dart';
 import 'task_card.dart';
@@ -390,13 +387,9 @@ class _TaskDetailSheetBodyState extends ConsumerState<_TaskDetailSheetBody>
                     ),
                     status: _status,
                     busy: _busy,
-                    scope: scope,
-                    projectId: widget.projectId,
                     onEdit: _edit,
                     onStatusSelected: _changeStatus,
                     onDelete: _delete,
-                    onTaskUpdated: (updated) =>
-                        setState(() => _task = updated),
                   ),
                   scope != null
                       ? TaskSubtasksPanel(
@@ -432,24 +425,18 @@ class _DetailsTab extends ConsumerWidget {
     required this.assigneeLabel,
     required this.status,
     required this.busy,
-    required this.scope,
-    required this.projectId,
     required this.onEdit,
     required this.onStatusSelected,
     required this.onDelete,
-    required this.onTaskUpdated,
   });
 
   final TaskDto task;
   final String assigneeLabel;
   final TaskStatus status;
   final bool busy;
-  final TaskScope? scope;
-  final String projectId;
   final VoidCallback onEdit;
   final ValueChanged<TaskStatus> onStatusSelected;
   final VoidCallback onDelete;
-  final ValueChanged<TaskDto> onTaskUpdated;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -494,19 +481,9 @@ class _DetailsTab extends ConsumerWidget {
               ),
         ),
         const SizedBox(height: 20),
-        if (scope != null)
-          _AssigneesSection(
-            task: task,
-            assigneeLabel: assigneeLabel,
-            scope: scope!,
-            projectId: projectId,
-            onTaskUpdated: onTaskUpdated,
-          )
-        else ...[
-          _FieldLabel(text: 'Atanan'),
-          const SizedBox(height: 6),
-          Text(assigneeLabel, style: Theme.of(context).textTheme.bodyMedium),
-        ],
+        _FieldLabel(text: 'Atanan'),
+        const SizedBox(height: 6),
+        Text(assigneeLabel, style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 16),
         _FieldLabel(text: 'Teslim tarihi'),
         const SizedBox(height: 6),
@@ -607,215 +584,6 @@ class _DetailsTab extends ConsumerWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-/// "Atananlar" — birincil (`assignee_id`) + ek atananlar (`task_assignees`)
-/// TEK bölümde gösterilir, TEK "Düzenle" diyaloğuyla değiştirilir (bkz.
-/// `AssigneesField`). Önceden birincil yalnızca kalem simgesiyle açılan
-/// tam düzenleme diyaloğundan, ek atananlar ise burada ayrı bir
-/// mini-diyalogla değiştirilebiliyordu; artık ikisi de aynı bileşeni
-/// kullanıyor (kalem simgesindeki tam düzenleme diyaloğu da hâlâ ikisini
-/// birlikte değiştirebilir — bkz. edit_task_dialog.dart).
-class _AssigneesSection extends ConsumerWidget {
-  const _AssigneesSection({
-    required this.task,
-    required this.assigneeLabel,
-    required this.scope,
-    required this.projectId,
-    required this.onTaskUpdated,
-  });
-
-  final TaskDto task;
-  final String assigneeLabel;
-  final TaskScope scope;
-  final String projectId;
-  final ValueChanged<TaskDto> onTaskUpdated;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final assigneesAsync = ref.watch(taskAssigneesProvider(scope));
-    final theme = Theme.of(context);
-    final primaryId = task.effectiveAssigneeId;
-    final hasPrimary = primaryId != null && primaryId.isNotEmpty;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            _FieldLabel(text: 'Atananlar'),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: () => _editAssignees(context, ref),
-              icon: const Icon(Icons.group_add_outlined, size: 16),
-              label: const Text('Düzenle'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        assigneesAsync.when(
-          loading: () => const SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          error: (error, _) => Text(
-            'Yüklenemedi.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.error,
-            ),
-          ),
-          data: (assignees) {
-            final extras = [
-              for (final assignee in assignees)
-                if (assignee.id != primaryId) assignee,
-            ];
-            if (!hasPrimary && extras.isEmpty) {
-              return Text(
-                'Atanan yok.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              );
-            }
-            return Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (hasPrimary)
-                  _AssigneeChip(label: assigneeLabel, isPrimary: true),
-                for (final assignee in extras)
-                  _AssigneeChip(
-                    label: assignee.displayName,
-                    isPrimary: false,
-                  ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Future<void> _editAssignees(BuildContext context, WidgetRef ref) async {
-    final isAdmin = ref.read(workspaceCapabilitiesProvider).isAdmin;
-    final primaryId = task.effectiveAssigneeId;
-    final current = ref.read(taskAssigneesProvider(scope)).valueOrNull ??
-        const <TaskAssigneeOption>[];
-    var selectedIds = <String>[
-      if (primaryId != null && primaryId.isNotEmpty) primaryId,
-      for (final assignee in current)
-        if (assignee.id != primaryId) assignee.id,
-    ];
-
-    final result = await showDialog<List<String>>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setLocal) {
-            return AlertDialog(
-              title: const Text('Atananları düzenle'),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: AssigneesField(
-                  selectedIds: selectedIds,
-                  canMultiSelect: isAdmin,
-                  enabled: true,
-                  helperText: isAdmin
-                      ? 'Birincil atanana ek olarak bu görevi görebilecek üyeler.'
-                      : null,
-                  onChanged: (next) => setLocal(() => selectedIds = next),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('İptal'),
-                ),
-                FilledButton(
-                  onPressed: () =>
-                      Navigator.of(dialogContext).pop(selectedIds),
-                  child: const Text('Kaydet'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (result == null || !context.mounted) return;
-
-    final newPrimaryId = result.isNotEmpty ? result.first : null;
-    final newExtras =
-        result.length > 1 ? result.sublist(1) : const <String>[];
-
-    if (newPrimaryId != primaryId) {
-      try {
-        final clearAssignee = newPrimaryId == null || newPrimaryId.isEmpty;
-        final dto = UpdateTaskDto(
-          assigneeId: clearAssignee ? null : newPrimaryId,
-          clearAssignee: clearAssignee,
-        );
-        final updated = projectId.isNotEmpty
-            ? await ref
-                .read(tasksProvider(projectId).notifier)
-                .updateTask(taskId: task.id, dto: dto)
-            : await ref.read(taskRepositoryProvider).updateTask(
-                  workspaceId: scope.workspaceId,
-                  taskId: task.id,
-                  dto: dto,
-                );
-        if (projectId.isEmpty) {
-          ref.invalidate(personalTasksProvider);
-        }
-        onTaskUpdated(updated);
-      } catch (error) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(content: Text('Atanan güncellenemedi: $error')),
-          );
-        return;
-      }
-    }
-
-    if (!isAdmin) return;
-    try {
-      await ref
-          .read(taskAssigneesProvider(scope).notifier)
-          .setAssignees(newExtras);
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Kaydedilemedi: $error')));
-    }
-  }
-}
-
-class _AssigneeChip extends StatelessWidget {
-  const _AssigneeChip({required this.label, required this.isPrimary});
-
-  final String label;
-  final bool isPrimary;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Chip(
-      avatar: CircleAvatar(
-        backgroundColor: scheme.primary.withValues(alpha: 0.15),
-        foregroundColor: scheme.primary,
-        child: Text(
-          label.isNotEmpty ? label[0].toUpperCase() : '?',
-          style: const TextStyle(fontSize: 11),
-        ),
-      ),
-      label: Text(isPrimary ? '$label — birincil' : label),
     );
   }
 }

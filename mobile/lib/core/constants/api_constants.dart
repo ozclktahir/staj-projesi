@@ -120,9 +120,6 @@ abstract final class ApiConstants {
   static String workspaceTaskReassign(String workspaceId, String taskId) =>
       '/workspaces/$workspaceId/tasks/$taskId/reassign';
 
-  static String workspaceTaskAssignees(String workspaceId, String taskId) =>
-      '/workspaces/$workspaceId/tasks/$taskId/assignees';
-
   static String workspaceAdminStats(String workspaceId) =>
       '/workspaces/$workspaceId/admin/stats';
 

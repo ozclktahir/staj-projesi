@@ -3,15 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../auth/providers/auth_provider.dart';
+import '../../workspace/presentation/assignee_picker_field.dart';
 import '../../workspace/providers/workspace_capabilities_provider.dart';
-import '../../workspace/providers/workspace_provider.dart';
 import '../data/task_dto.dart';
 import '../data/task_repository.dart';
-import '../data/task_scope.dart';
 import '../data/update_task_dto.dart';
-import '../providers/task_assignees_provider.dart';
 import '../providers/task_provider.dart';
-import 'assignees_field.dart';
 
 Future<TaskDto?> showEditTaskDialog({
   required BuildContext context,
@@ -25,43 +22,12 @@ Future<TaskDto?> showEditTaskDialog({
       TextEditingController(text: task.description ?? '');
   final caps = ref.read(workspaceCapabilitiesProvider);
   final userId = ref.read(authProvider).userId;
-  final primaryAssigneeId = caps.isAdmin
+  String? assigneeId = caps.isAdmin
       ? task.effectiveAssigneeId
       : (task.effectiveAssigneeId ?? userId);
-  final workspaceId =
-      ref.read(workspaceProvider).activeWorkspace?.id ?? task.workspaceId;
-  final scope = (workspaceId == null || workspaceId.isEmpty)
-      ? null
-      : TaskScope(workspaceId: workspaceId, taskId: task.id);
-
-  // Mevcut ek atananları (task_assignees) önceden getir; birincil ile
-  // birleştirip sıralı tek bir seçim listesi olarak diyaloğa taşı — bkz.
-  // AssigneesField.
-  var extraAssigneeIds = <String>[];
-  if (scope != null) {
-    try {
-      final current =
-          await ref.read(taskAssigneesProvider(scope).future);
-      extraAssigneeIds = [
-        for (final assignee in current)
-          if (assignee.id != primaryAssigneeId) assignee.id,
-      ];
-    } catch (_) {
-      // Ek atananlar getirilemezse yalnızca birincil ile devam et.
-      extraAssigneeIds = const [];
-    }
-  }
-
-  var selectedAssigneeIds = <String>[
-    if (primaryAssigneeId != null && primaryAssigneeId.isNotEmpty)
-      primaryAssigneeId,
-    ...extraAssigneeIds,
-  ];
   DateTime? dueDate = task.dueDate != null
       ? DateTime.tryParse(task.dueDate!)?.toLocal()
       : null;
-
-  if (!context.mounted) return null;
 
   try {
     return await showDialog<TaskDto>(
@@ -136,15 +102,11 @@ Future<TaskDto?> showEditTaskDialog({
                           child: const Text('Teslim tarihini kaldır'),
                         ),
                       const SizedBox(height: 8),
-                      AssigneesField(
-                        selectedIds: selectedAssigneeIds,
-                        canMultiSelect: caps.isAdmin,
+                      AssigneePickerField(
+                        value: assigneeId,
                         enabled: !submitting,
-                        helperText: caps.isAdmin
-                            ? 'Birincil atanana ek olarak bu görevi görebilecek üyeler.'
-                            : null,
-                        onChanged: (next) =>
-                            setLocal(() => selectedAssigneeIds = next),
+                        onChanged: (value) =>
+                            setLocal(() => assigneeId = value),
                       ),
                       if (errorText != null) ...[
                         const SizedBox(height: 16),
@@ -178,13 +140,9 @@ Future<TaskDto?> showEditTaskDialog({
                             errorText = null;
                           });
                           try {
-                            final primaryAssigneeId =
-                                selectedAssigneeIds.isNotEmpty
-                                    ? selectedAssigneeIds.first
-                                    : null;
                             final resolvedAssignee = caps.isAdmin
-                                ? primaryAssigneeId
-                                : (primaryAssigneeId ?? userId);
+                                ? assigneeId
+                                : (assigneeId ?? userId);
                             final clearAssignee = caps.isAdmin &&
                                 (resolvedAssignee == null ||
                                     resolvedAssignee.isEmpty) &&
@@ -207,29 +165,6 @@ Future<TaskDto?> showEditTaskDialog({
                                         task.dueDate != null,
                                   ),
                                 );
-
-                            // Ek atananlar (task_assignees) — yalnızca
-                            // admin/OWNER kaydedebilir (backend de aynı
-                            // kuralı uygular). Birincil değişikliği zaten
-                            // başarılı olduğundan, ek atama başarısız olsa
-                            // bile diyaloğu kapatmayı engelleme.
-                            if (caps.isAdmin && scope != null) {
-                              final extras = selectedAssigneeIds.length > 1
-                                  ? selectedAssigneeIds.sublist(1)
-                                  : const <String>[];
-                              try {
-                                await ref
-                                    .read(
-                                      taskAssigneesProvider(scope).notifier,
-                                    )
-                                    .setAssignees(extras);
-                              } catch (error) {
-                                debugPrint(
-                                  '[EditTask] setAssignees: $error',
-                                );
-                              }
-                            }
-
                             if (dialogContext.mounted) {
                               Navigator.of(dialogContext).pop(updated);
                             }

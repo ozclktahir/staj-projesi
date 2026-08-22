@@ -22,7 +22,6 @@ import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import { WorkspaceRoleGuard } from '../auth/guards/workspace-role.guard';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { GetTasksFilterDto } from './dto/get-tasks-filter.dto';
-import { SetTaskAssigneesDto } from './dto/set-task-assignees.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskService } from './task.service';
 
@@ -100,37 +99,6 @@ export class TaskController {
     @Param('id') id: string,
   ) {
     return this.taskService.findOne(workspaceId, id);
-  }
-
-  @Get(':id/assignees')
-  @ApiOperation({
-    summary:
-      "Görevin ek atananlarını (task_assignees — çoklu atama katmanı) listeler",
-  })
-  listAssignees(
-    @Param('workspaceId') workspaceId: string,
-    @Param('id') id: string,
-  ) {
-    return this.taskService.listAssignees(workspaceId, id);
-  }
-
-  @Put(':id/assignees')
-  @Roles('OWNER', 'Admin')
-  @UseGuards(SupabaseAuthGuard, WorkspaceRoleGuard)
-  @ApiOperation({
-    summary:
-      'Görevin ek atanan listesini (user_ids) tam olarak bu kümeyle değiştirir (yalnızca OWNER/Admin)',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Çoklu atama yalnızca OWNER veya Admin tarafından düzenlenebilir.',
-  })
-  setAssignees(
-    @Param('workspaceId') workspaceId: string,
-    @Param('id') id: string,
-    @Body() dto: SetTaskAssigneesDto,
-  ) {
-    return this.taskService.setAssignees(workspaceId, id, dto.user_ids ?? []);
   }
 
   @Post(':id/reassign')

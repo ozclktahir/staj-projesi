@@ -24,11 +24,6 @@ export type CreateTaskInput = {
   priority?: TaskPriority;
   /** Atanan kullanıcı (workspace üyesi) */
   assigneeId?: string | null;
-  /**
-   * Birincil atanana EK olarak görevi görecek kullanıcılar (task_assignees).
-   * Yalnızca workspace admin/owner uygulayabilir — bkz. setTaskAssignees.
-   */
-  extraAssigneeIds?: string[];
 };
 
 export type CreateTaskResult =
@@ -301,30 +296,6 @@ export async function createTask(
     insertedId =
       inserted && typeof inserted.id === "string" ? inserted.id : null;
     createdTaskId = insertedId;
-
-    // Çoklu atama (Ek Atananlar) — görev oluşturulurken seçilmişse hemen uygula.
-    // Yalnızca admin/owner; setTaskAssignees ayrıca kendi yetki kontrolünü yapar.
-    const extraIds = [
-      ...new Set(
-        (input.extraAssigneeIds ?? [])
-          .map((id) => (typeof id === "string" ? id.trim() : ""))
-          .filter(Boolean),
-      ),
-    ];
-    if (insertedId && extraIds.length > 0 && roleCtx.isAdmin) {
-      const { setTaskAssignees } = await import(
-        "@/app/actions/task-assignees"
-      );
-      const assigneeResult = await setTaskAssignees(insertedId, extraIds);
-      if (!assigneeResult.success) {
-        // Görev oluştu; yalnızca ek atama başarısız — kullanıcıya bildir ama
-        // görevi geri alma.
-        console.error(
-          "[createTask] setTaskAssignees:",
-          assigneeResult.error,
-        );
-      }
-    }
 
     if (insertedId) {
       const actorName = await resolveActorDisplayName(supabase, user);

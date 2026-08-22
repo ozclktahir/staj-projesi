@@ -80,7 +80,7 @@ Future<void> showWorkspaceSwitcher(BuildContext context, WidgetRef ref) {
                   FilledButton.icon(
                     onPressed: state.isSubmitting
                         ? null
-                        : () => _showCreateWorkspaceDialog(context, ref),
+                        : () => showCreateWorkspaceDialog(context, ref),
                     icon: state.isSubmitting
                         ? const SizedBox(
                             width: 18,
@@ -100,7 +100,9 @@ Future<void> showWorkspaceSwitcher(BuildContext context, WidgetRef ref) {
   );
 }
 
-Future<void> _showCreateWorkspaceDialog(
+/// Yeni workspace oluşturma diyaloğu — hem burada (switcher) hem global
+/// arama ekranındaki "Komutlar" bölümünden tetiklenebilir.
+Future<void> showCreateWorkspaceDialog(
   BuildContext context,
   WidgetRef ref,
 ) async {
@@ -178,7 +180,7 @@ Future<void> _showCreateWorkspaceDialog(
                             setLocal(() => submitting = false);
                             final message =
                                 ref.read(workspaceProvider).errorMessage ??
-                                    'Oluşturulamadı.';
+                                'Oluşturulamadı.';
                             ScaffoldMessenger.of(dialogContext)
                               ..hideCurrentSnackBar()
                               ..showSnackBar(SnackBar(content: Text(message)));

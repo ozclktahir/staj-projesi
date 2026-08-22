@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client_provider.dart';
 import '../../../core/rbac/workspace_rbac.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../tasks/data/task_dto.dart';
 import '../../tasks/data/task_repository.dart';
 import '../../tasks/providers/task_provider.dart';
 import '../data/project_dto.dart';
@@ -24,10 +25,7 @@ class ProjectsNotifier extends AsyncNotifier<List<ProjectDto>> {
     );
     final userId = ref.watch(authProvider.select((s) => s.userId));
     if (workspace == null) return const [];
-    final projects =
-        await ref.read(projectRepositoryProvider).fetchProjects(workspace.id);
-    return _applyVisibilityFilter(
-      projects: projects,
+    return _fetchVisibleProjects(
       workspaceId: workspace.id,
       role: workspace.role,
       ownerId: workspace.ownerId,
@@ -42,11 +40,7 @@ class ProjectsNotifier extends AsyncNotifier<List<ProjectDto>> {
       final userId = ref.read(authProvider).userId;
       if (workspace == null) return const <ProjectDto>[];
       try {
-        final projects = await ref
-            .read(projectRepositoryProvider)
-            .fetchProjects(workspace.id);
-        return _applyVisibilityFilter(
-          projects: projects,
+        return await _fetchVisibleProjects(
           workspaceId: workspace.id,
           role: workspace.role,
           ownerId: workspace.ownerId,
@@ -58,8 +52,11 @@ class ProjectsNotifier extends AsyncNotifier<List<ProjectDto>> {
     });
   }
 
-  Future<List<ProjectDto>> _applyVisibilityFilter({
-    required List<ProjectDto> projects,
+  /// Projeleri ve (Member/Guest için) atanan görev listesini PARALEL çeker
+  /// — ikisi de yalnızca workspaceId/userId'ye bağlı, birbirinin sonucuna
+  /// değil (dashboard_provider.dart'taki stats+tasks düzeltmesiyle aynı
+  /// desen; önceden projeler bitmeden görev sorgusu hiç başlamıyordu).
+  Future<List<ProjectDto>> _fetchVisibleProjects({
     required String workspaceId,
     required String? role,
     required String? ownerId,
@@ -70,30 +67,41 @@ class ProjectsNotifier extends AsyncNotifier<List<ProjectDto>> {
       ownerId: ownerId,
       userId: userId,
     );
-    if (caps.isAdmin || userId == null || userId.isEmpty) {
-      return projects;
+    final needsTaskVisibility =
+        !caps.isAdmin && userId != null && userId.isNotEmpty;
+
+    Future<List<TaskDto>> loadAssignedTasks() async {
+      if (!needsTaskVisibility) return const [];
+      try {
+        return await ref
+            .read(taskRepositoryProvider)
+            .fetchTasks(
+              workspaceId: workspaceId,
+              assigneeId: userId,
+              limit: 200,
+            );
+      } on TaskException catch (error) {
+        debugPrint('[Projects] member visibility tasks: $error');
+        return const [];
+      }
     }
+
+    final (projects, assignedTasks) = await (
+      ref.read(projectRepositoryProvider).fetchProjects(workspaceId),
+      loadAssignedTasks(),
+    ).wait;
+
+    if (!needsTaskVisibility) return projects;
 
     final visibleIds = <String>{
       for (final project in projects)
         if (project.isLinkedToUser(userId)) project.id,
     };
-
-    try {
-      final assignedTasks =
-          await ref.read(taskRepositoryProvider).fetchTasks(
-                workspaceId: workspaceId,
-                assigneeId: userId,
-                limit: 200,
-              );
-      for (final task in assignedTasks) {
-        final projectId = task.projectId;
-        if (projectId != null && projectId.isNotEmpty) {
-          visibleIds.add(projectId);
-        }
+    for (final task in assignedTasks) {
+      final projectId = task.projectId;
+      if (projectId != null && projectId.isNotEmpty) {
+        visibleIds.add(projectId);
       }
-    } on TaskException catch (error) {
-      debugPrint('[Projects] member visibility tasks: $error');
     }
 
     if (visibleIds.isEmpty) return const [];
@@ -111,7 +119,9 @@ class ProjectsNotifier extends AsyncNotifier<List<ProjectDto>> {
     if (workspaceId == null) return false;
 
     try {
-      final created = await ref.read(projectRepositoryProvider).createProject(
+      final created = await ref
+          .read(projectRepositoryProvider)
+          .createProject(
             workspaceId: workspaceId,
             dto: CreateProjectDto(name: name, description: description),
           );
@@ -136,10 +146,9 @@ class ProjectsNotifier extends AsyncNotifier<List<ProjectDto>> {
     ]);
 
     try {
-      await ref.read(projectRepositoryProvider).deleteProject(
-            workspaceId: workspaceId,
-            projectId: projectId,
-          );
+      await ref
+          .read(projectRepositoryProvider)
+          .deleteProject(workspaceId: workspaceId, projectId: projectId);
     } catch (_) {
       state = AsyncData(previous);
       rethrow;
@@ -149,5 +158,5 @@ class ProjectsNotifier extends AsyncNotifier<List<ProjectDto>> {
 
 final projectsProvider =
     AsyncNotifierProvider<ProjectsNotifier, List<ProjectDto>>(
-  ProjectsNotifier.new,
-);
+      ProjectsNotifier.new,
+    );

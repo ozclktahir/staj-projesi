@@ -94,6 +94,11 @@ final realtimeConnectionProvider = Provider<void>((ref) {
         scheduleInvalidate(myInvitationsProvider);
       });
     },
+    onNotificationRead: (_) {
+      onRealtimeEvent(() {
+        scheduleInvalidate(notificationsProvider);
+      });
+    },
     onActivityLogged: (_) {
       onRealtimeEvent(() {
         scheduleInvalidate(activityLogProvider);

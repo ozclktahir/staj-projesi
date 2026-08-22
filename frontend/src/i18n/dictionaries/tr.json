@@ -486,13 +486,7 @@
     "reassignFailed": "Yeniden atama başarısız",
     "rejectedBy": "Bu görev daha önce {name} tarafından reddedildi",
     "hide": "Gizle",
-    "countItems": "{n} adet",
-    "extraAssignees": "Ek Atananlar (çoklu)",
-    "extraAssigneesHint": "Birincil atanana ek olarak bu görevi görebilecek üyeler.",
-    "noMembers": "Üye bulunamadı.",
-    "primary": "birincil atanan",
-    "assignees": "Atanan Kişiler",
-    "assigneesHint": "İlk seçilen kişi birincil atanan olur; admin birden fazla kişi seçebilir."
+    "countItems": "{n} adet"
   },
   "loading": {
     "generic": "Yükleniyor…",

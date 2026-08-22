@@ -16,8 +16,8 @@ import {
   getCachedWorkspaceMembers,
   setCachedWorkspaceMembers,
 } from "@/lib/client-cache";
-import { AssigneesField } from "@/components/task/assignees-field";
 import { COMMAND_CREATE_TASK, COMMAND_PARAM } from "@/lib/command-actions";
+import { cleanText, emailLocalPart } from "@/lib/member-labels";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -77,8 +77,7 @@ export function CreateTaskModal({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>("TODO");
   const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
-  /** Sıralı: ilk id birincil atanan (assignee_id), geri kalanı ek atanan (task_assignees). */
-  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  const [assigneeId, setAssigneeId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [members, setMembers] = useState<WorkspaceMemberOption[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -97,7 +96,7 @@ export function CreateTaskModal({
       setMembers(cached.members);
       setIsAdmin(cached.isAdmin);
       if (!cached.isAdmin && cached.members[0]) {
-        setAssigneeIds([cached.members[0].id]);
+        setAssigneeId(cached.members[0].id);
       }
       return;
     }
@@ -114,7 +113,7 @@ export function CreateTaskModal({
       setMembers(result.members);
       setIsAdmin(result.isAdmin);
       if (!result.isAdmin && result.members[0]) {
-        setAssigneeIds([result.members[0].id]);
+        setAssigneeId(result.members[0].id);
       }
     });
   }, [open, workspaceId]);
@@ -147,7 +146,7 @@ export function CreateTaskModal({
     setDescription("");
     setStatus("TODO");
     setPriority("MEDIUM");
-    setAssigneeIds([]);
+    setAssigneeId("");
     setDueDate("");
     setSelectedRejectedId("");
     setRejectedNote(null);
@@ -166,7 +165,7 @@ export function CreateTaskModal({
     setDescription(task.description ?? "");
     setPriority(normalizePriority(task.priority));
     setDueDate(toDateInputValue(task.due_date));
-    setAssigneeIds([]);
+    setAssigneeId("");
     setRejectedNote(
       t("taskModal.rejectedBy", { name: task.rejected_by_name }),
     );
@@ -177,16 +176,15 @@ export function CreateTaskModal({
     setIsSubmitting(true);
 
     try {
-      const primaryAssigneeId = assigneeIds[0] ?? "";
       if (selectedRejectedId) {
-        if (!primaryAssigneeId) {
+        if (!assigneeId) {
           toast.error(t("taskModal.needAssignee"));
           return;
         }
         const result = await reassignRejectedTask({
           taskId: selectedRejectedId,
           projectId,
-          assigneeId: primaryAssigneeId,
+          assigneeId,
           dueDate: dueDate || null,
         });
         if (!result.success) {
@@ -201,8 +199,7 @@ export function CreateTaskModal({
           description,
           status,
           priority,
-          assigneeId: primaryAssigneeId || null,
-          extraAssigneeIds: assigneeIds.slice(1),
+          assigneeId: assigneeId || null,
         });
 
         if (!result.success) {
@@ -391,26 +388,41 @@ export function CreateTaskModal({
               </div>
             )}
 
-            <AssigneesField
-              id="task-assignees"
-              label={
-                isReassignMode
+            <div className="space-y-2">
+              <Label htmlFor="task-assignee">
+                {isReassignMode
                   ? t("taskModal.newAssignee")
-                  : t("taskModal.assignees")
-              }
-              members={members}
-              selectedIds={assigneeIds}
-              onChange={setAssigneeIds}
-              canMultiSelect={isAdmin && !isReassignMode}
-              disabled={
-                isSubmitting || (!isAdmin && !isReassignMode && members.length <= 1)
-              }
-              hint={
-                !isReassignMode && isAdmin
-                  ? t("taskModal.assigneesHint")
-                  : undefined
-              }
-            />
+                  : t("taskModal.assignee")}
+              </Label>
+              <select
+                id="task-assignee"
+                value={assigneeId}
+                onChange={(event) => setAssigneeId(event.target.value)}
+                disabled={isSubmitting || (!isAdmin && members.length <= 1)}
+                className={fieldClassName}
+                required={isReassignMode}
+              >
+                <option value="">
+                  {isReassignMode
+                    ? t("taskModal.pickPerson")
+                    : t("taskModal.unassigned")}
+                </option>
+                {members.map((member) => {
+                  const label =
+                    cleanText(member.fullName) ||
+                    cleanText(member.displayName) ||
+                    emailLocalPart(member.email) ||
+                    cleanText(member.email) ||
+                    "";
+                  if (!label) return null;
+                  return (
+                    <option key={member.id} value={member.id}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
 
             {isReassignMode ? (
               <div className="space-y-2">
@@ -441,7 +453,7 @@ export function CreateTaskModal({
                 disabled={
                   isSubmitting ||
                   !title.trim() ||
-                  (isReassignMode && !assigneeIds[0])
+                  (isReassignMode && !assigneeId)
                 }
                 className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
               >

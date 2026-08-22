@@ -20,6 +20,7 @@ class SocketService {
     String? workspaceId,
     SocketPayloadHandler? onTaskUpdated,
     SocketPayloadHandler? onNewNotification,
+    SocketPayloadHandler? onNotificationRead,
     SocketPayloadHandler? onActivityLogged,
     SocketPayloadHandler? onPresenceUpdated,
   }) {
@@ -35,7 +36,8 @@ class SocketService {
 
     final query = <String, dynamic>{
       'userId': userId,
-      if (workspaceId != null && workspaceId.isNotEmpty) 'workspaceId': workspaceId,
+      if (workspaceId != null && workspaceId.isNotEmpty)
+        'workspaceId': workspaceId,
     };
 
     final options = io.OptionBuilder()
@@ -54,10 +56,7 @@ class SocketService {
         .setQuery(query)
         .build();
 
-    final socket = io.io(
-      ApiConstants.baseUrl,
-      options,
-    );
+    final socket = io.io(ApiConstants.baseUrl, options);
     _socket = socket;
 
     socket.onConnect((_) {
@@ -84,6 +83,15 @@ class SocketService {
     if (onNewNotification != null) {
       socket.on('new_notification', onNewNotification);
       socket.on('notification', onNewNotification);
+    }
+    if (onNotificationRead != null) {
+      // Başka bir cihazda (ör. web'de) okundu işaretlenen/tümü-okundu
+      // yapılan bildirimlerin bu cihazda da anlık yansıması için —
+      // önceden yalnızca YENİ bildirim event'i dinleniyordu, "okundu"
+      // event'leri hiç dinlenmiyordu (mobil-web parite denetiminde bulundu,
+      // 22 Ağustos 2026).
+      socket.on('notification_read', onNotificationRead);
+      socket.on('notifications_read_all', onNotificationRead);
     }
     if (onActivityLogged != null) {
       socket.on('activity_logged', onActivityLogged);

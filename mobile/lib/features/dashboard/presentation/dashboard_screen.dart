@@ -9,6 +9,8 @@ import '../../../core/widgets/app_empty_state.dart';
 import '../../activity/data/activity_log_dto.dart';
 import '../../activity/providers/activity_log_provider.dart';
 import '../../tasks/data/task_dto.dart';
+import '../../workspace/data/workspace_member_dto.dart';
+import '../../workspace/providers/workspace_members_provider.dart';
 import '../../workspace/providers/workspace_provider.dart';
 import '../providers/dashboard_models.dart';
 import '../providers/dashboard_provider.dart';
@@ -52,8 +54,7 @@ class DashboardScreen extends ConsumerWidget {
               Text(error.toString(), textAlign: TextAlign.center),
               const SizedBox(height: 12),
               FilledButton(
-                onPressed: () =>
-                    ref.read(dashboardProvider.notifier).refresh(),
+                onPressed: () => ref.read(dashboardProvider.notifier).refresh(),
                 child: Text(s.commonRetry),
               ),
             ],
@@ -74,16 +75,16 @@ class DashboardScreen extends ConsumerWidget {
             Text(
               'Workspace Komuta Merkezi',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
-                  ),
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               'Tüm projelerin özet metrikleri, grafikler ve son hareketler.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 16),
             _KpiGrid(
@@ -92,18 +93,18 @@ class DashboardScreen extends ConsumerWidget {
               completionRateLabel: s.dashboardCompletionRate,
               overdueLabel: s.dashboardOverdueTasks,
               activeMembersLabel: s.dashboardActiveMembers,
-              activeMembersHint: ref.watch(
-                workspacePresenceProvider.select((p) => p.ready),
-              )
-                  ? 'Şu anda çevrimiçi'
+              activeMembersHint:
+                  ref.watch(workspacePresenceProvider.select((p) => p.ready))
+                  ? 'Şu anda çevrimiçi · dokun'
                   : null,
+              onTapActiveMembers: () => _showOnlineMembersSheet(context, ref),
             ),
             const SizedBox(height: 20),
             Text(
               'Grafikler',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 10),
             _StatusPieChart(data: data, title: s.dashboardStatusDist),
@@ -120,15 +121,144 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: 20),
             Text(
               'Yaklaşan görevler',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             _UpcomingList(deadlines: data.upcomingDeadlines),
             const SizedBox(height: 20),
             const _QuickActivityFeed(),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dashboard'daki "Aktif Üyeler" kartına dokununca şu an online olan
+/// üyeleri (ad + baş harf avatarı) gösteren panel — web'deki
+/// online-members-popover'ın mobil karşılığı. `workspacePresenceProvider`
+/// yalnızca ID taşıdığından ad/avatar için `workspaceMembersProvider`
+/// ile eşleştiriliyor.
+void _showOnlineMembersSheet(BuildContext context, WidgetRef ref) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.6,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final presence = ref.watch(workspacePresenceProvider);
+                final membersAsync = ref.watch(workspaceMembersProvider);
+                final scheme = Theme.of(context).colorScheme;
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Şu an online',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      presence.ready
+                          ? '${presence.onlineCount} kişi online'
+                          : 'Bağlanıyor…',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: membersAsync.when(
+                        loading: () => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                        error: (error, _) => Text(
+                          'Üyeler yüklenemedi',
+                          style: TextStyle(color: scheme.error),
+                        ),
+                        data: (members) {
+                          final online = members
+                              .where(
+                                (m) => presence.onlineUserIds.contains(m.id),
+                              )
+                              .toList();
+                          if (online.isEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Text(
+                                'Şu anda çevrimiçi kimse yok.',
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            );
+                          }
+                          return ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: online.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 4),
+                            itemBuilder: (context, index) {
+                              final member = online[index];
+                              return _OnlineMemberRow(member: member);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _OnlineMemberRow extends StatelessWidget {
+  const _OnlineMemberRow({required this.member});
+
+  final WorkspaceMemberDto member;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final initial = member.label.isNotEmpty
+        ? member.label.substring(0, 1).toUpperCase()
+        : '?';
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        backgroundColor: scheme.primary.withValues(alpha: 0.15),
+        foregroundColor: scheme.primary,
+        child: Text(initial),
+      ),
+      title: Text(member.label),
+      trailing: Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: Colors.green,
+          shape: BoxShape.circle,
         ),
       ),
     );
@@ -143,6 +273,7 @@ class _KpiGrid extends StatelessWidget {
     required this.overdueLabel,
     required this.activeMembersLabel,
     this.activeMembersHint,
+    this.onTapActiveMembers,
   });
 
   final DashboardData data;
@@ -151,6 +282,7 @@ class _KpiGrid extends StatelessWidget {
   final String overdueLabel;
   final String activeMembersLabel;
   final String? activeMembersHint;
+  final VoidCallback? onTapActiveMembers;
 
   @override
   Widget build(BuildContext context) {
@@ -190,6 +322,7 @@ class _KpiGrid extends StatelessWidget {
           icon: Icons.group_outlined,
           accent: const Color(0xFFF59E0B),
           hint: activeMembersHint,
+          onTap: onTapActiveMembers,
         ),
       ],
     );
@@ -203,6 +336,7 @@ class _KpiCard extends StatelessWidget {
     required this.icon,
     required this.accent,
     this.hint,
+    this.onTap,
   });
 
   final String label;
@@ -210,6 +344,7 @@ class _KpiCard extends StatelessWidget {
   final IconData icon;
   final Color accent;
   final String? hint;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -221,63 +356,68 @@ class _KpiCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: accent.withValues(alpha: 0.45), width: 1.5),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: accent, size: 16),
               ),
-              child: Icon(icon, color: accent, size: 16),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 11,
-                          height: 1.1,
-                        ),
-                  ),
-                  Flexible(
-                    child: Text(
-                      value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            height: 1.15,
-                          ),
-                    ),
-                  ),
-                  if (hint != null)
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Text(
-                      hint!,
+                      label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: accent,
-                            fontSize: 9,
-                            height: 1.1,
-                          ),
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                        height: 1.1,
+                      ),
                     ),
-                ],
+                    Flexible(
+                      child: Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              height: 1.15,
+                            ),
+                      ),
+                    ),
+                    if (hint != null)
+                      Text(
+                        hint!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: accent,
+                          fontSize: 9,
+                          height: 1.1,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -311,18 +451,18 @@ class _ChartCardShell extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 2),
             Text(
               subtitle,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontSize: 11,
-                  ),
+                color: scheme.onSurfaceVariant,
+                fontSize: 11,
+              ),
             ),
             const SizedBox(height: 8),
             child,
@@ -363,9 +503,9 @@ class _EmptyChartHint extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'Henüz veri yok',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -393,8 +533,9 @@ class _ColorBadges extends StatelessWidget {
               border: Border.all(
                 color: Theme.of(context).colorScheme.outlineVariant,
               ),
-              color: Theme.of(context).colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.45),
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -411,15 +552,15 @@ class _ColorBadges extends StatelessWidget {
                 Text(
                   item.label,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(width: 4),
                 Text(
                   '${item.count}',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -699,8 +840,9 @@ class _WorkloadBarChart extends StatelessWidget {
                             return const SizedBox.shrink();
                           }
                           final name = items[i].name;
-                          final short =
-                              name.length > 8 ? '${name.substring(0, 7)}…' : name;
+                          final short = name.length > 8
+                              ? '${name.substring(0, 7)}…'
+                              : name;
                           return Padding(
                             padding: const EdgeInsets.only(top: 6),
                             child: Text(
@@ -761,8 +903,8 @@ class _UpcomingList extends StatelessWidget {
               Text(
                 'Yaklaşan teslim tarihi yok',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -830,9 +972,9 @@ class _QuickActivityFeed extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Text(
                   s.dashboardRecentActivity,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -840,9 +982,9 @@ class _QuickActivityFeed extends ConsumerWidget {
             Text(
               'Workspace genelindeki en son kullanıcı hareketleri',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontSize: 11,
-                  ),
+                color: scheme.onSurfaceVariant,
+                fontSize: 11,
+              ),
             ),
             const SizedBox(height: 12),
             async.when(
@@ -924,9 +1066,9 @@ class _ActivityRow extends StatelessWidget {
                 Text(
                   _relativeTime(log.createdAt),
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 10,
-                      ),
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ),

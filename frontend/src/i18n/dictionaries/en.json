@@ -486,13 +486,7 @@
     "reassignFailed": "Reassignment failed",
     "rejectedBy": "This task was previously rejected by {name}",
     "hide": "Hide",
-    "countItems": "{n} items",
-    "extraAssignees": "Additional assignees (multiple)",
-    "extraAssigneesHint": "Members who can see this task in addition to the primary assignee.",
-    "noMembers": "No members found.",
-    "primary": "primary assignee",
-    "assignees": "Assignees",
-    "assigneesHint": "The first person selected becomes the primary assignee; admins can pick more than one."
+    "countItems": "{n} items"
   },
   "loading": {
     "generic": "Loading…",
