@@ -180,7 +180,17 @@ export class TaskService {
    */
   async listAssignees(workspaceId: string, taskId: string) {
     await this.findOne(workspaceId, taskId);
-    const client = this.supabaseService.getClient();
+    // RLS'yi bypass eder: task_assignees_select/insert_admin politikaları
+    // is_workspace_admin(...) üzerinden auth.uid()'e bağımlı, ama paylaşılan
+    // singleton `getClient()`'ın hiçbir kullanıcı oturumu yok (auth.uid() =
+    // NULL) — prod'da canlı testle doğrulandı (22 Ağustos 2026): bare
+    // getClient() ile PUT .../assignees "new row violates row-level
+    // security policy" ile başarısız oluyordu. Yetkilendirme zaten
+    // controller'daki @Roles + WorkspaceRoleGuard'da yapıldığı için burada
+    // admin istemcisini tercih etmek (WorkspaceRoleGuard'daki desenle aynı)
+    // güvenli.
+    const client =
+      this.supabaseService.getAdminClient() ?? this.supabaseService.getClient();
 
     const { data: rows, error } = await client
       .from('task_assignees')
@@ -235,7 +245,9 @@ export class TaskService {
    */
   async setAssignees(workspaceId: string, taskId: string, userIds: string[]) {
     await this.findOne(workspaceId, taskId);
-    const client = this.supabaseService.getClient();
+    // bkz. listAssignees üstündeki not — aynı RLS/auth.uid() sorunu.
+    const client =
+      this.supabaseService.getAdminClient() ?? this.supabaseService.getClient();
 
     const unique = [...new Set((userIds ?? []).filter(Boolean))];
 
