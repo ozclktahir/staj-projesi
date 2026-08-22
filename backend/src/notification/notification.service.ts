@@ -19,7 +19,20 @@ export class NotificationService {
    * Bildirimi veritabanına kaydeder ve ilgili kullanıcıya WebSocket üzerinden emit eder.
    */
   async create(workspaceId: string, dto: CreateNotificationDto) {
-    const client = this.supabaseService.getClient();
+    // RLS'yi bypass eder: notifications_insert/update/select politikaları
+    // auth.uid()'e bağımlı ama paylaşılan singleton `getClient()`'ın hiçbir
+    // kullanıcı oturumu yok (auth.uid() = NULL) — prod'da canlı testle
+    // doğrulandı (22 Ağustos 2026): bare getClient() ile bir workspace
+    // daveti bildirimi oluşturmaya çalışmak "new row violates row-level
+    // security policy for table notifications" ile başarısız oluyordu. Aynı
+    // kök neden bu servisin TÜM metodlarını etkiliyordu (bu dosyadaki diğer
+    // tüm `getClient()` çağrıları da aynı şekilde düzeltildi) — bildirim
+    // listesi/okundu işaretleme mobil üzerinden sessizce boş/başarısız
+    // dönüyor olabilirdi. Çağıran taraf zaten guard/rol kontrolünden
+    // geçtiğinden burada admin istemcisini tercih etmek güvenli
+    // (WorkspaceRoleGuard'daki desenle aynı).
+    const client =
+      this.supabaseService.getAdminClient() ?? this.supabaseService.getClient();
 
     const { data, error } = await client
       .from('notifications')
@@ -49,7 +62,10 @@ export class NotificationService {
    * Kullanıcıya ait bildirimleri en yeniden eskiye listeler.
    */
   async findAllForUser(workspaceId: string, userId: string) {
-    const client = this.supabaseService.getClient();
+    // RLS bypass — bkz. create()'in üstündeki not (auth.uid()'siz singleton
+    // client, notifications tablosunun tüm RLS politikalarına takılıyordu).
+    const client =
+      this.supabaseService.getAdminClient() ?? this.supabaseService.getClient();
 
     const { data, error } = await client
       .from('notifications')
@@ -73,7 +89,10 @@ export class NotificationService {
     notificationId: string,
     userId: string,
   ) {
-    const client = this.supabaseService.getClient();
+    // RLS bypass — bkz. create()'in üstündeki not (auth.uid()'siz singleton
+    // client, notifications tablosunun tüm RLS politikalarına takılıyordu).
+    const client =
+      this.supabaseService.getAdminClient() ?? this.supabaseService.getClient();
 
     const { data, error } = await client
       .from('notifications')
@@ -101,7 +120,10 @@ export class NotificationService {
    * Kullanıcının workspace içindeki tüm bildirimlerini okundu yapar.
    */
   async markAllAsRead(workspaceId: string, userId: string) {
-    const client = this.supabaseService.getClient();
+    // RLS bypass — bkz. create()'in üstündeki not (auth.uid()'siz singleton
+    // client, notifications tablosunun tüm RLS politikalarına takılıyordu).
+    const client =
+      this.supabaseService.getAdminClient() ?? this.supabaseService.getClient();
 
     const { data, error } = await client
       .from('notifications')
@@ -136,7 +158,10 @@ export class NotificationService {
     userId: string,
     decision: 'accept' | 'decline',
   ) {
-    const client = this.supabaseService.getClient();
+    // RLS bypass — bkz. create()'in üstündeki not (auth.uid()'siz singleton
+    // client, notifications tablosunun tüm RLS politikalarına takılıyordu).
+    const client =
+      this.supabaseService.getAdminClient() ?? this.supabaseService.getClient();
 
     const { data: notif, error: notifError } = await client
       .from('notifications')
@@ -280,7 +305,10 @@ export class NotificationService {
     userId: string,
     decision: 'accept' | 'decline',
   ) {
-    const client = this.supabaseService.getClient();
+    // RLS bypass — bkz. create()'in üstündeki not (auth.uid()'siz singleton
+    // client, notifications tablosunun tüm RLS politikalarına takılıyordu).
+    const client =
+      this.supabaseService.getAdminClient() ?? this.supabaseService.getClient();
 
     const { data: notif, error: notifError } = await client
       .from('notifications')
@@ -425,7 +453,10 @@ export class NotificationService {
   }
 
   private async getWorkspaceAdminIds(workspaceId: string): Promise<string[]> {
-    const client = this.supabaseService.getClient();
+    // RLS bypass — bkz. create()'in üstündeki not (auth.uid()'siz singleton
+    // client, notifications tablosunun tüm RLS politikalarına takılıyordu).
+    const client =
+      this.supabaseService.getAdminClient() ?? this.supabaseService.getClient();
     const ids = new Set<string>();
 
     const { data: workspace } = await client
