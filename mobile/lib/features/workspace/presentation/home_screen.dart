@@ -121,7 +121,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'STAJ-PROJESI',
+                      'ANT',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             letterSpacing: 1.2,
                             fontWeight: FontWeight.w700,

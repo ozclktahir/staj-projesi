@@ -67,7 +67,7 @@ class _StajMobileAppState extends ConsumerState<StajMobileApp> {
     return wrapWithAppStrings(
       strings: strings,
       child: MaterialApp.router(
-        title: 'Staj Projesi',
+        title: 'Ant',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,

@@ -103,7 +103,7 @@ class _BrandPanel extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'STAJ-PROJESI',
+              'ANT',
               style: TextStyle(
                 letterSpacing: 4,
                 fontSize: 12,
