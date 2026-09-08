@@ -22,6 +22,8 @@ abstract final class ApiConstants {
   static const String authMfaStatus = '/auth/mfa/status';
   static const String authMfaChallenge = '/auth/mfa/challenge';
   static const String authMfaVerify = '/auth/mfa/verify';
+  static const String authLoginRequestOtp = '/auth/login/request-otp';
+  static const String authLoginVerifyOtp = '/auth/login/verify-otp';
   static const String workspaces = '/workspace';
 
   static String workspaceLeave(String workspaceId) =>

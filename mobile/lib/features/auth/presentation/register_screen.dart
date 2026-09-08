@@ -35,7 +35,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    final ok = await ref.read(authProvider.notifier).register(
+    final outcome = await ref.read(authProvider.notifier).register(
           email: _emailController.text,
           password: _passwordController.text,
           firstName: _firstNameController.text,
@@ -44,13 +44,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     if (!mounted) return;
 
-    if (!ok) {
-      final s = ref.read(appStringsProvider);
-      final message =
-          ref.read(authProvider).errorMessage ?? s.authRegisterFailed;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(message)));
+    final s = ref.read(appStringsProvider);
+    switch (outcome) {
+      case RegisterOutcome.authenticated:
+        // Router, authProvider durumundaki değişikliği dinleyip
+        // onboarding/home'a otomatik yönlendirir.
+        break;
+      case RegisterOutcome.needsManualLogin:
+        // Kayıt oluştu ama otomatik oturum alınamadı (e-posta onayı ya da
+        // e-posta OTP bekleniyor) — web'deki register/page.tsx ile aynı
+        // düşüş: kullanıcıyı /login'e yönlendir.
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(s.authRegisterSuccessLogin)));
+        context.go(AppRoutes.login);
+        break;
+      case RegisterOutcome.failed:
+        final message =
+            ref.read(authProvider).errorMessage ?? s.authRegisterFailed;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
+        break;
     }
   }
 

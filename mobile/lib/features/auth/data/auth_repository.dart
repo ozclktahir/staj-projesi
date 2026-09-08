@@ -45,17 +45,82 @@ class MfaChallengeResult {
   final String challengeId;
 }
 
+/// `/auth/login` (ve `/auth/login/request-otp`) cevabı: ya doğrudan oturum,
+/// ya da (TOTP aktif değilse) e-postaya gönderilen giriş onay kodu bekleniyor
+/// — web'deki `data.otp_required` dallanmasıyla aynı ayrım.
+class LoginResult {
+  const LoginResult.session(this.session)
+      : otpUserId = null,
+        otpMessage = null;
+
+  const LoginResult.otpRequired({required String userId, String? message})
+      : session = null,
+        otpUserId = userId,
+        otpMessage = message;
+
+  final AuthSession? session;
+  final String? otpUserId;
+  final String? otpMessage;
+
+  bool get isOtpRequired => otpUserId != null;
+}
+
+/// Kayıt sonrası: ya doğrudan oturum alınır, ya da (e-posta onayı ya da
+/// e-posta OTP nedeniyle) kullanıcı manuel giriş yapmalı — web'deki
+/// register/page.tsx'teki `!data.access_token` düşüşüyle aynı.
+class RegisterResult {
+  const RegisterResult.session(this.session);
+
+  const RegisterResult.needsManualLogin() : session = null;
+
+  final AuthSession? session;
+}
+
 /// NestJS `/auth/*` uçları — JWT access_token + user id.
 class AuthRepository {
   AuthRepository({required ApiClient apiClient}) : _dio = apiClient.dio;
 
   final Dio _dio;
 
-  Future<AuthSession> login(LoginDto dto) async {
+  Future<LoginResult> login(LoginDto dto) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         ApiConstants.authLogin,
         data: dto.toJson(),
+      );
+      return _loginResultFromResponse(response.data);
+    } on DioException catch (error) {
+      throw AuthException(_messageFromDio(error));
+    }
+  }
+
+  /// Şifreyi yeniden doğrular ve (TOTP aktif değilse) e-posta ile giriş onay
+  /// kodu gönderir — login()'in e-posta-OTP dalıyla aynı akış, "kodu tekrar
+  /// gönder" için kullanılır.
+  Future<LoginResult> requestLoginOtp({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiConstants.authLoginRequestOtp,
+        data: {'email': email.trim().toLowerCase(), 'password': password},
+      );
+      return _loginResultFromResponse(response.data);
+    } on DioException catch (error) {
+      throw AuthException(_messageFromDio(error));
+    }
+  }
+
+  /// E-postaya gönderilen kodu doğrular ve login()'de üretilmiş oturumu döner.
+  Future<AuthSession> verifyLoginOtp({
+    required String userId,
+    required String code,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiConstants.authLoginVerifyOtp,
+        data: {'user_id': userId, 'code': code},
       );
       return _sessionFromResponse(response.data);
     } on DioException catch (error) {
@@ -64,7 +129,7 @@ class AuthRepository {
   }
 
   /// Kayıt sonrası session dönmeyebilir; token için login yapılır.
-  Future<AuthSession> register(RegisterDto dto) async {
+  Future<RegisterResult> register(RegisterDto dto) async {
     try {
       final response = await _dio.post<dynamic>(
         ApiConstants.authRegister,
@@ -73,16 +138,25 @@ class AuthRepository {
 
       final token = _tryReadAccessToken(response.data);
       if (token != null) {
-        return AuthSession(
-          accessToken: token,
-          userId: _tryReadUserId(response.data) ?? userIdFromJwt(token),
-          refreshToken: _tryReadRefreshToken(response.data),
+        return RegisterResult.session(
+          AuthSession(
+            accessToken: token,
+            userId: _tryReadUserId(response.data) ?? userIdFromJwt(token),
+            refreshToken: _tryReadRefreshToken(response.data),
+          ),
         );
       }
 
-      return login(
+      final loginResult = await login(
         LoginDto(email: dto.email, password: dto.password),
       );
+      if (loginResult.session != null) {
+        return RegisterResult.session(loginResult.session!);
+      }
+
+      // TOTP aktif değil ama e-posta OTP gerekiyor — web'deki gibi kullanıcı
+      // /login ekranından manuel giriş yapmalı (otomatik oturum alınamaz).
+      return const RegisterResult.needsManualLogin();
     } on DioException catch (error) {
       throw AuthException(_messageFromDio(error));
     } on AuthException {
@@ -177,6 +251,27 @@ class AuthRepository {
       refreshToken: _tryReadRefreshToken(data),
       userId: _tryReadUserId(data) ?? userIdFromJwt(token),
     );
+  }
+
+  /// `otp_required: true` ise (access_token yokluğu bir hata değildir) OTP
+  /// sonucunu, aksi halde normal oturumu döner.
+  LoginResult _loginResultFromResponse(Map<String, dynamic>? data) {
+    final otpUserId = _tryReadOtpUserId(data);
+    if (otpUserId != null) {
+      return LoginResult.otpRequired(
+        userId: otpUserId,
+        message: data?['message'] as String?,
+      );
+    }
+    return LoginResult.session(_sessionFromResponse(data));
+  }
+
+  String? _tryReadOtpUserId(dynamic data) {
+    if (data is! Map) return null;
+    final map = Map<String, dynamic>.from(data);
+    if (map['otp_required'] != true) return null;
+    final userId = map['user_id'];
+    return userId is String && userId.isNotEmpty ? userId : null;
   }
 
   String? _tryReadAccessToken(dynamic data) {

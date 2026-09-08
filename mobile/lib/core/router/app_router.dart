@@ -83,6 +83,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return AppRoutes.login;
       }
 
+      // Şifre doğrulandı, MFA/OTP kodu bekleniyor — token henüz yok ama bu
+      // "authenticated ama geçiş halinde" değil, /login'in kendi build()'i
+      // (LoginScreen) uygun challenge kartını göstermeli. Bu guard olmadan
+      // aşağıdaki "token == null → splash" kuralı kullanıcıyı challenge
+      // kartını hiç görmeden splash'a atar ve orada takılı kalırdı.
+      if (auth.status == AuthStatus.mfaPending ||
+          auth.status == AuthStatus.otpPending) {
+        return isAuthRoute ? null : AppRoutes.login;
+      }
+
       // Authenticated ama token henüz yoksa (geçiş) splash'ta kal.
       if (auth.token == null || auth.token!.isEmpty) {
         return isSplash ? null : AppRoutes.splash;

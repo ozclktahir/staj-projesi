@@ -1,24 +1,52 @@
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { Session, User } from '@supabase/supabase-js';
+import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
+import type { Cache } from 'cache-manager';
+import { randomInt } from 'crypto';
+import { MailService } from '../mail/mail.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { LoginDto } from './dto/login.dto';
+import { RequestLoginOtpDto, VerifyLoginOtpDto } from './dto/login-otp.dto';
 import { RegisterDto } from './dto/register.dto';
+
+/** Login OTP — kod + oturum 5 dakika Redis'te tutulur, doğrulanınca silinir. */
+const LOGIN_OTP_TTL_MS = 5 * 60 * 1000;
+/** Aynı kullanıcı için art arda kod isteme (spam/brute-force) koruması. */
+const LOGIN_OTP_COOLDOWN_MS = 60 * 1000;
+
+type LoginOtpPayload = {
+  code: string;
+  access_token: string;
+  refresh_token: string | null;
+  user: User;
+};
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly mailService: MailService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
+  }
+
+  /** FRONTEND_URL tanımlıysa onay linki tıklandıktan sonra oraya yönlendirir. */
+  private confirmRedirectUrl(): string | undefined {
+    const base = process.env.FRONTEND_URL?.trim();
+    return base ? `${base.replace(/\/+$/, '')}/login` : undefined;
   }
 
   /** Supabase hata mesajlarını Türkçe / anlaşılır hale getirir. */
@@ -58,6 +86,11 @@ export class AuthService {
     }
 
     if (context === 'login') {
+      if (lower.includes('email not confirmed')) {
+        throw new UnauthorizedException(
+          'Lütfen önce e-postanıza gelen onay linkine tıklayın.',
+        );
+      }
       throw new UnauthorizedException(
         lower.includes('invalid login') || lower.includes('invalid credentials')
           ? 'E-posta veya şifre hatalı.'
@@ -80,9 +113,42 @@ export class AuthService {
       full_name: fullName,
     };
 
-    // Service role varsa: e-posta göndermeden (rate limit yok) onaylı kullanıcı oluştur
     const admin = this.supabaseService.getAdminClient();
     if (admin) {
+      // Gerçek e-posta onayı: yalnızca SMTP yapılandırılıysa zorunlu kılınır.
+      // generateLink() kullanıcıyı ONAYSIZ oluşturur ve bize bir action_link
+      // döner; linki kendi MailService'imizle gönderiyoruz (Supabase'in kendi
+      // mailer'ının rate limitine takılmadan — bkz. mapAuthError'daki not).
+      // SMTP yoksa link hiçbir zaman teslim edilemez ve hesap sonsuza dek
+      // giriş yapılamaz kalır; bu yüzden SMTP kapalıyken bilinçli olarak eski
+      // (otomatik onaylı) davranışa düşülür — bkz. CLAUDE.md.
+      if (this.mailService.enabled) {
+        const { data, error } = await admin.auth.admin.generateLink({
+          type: 'signup',
+          email,
+          password: dto.password,
+          options: {
+            data: metadata,
+            redirectTo: this.confirmRedirectUrl(),
+          },
+        });
+
+        if (error) {
+          this.mapAuthError(error.message, 'register');
+        }
+
+        if (!data.user) {
+          throw new BadRequestException('Kullanıcı oluşturulamadı.');
+        }
+
+        await this.persistProfile(data.user, null, dto, fullName);
+        await this.mailService.sendEmailConfirmationLink(
+          email,
+          data.properties.action_link,
+        );
+        return data.user;
+      }
+
       const { data, error } = await admin.auth.admin.createUser({
         email,
         password: dto.password,
@@ -189,24 +255,160 @@ export class AuthService {
     );
   }
 
-  async login(dto: LoginDto) {
-    const email = this.normalizeEmail(dto.email);
-
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .auth.signInWithPassword({
-        email,
-        password: dto.password,
-      });
+  /**
+   * Şifreyi doğrular. Paylaşılan singleton yerine taze bir ephemeral istemci
+   * kullanır (signInWithPassword da setSession gibi client'ın dahili oturum
+   * durumunu değiştirir — bkz. SupabaseService.createEphemeralClient dokümanı).
+   */
+  private async passwordSignIn(email: string, password: string) {
+    const client = this.supabaseService.createEphemeralClient();
+    const { data, error } = await client.auth.signInWithPassword({
+      email: this.normalizeEmail(email),
+      password,
+    });
 
     if (error) {
       this.mapAuthError(error.message, 'login');
     }
 
+    if (!data.session || !data.user) {
+      throw new UnauthorizedException('Giriş başarısız. Lütfen tekrar deneyin.');
+    }
+
+    return { client, session: data.session, user: data.user };
+  }
+
+  /** Hesapta doğrulanmış bir TOTP faktörü var mı? (varsa e-posta OTP'ye gerek yok) */
+  private async hasVerifiedTotp(client: SupabaseClient): Promise<boolean> {
+    const { data, error } = await client.auth.mfa.listFactors();
+    if (error) {
+      this.logger.warn(`MFA faktörleri okunamadı: ${error.message}`);
+      return false;
+    }
+    return (data.totp ?? []).some((factor) => factor.status === 'verified');
+  }
+
+  private generateOtpCode(): string {
+    return String(randomInt(100000, 1000000));
+  }
+
+  /**
+   * Login OTP kodu üretir, Redis'e (session ile birlikte) yazar ve e-posta
+   * gönderir. `session`, signInWithPassword'dan zaten elde edilmiş olmalı —
+   * verifyLoginOtp() bu tokenları AYNEN geri döner (token üretim mantığını
+   * tekrar etmez).
+   */
+  private async issueLoginOtp(user: User, session: Session) {
+    if (!user.email) {
+      throw new BadRequestException('Kullanıcının e-posta adresi bulunamadı.');
+    }
+
+    const cooldownKey = `login_otp_cooldown:${user.id}`;
+    const cooldownUntil = await this.cacheManager.get<number>(cooldownKey);
+    if (cooldownUntil && cooldownUntil > Date.now()) {
+      const remaining = Math.max(1, Math.ceil((cooldownUntil - Date.now()) / 1000));
+      throw new HttpException(
+        `Çok sık kod istediniz. ${remaining} saniye sonra tekrar deneyin.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const code = this.generateOtpCode();
+    const payload: LoginOtpPayload = {
+      code,
+      access_token: session.access_token,
+      refresh_token: session.refresh_token ?? null,
+      user,
+    };
+
+    await this.cacheManager.set(
+      `login_otp:${user.id}`,
+      JSON.stringify(payload),
+      LOGIN_OTP_TTL_MS,
+    );
+    await this.cacheManager.set(
+      cooldownKey,
+      Date.now() + LOGIN_OTP_COOLDOWN_MS,
+      LOGIN_OTP_COOLDOWN_MS,
+    );
+
+    await this.mailService.sendLoginOtpEmail(user.email, code);
+
     return {
-      access_token: data.session?.access_token,
-      refresh_token: data.session?.refresh_token,
-      user: data.user,
+      otp_required: true as const,
+      user_id: user.id,
+      message: 'Giriş onay kodu e-postanıza gönderildi.',
+    };
+  }
+
+  async login(dto: LoginDto) {
+    const { client, session, user } = await this.passwordSignIn(
+      dto.email,
+      dto.password,
+    );
+
+    if (await this.hasVerifiedTotp(client)) {
+      return {
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        user,
+      };
+    }
+
+    return this.issueLoginOtp(user, session);
+  }
+
+  /**
+   * "Kodu tekrar gönder" ve login()'in e-posta-OTP dalıyla aynı akış —
+   * şifreyi tekrar doğrular (taze bir session/kod üretmek için) ve TOTP aktif
+   * bir hesap için çağrılırsa reddeder (bu uç yalnızca e-posta OTP akışı içindir).
+   */
+  async requestLoginOtp(dto: RequestLoginOtpDto) {
+    const { client, session, user } = await this.passwordSignIn(
+      dto.email,
+      dto.password,
+    );
+
+    if (await this.hasVerifiedTotp(client)) {
+      throw new BadRequestException(
+        'Bu hesapta authenticator uygulaması (TOTP) aktif; e-posta kodu kullanılamaz.',
+      );
+    }
+
+    return this.issueLoginOtp(user, session);
+  }
+
+  /** E-postaya gönderilen kodu doğrular ve login()'de üretilmiş oturumu döner. */
+  async verifyLoginOtp(dto: VerifyLoginOtpDto) {
+    const key = `login_otp:${dto.user_id}`;
+    const raw = await this.cacheManager.get<string>(key);
+
+    if (!raw) {
+      throw new UnauthorizedException(
+        'Kod süresi doldu veya bulunamadı. Lütfen yeni bir kod isteyin.',
+      );
+    }
+
+    let payload: LoginOtpPayload;
+    try {
+      payload = JSON.parse(raw) as LoginOtpPayload;
+    } catch {
+      await this.cacheManager.del(key);
+      throw new UnauthorizedException(
+        'Kod doğrulanamadı. Lütfen yeni bir kod isteyin.',
+      );
+    }
+
+    if (payload.code !== dto.code.trim()) {
+      throw new UnauthorizedException('Kod hatalı.');
+    }
+
+    await this.cacheManager.del(key);
+
+    return {
+      access_token: payload.access_token,
+      refresh_token: payload.refresh_token,
+      user: payload.user,
     };
   }
 
