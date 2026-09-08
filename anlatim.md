@@ -1,217 +1,299 @@
-# 🚀 Proje Teknik Mimarisi ve Teknoloji Raporu
+# 🐜 Ant — Proje Teknik Mimarisi ve Teknoloji Raporu
 
-Bu dokümanı staj sürecinde üzerinde çalıştığımız **İş Yönetim Sistemi (Workspace App)** için hazırladım. Amacım mentoruma / staj sorumluma projenin “sadece ne kullandığımızı” değil, **neden bu şekilde kurduğumuzu** ve parçaların birbirine nasıl bağlandığını net anlatmak.
+Bu dokümanı staj sürecinde üzerinde çalıştığım **Ant** (eski adıyla "İş Yönetim Sistemi / Workspace App") için hazırladım. Amacım mentoruma / staj sorumluma projenin "sadece ne kullandığımızı" değil, **neden bu şekilde kurduğumuzu**, parçaların birbirine nasıl bağlandığını ve staj boyunca projenin nasıl bir tek-sayfalık web demosundan üç platformlu (Web + Mobil + API), production'da canlı çalışan bir ürüne dönüştüğünü net anlatmak.
+
+> **Not:** Bu doküman staj boyunca birkaç kez baştan güncellendi; bu en güncel hâli, projenin bugünkü (Eylül 2026) durumunu yansıtıyor.
 
 ---
 
 ## 1. Projenin Genel Amacı
 
-Projemiz, ekiplerin ortak bir **çalışma alanı (workspace)** altında projeler ve görevler üzerinden iş takibi yapabildiği modern bir web platformu.
+Ant, ekiplerin ortak bir **çalışma alanı (workspace)** altında projeler ve görevler üzerinden iş takibi yapabildiği, Notion + Linear esintili, çok kiracılı (multi-tenant) bir platform. Artık üç ayrı istemciden oluşuyor: **Web** (Next.js), **Mobil** (Flutter) ve bunları besleyen ortak bir **NestJS API**.
 
 Kısaca sunduğu şeyler:
 
-- **Görev yönetimi:** Kanban panosu, görev detay penceresi, alt görevler, öncelik ve atanan kişi
-- **Çok kullanıcılı işbirliği:** Workspace davetleri, roller (Admin / Member), üye bazlı görünürlük
-- **Gerçek zamanlı (realtime) senkron:** Bir kullanıcının yaptığı değişikliklerin diğer kullanıcılarda sayfa yenilenmeden görünmesi
-- **İletişim:** Görev yorumları, dosya ekleri, bildirim zili
-- **Analitik:** Dashboard üzerinde KPI kartları ve grafikler (durum, öncelik, üye iş yükü)
-- **Denetlenebilirlik:** Aktivite geçmişi (activity / audit log)
+- **Görev yönetimi:** Gerçek sürükle-bırak Kanban panosu, görev detay penceresi, alt görevler, öncelik, tekli atanan kişi, görev sahiplenme (claim) akışı
+- **Çok kullanıcılı işbirliği:** Workspace davetleri, roller (Admin / Member / Guest, ayrıca Owner), üye/rol bazlı görünürlük, üye yönetimi sayfası
+- **Gerçek zamanlı (realtime) senkron:** Bir kullanıcının yaptığı değişikliklerin diğer kullanıcılarda sayfa yenilenmeden görünmesi; canlı "Aktif Üyeler" göstergesi
+- **İletişim:** Görev yorumları, dosya ekleri, bildirim zili (realtime), workspace davetleri
+- **Analitik:** Dashboard'da KPI kartları ve grafikler (durum, öncelik, üye iş yükü), yaklaşan teslim tarihleri
+- **Kişisel çalışma alanı:** Her kullanıcının kendine ait notlar, yapılacaklar listesi ve dosyaları
+- **Denetlenebilirlik ve güvenlik:** Aktivite geçmişi (activity/audit log), çift-onaylı (dual-approval) görev silme, Çöp Kutusu/geri yükleme, admin paneli
+- **Erişilebilirlik:** Tam TR/EN i18n, açık/koyu/sistem tema, global arama (Cmd/Ctrl+K web, tam ekran arama mobil)
 
-Yani klasik bir “todo list”ten ziyade, küçük–orta ekiplerin günlük iş akışını tek yerden yönetebileceği bir ürün iskeleti kurduk.
+Yani klasik bir "todo list"ten ziyade, küçük–orta ekiplerin günlük iş akışını hem masaüstünden hem telefondan tek yerden yönetebileceği bir ürün kurduk.
 
 ---
 
-## 2. Frontend (Ön Yüz) Teknolojileri ve Neden Seçtik?
+## 2. Mimari Genel Bakış — En Önemli Karar
 
-Ön yüz uygulaması `frontend/` klasöründe, **Next.js App Router** ile çalışıyor (geliştirme ortamında genelde `:3001` portu).
+Projenin en belirleyici mimari özelliği, **iki paralel backend yolu** kullanmasıdır — bu, staj boyunca üzerinde en çok düşündüğümüz karar oldu:
 
-### Next.js (App Router) & React
+- **Web (Next.js):** Çoğu CRUD işlemi **Server Actions** ile doğrudan **Supabase JS client**'a gidiyor; asıl güvenlik katmanı veritabanı seviyesindeki **Row Level Security (RLS)** politikaları. NestJS API'yi web tarafı sınırlı kullanıyor.
+- **Mobil (Flutter) ve genel API sözleşmesi:** **NestJS REST API** üzerinden çalışıyor (Dio + JWT Bearer), yetkilendirme backend'deki `SupabaseAuthGuard` + `WorkspaceRoleGuard` (Admin/Member/Guest, Owner) ile.
 
-**Neden kullandık?**  
+**Neden bu tercih?** Web tarafında Next.js'in Server Actions'ı ve Supabase'in RLS'i birlikte, ekstra bir API katmanı yazmadan tip-güvenli ve güvenli bir CRUD akışı sağlıyor — hızlı geliştirme. Ama mobil bir istemcinin Supabase client'ını doğrudan gömüp RLS'ye güvenmesi hem daha kırılgan hem de iş kurallarını (örn. "görev silmek için diğer admin'in onayı gerekir" gibi çok adımlı mantığı) istemci tarafında tekrar yazmayı gerektirirdi; bunun yerine mobil, bu mantığın merkezi olarak yaşadığı NestJS API'sine bağlanıyor.
+
+**Bunun bedeli:** Aynı iş kuralı bazen iki yerde (RLS politikaları + NestJS guard/service) ayrı ayrı bakımda oluyor — bir kural değiştiğinde ikisinin de güncellenmesi gerekiyor. Bu, staj boyunca birkaç kez gerçek bug'lara yol açtı (bkz. Bölüm 6) ve bilinçli olarak takip ettiğimiz bir teknik borç.
+
+```text
+                    ┌───────────────────────┐
+                    │      Web (Next.js)     │
+                    │  Server Actions ──────►│───► Supabase JS Client (RLS)
+                    └───────────────────────┘              │
+                                                             ▼
+┌───────────────────────┐                        ┌──────────────────────┐
+│   Mobil (Flutter)      │                        │      Supabase        │
+│  Dio + JWT ───────────►│──► NestJS REST API ───►│ Auth·Postgres·Storage │
+└───────────────────────┘   (Guard + RBAC)        │      ·Realtime       │
+                                                    └──────────────────────┘
+```
+
+---
+
+## 3. Frontend (Web) Teknolojileri ve Neden Seçtik?
+
+Web uygulaması `frontend/` klasöründe, **Next.js 16 (App Router)** ve **React 19** ile çalışıyor.
+
+### Next.js (App Router) & React 19
+
+**Neden kullandık?**
 Hem sunucu tarafında sayfa/veri hazırlayıp hızlı ilk yükleme (SSR / Server Components) elde etmek, hem de Kanban, Sheet, bildirim menüsü gibi zengin istemci arayüzlerini React ile kurmak için. App Router sayesinde sayfa yapısını klasörlerle net ayırabildik (`(dashboard)`, `(auth)`, `project/[id]` vb.).
-
-Pratikte:
-
-- Giriş sonrası dashboard, projeler, ayarlar gibi sayfalar Next route’ları
-- Ağır etkileşimli parçalar (`"use client"`) — örn. Kanban panosu, bildirim dropdown’ı, grafik kartları
 
 ### TypeScript
 
-**Neden kullandık?**  
-Kod yazarken tip hatalarını mümkün olduğunca erken yakalamak için. Özellikle Supabase’ten gelen satırlarla UI modelleri (`ProjectTask`, `NotificationItem`, analitik DTO’lar) arasında uyumu garanti etmek büyük rahatlık sağladı. “Acaba bu alan `null` olabilir mi?” sorusunu IDE’de görmek, runtime sürprizlerini azalttı.
+**Neden kullandık?**
+Kod yazarken tip hatalarını mümkün olduğunca erken yakalamak için. Özellikle Supabase'ten gelen satırlarla UI modelleri arasında uyumu garanti etmek büyük rahatlık sağladı.
 
-### Tailwind CSS & Shadcn UI
+### Tailwind CSS & Shadcn/Radix UI
 
-**Neden kullandık?**  
-Hızlı ve tutarlı bir UI/UX için. Tailwind ile utility class’larla düzen/tema kurduk; Shadcn (Radix tabanlı) bileşenlerle Sheet, Dropdown, Button, Card gibi parçaları erişilebilir ve yeniden kullanılabilir hale getirdik.
-
-Bunun sayesinde:
-
-- **Açık / Koyu / Sistem** tema desteğini (`next-themes`) yönetmek kolaylaştı
-- Mobil ve masaüstü için responsive düzenleri hızlıca ayarlayabildik
-- Tasarımı “her ekranda farklı bir dünya” olmaktan çıkarıp tek bir dilde tutabildik
+**Neden kullandık?**
+Hızlı ve tutarlı bir UI/UX için. Tailwind ile utility class'larla düzen/tema kurduk; Shadcn (Radix tabanlı) bileşenlerle Sheet, Dropdown, Button, Card gibi parçaları erişilebilir ve yeniden kullanılabilir hale getirdik. Açık/Koyu/Sistem tema desteğini (`next-themes`) bu sayede yönetiyoruz.
 
 ### Recharts
 
-**Neden kullandık?**  
-Dashboard’da görev durum dağılımı (donut/pie), öncelik yoğunluğu (bar) ve üye iş yükünü (stacked bar) **interaktif grafiklerle** göstermek için. Saf HTML/CSS ile bu kadar okunaklı bir analitik panel kurmak çok daha zahmetli olurdu.
+**Neden kullandık?**
+Dashboard'da görev durum dağılımı, öncelik yoğunluğu ve üye iş yükünü **interaktif grafiklerle** göstermek için.
 
-Not: Recharts istemci tarafında çalıştığı için grafik bileşenlerinde `"use client"` kullandık; `ResponsiveContainer` için sabit yükseklik vererek “grafik görünmüyor / 0px height” tipik sorununu da aştık.
+### `@dnd-kit/core` — gerçek sürükle-bırak Kanban
+
+**Neden kullandık?**
+İlk sürümde Kanban'daki durum değişimi bir tutamaç (grip handle) ile sınırlıydı; sonradan kullanıcı geri bildirimiyle **tüm kartın** sürüklenebilir/tıklanabilir olması istendi. `@dnd-kit/core` ile bunu erişilebilir (klavye desteği dahil) bir şekilde kurduk.
+
+### `cmdk` — global arama / komut paleti
+
+**Neden kullandık?**
+Cmd/Ctrl+K ile açılan, hem içerik (proje/görev/üye/not) hem eylem (yeni görev, üye davet et, tema değiştir) arayan tek bir palet için.
+
+### Supabase Realtime Presence
+
+**Neden kullandık?**
+Dashboard'daki canlı "Aktif Üyeler" göstergesi için — hangi kullanıcıların o an workspace'te aktif olduğunu WebSocket üzerinden anlık takip ediyoruz.
 
 ---
 
-## 3. Backend, Veritabanı ve Altyapı
+## 4. Mobil (Flutter) Teknolojileri ve Neden Seçtik?
 
-Proje monorepo yapısında: web tarafı Next.js, ek olarak `backend/` altında **NestJS** API de var (Swagger dokümantasyonu, Auth, workspace/task vb. uçlar). Stajın web fazında günlük ürün akışının büyük kısmını Next.js **Server Actions** + Supabase client ile yürüttük; NestJS ise API / altyapı katmanı olarak yer alıyor.
+Staj ilerledikçe, web'de kurulan ürünün **mobilde de aynı deneyimle** sunulması hedeflendi — `mobile/` klasöründeki Flutter istemcisi, web ile "tam parite" hedefiyle geliştirildi ve birkaç ayrı denetim turundan geçti.
 
-### Supabase (PostgreSQL)
+### Flutter & Dart
 
-**Neden kullandık?**  
+**Neden kullandık?**
+Tek bir kod tabanından hem Android hem iOS'a derlenebilen, native performanslı bir istemci için.
 
-1. **İlişkisel veritabanı:** Workspace → proje → görev → yorum/ek gibi ilişkiler SQL ile doğal modelleniyor  
-2. **Yerleşik Auth:** Kayıt / giriş / oturum JWT ile yönetiliyor  
-3. **Sunucusuz / yönetilen altyapı:** Auth + DB + Storage + Realtime’ı tek ekosistemde topluyor  
+### Riverpod (State Management)
 
-Önemli tablolardan bazıları: `workspaces`, `workspace_members`, `projects`, `tasks`, `task_comments`, `task_attachments`, `notifications`, `activity_logs`, `workspace_invitations`.
+**Neden kullandık?**
+Auth durumu, workspace listesi, görev/proje verisi gibi uygulama genelinde paylaşılan state'i öngörülebilir ve test edilebilir şekilde yönetmek için. `StateNotifierProvider` deseniyle, örneğin `AuthNotifier` giriş/çıkış/token yenileme durumunu tek bir yerde tutuyor.
 
-Dosya ekleri için **Supabase Storage** (`task-attachments` bucket) kullandık: dosya storage’da, metadata tabloda.
+### go_router
 
-### Supabase Realtime (WebSockets)
+**Neden kullandık?**
+Auth durumuna göre otomatik yönlendirme (giriş yapılmamışsa `/login`'e, onboarding tamamlanmamışsa `/onboarding`'e) gibi "guard'lı" bir navigasyon modeli kurmak için.
 
-**Nasıl kullandık?**  
-Veritabanındaki değişiklikleri (`postgres_changes`) dinleyen abonelikler kurduk. Örnekler:
+### Dio + `flutter_secure_storage`
 
-- Birisi Kanban’da görev durumunu değiştirince diğer kullanıcının panosu anında güncellenir  
-- Görev detayında yeni yorum / dosya düşünce liste yenilenmeden akar  
-- Yeni bildirim INSERT olunca zil rozeti ve toast tetiklenir  
-- Aktivite logu düşünce feed’in en üstüne eklenir  
+**Neden kullandık?**
+Dio, NestJS API'sine JWT Bearer token'lı istekler atan HTTP istemcisi; 401 durumunda sessiz token yenileme interceptor'ı burada yaşıyor. Token'lar cihazın güvenli (şifreli) depolama alanında (`flutter_secure_storage`) tutuluyor, düz `SharedPreferences`'ta değil.
 
-Bunu yaparken kanalı (`channel`) bileşen unmount olduğunda `removeChannel` ile temizliyoruz; aksi halde “hayalet” dinleyiciler kalırdı.
+### `socket_io_client`
+
+**Neden kullandık?**
+Web'in Supabase Realtime'ının mobildeki karşılığı olarak, backend'deki bir Socket.IO gateway'ine bağlanıp bildirim ve "aktif üye" event'lerini canlı dinlemek için (web ve mobil burada **bilinçli olarak iki farklı taşıma katmanı** kullanıyor — web Supabase Realtime, mobil Socket.IO; ikisi de gerçek-zamanlı ama birbirinden bağımsız, mobile ayrıca bir Supabase Realtime bağımlılığı eklemek istemediğimiz için).
+
+### `fl_chart`
+
+**Neden kullandık?**
+Web'deki Recharts dashboard grafiklerinin mobildeki karşılığı.
+
+---
+
+## 5. Backend (NestJS) — API Omurgası
+
+`backend/` altındaki NestJS servisi, staj ilerledikçe "isteğe bağlı bir ek" olmaktan çıkıp mobilin **tek bağlantı noktası** haline geldi, ayrıca web'in de bazı akışları (auth, bildirim) için kullandığı merkezi bir omurga oldu.
+
+### Modüler yapı
+
+Auth, Workspace, Project, Task, Comment, File, ActivityLog, ProgressReport, Note (kişisel notlar), Dashboard, Notification, Admin, Invitation, Personal — her biri kendi Nest modülü. **Swagger** (`/api`) ile tüm uçlar otomatik dokümante ediliyor.
+
+### `SupabaseAuthGuard` + `WorkspaceRoleGuard`
+
+**Neden kullandık?**
+Her isteğin gerçek bir Supabase JWT'siyle geldiğini doğrulamak (`SupabaseAuthGuard`) ve workspace-scoped rotalarda kullanıcının o workspace'teki rolünü (Admin/Member/Guest, Owner) kontrol edip gerekiyorsa reddetmek (`WorkspaceRoleGuard`) için. Bu iki guard, mobilin RLS'ye güvenmeden de güvenli çalışabilmesinin temeli.
+
+### Redis (`@nestjs/cache-manager`)
+
+**Neden kullandık?**
+Sık çağrılan ama nispeten az değişen uçları (proje listesi, dashboard istatistikleri) kısa TTL'lerle (30-60sn) önbelleklemek için. Redis bağlanamazsa (yerel geliştirmede olduğu gibi) sessizce bellek-içi (in-memory) önbelleğe düşüyor — geliştirme deneyimini bozmuyor.
+
+### `@nestjs/throttler`
+
+**Neden kullandık?**
+Auth uçlarını (giriş/kayıt) kaba kuvvet (brute-force) saldırılarına karşı dakikada 5 istek/IP ile sınırlamak için.
+
+### Socket.IO Gateway
+
+**Neden kullandık?**
+Mobil istemcinin bildirim ve "aktif üye" event'lerini canlı dinleyebilmesi için — bağlantı kurulurken gelen token'ın gerçekten doğrulanması (staj sırasında bulunup düzeltilen bir güvenlik açığıydı, bkz. Bölüm 6) önemli bir detay.
+
+### Sentry (env-gated)
+
+**Neden kullandık?**
+Production'daki beklenmeyen hataları yakalamak için; `SENTRY_DSN` tanımlı değilse tamamen no-op — yerel geliştirmeyi hiç etkilemiyor.
+
+---
+
+## 6. Supabase (PostgreSQL, Auth, Storage, Realtime, RLS)
+
+**Neden kullandık?**
+
+1. **İlişkisel veritabanı:** Workspace → proje → görev → yorum/ek gibi ilişkiler SQL ile doğal modelleniyor
+2. **Yerleşik Auth:** Kayıt/giriş/oturum JWT ile yönetiliyor, hem web hem mobil aynı Auth'u paylaşıyor
+3. **Sunucusuz/yönetilen altyapı:** Auth + DB + Storage + Realtime'ı tek ekosistemde topluyor
 
 ### Row Level Security (RLS)
 
-**Güvenliği nasıl sağladık?**  
-Sadece frontend’de “bu butonu gizle” demek yetmez. Supabase’te RLS politikalarıyla **veritabanı seviyesinde** kısıtladık:
+**Güvenliği nasıl sağladık?**
+Sadece arayüzde "bu butonu gizle" demek yetmez. Supabase'te RLS politikalarıyla **veritabanı seviyesinde** kısıtladık: kullanıcı yalnızca kendi bildirimlerini okuyabilir, Member/Guest çoğu senaryoda yalnızca kendisine atanan görevlere erişir, workspace üyeliği olmayan biri hiçbir satırı göremez. Bu politikalar hem web'in doğrudan Supabase erişimini hem de (dolaylı olarak, admin client aracılığıyla) backend'in bazı yazma işlemlerini kapsıyor.
 
-- Kullanıcı yalnızca kendi bildirimlerini okuyabilir  
-- Workspace üyesi / owner kendi alanındaki proje ve görevleri görebilir  
-- Member çoğu senaryoda yalnızca kendisine atanan görevlere erişir  
-- Bildirim INSERT için workspace üyelerinin birbirine (ör. görev atama bildirimi) yazabilmesi için politikayı bilinçli genişlettik  
+### Supabase Storage
 
-Yani yetki kontrolünün bir kısmını uygulamada, asıl güvenceyi SQL politikalarında tuttuk.
+Dosya ekleri (`task-attachments`, kişisel dosyalar) için kullanılıyor: dosya Storage'da, metadata veritabanı tablosunda.
 
-### Next.js Server Actions
+### Supabase Realtime
 
-Geleneksel olarak her iş için ayrı REST endpoint yazmak yerine (web UI tarafında) birçok işlemi **Server Actions** ile yaptık: `createTask`, `updateTask`, `createComment`, `getWorkspaceAnalytics`, davet kabul/reddet vb.
-
-**Neden bu yaklaşım?**  
-
-- Form / buton aksiyonlarını doğrudan sunucuda çalıştırabiliyoruz  
-- TypeScript tipleriyle uçtan uca daha güvenli bir akış  
-- Cookie / JWT ile oturumlu Supabase client’ı sunucu tarafında kullanmak pratik  
-
-Özetle: **Frontend UI’ı tetikler → Server Action doğrular / yazar → Supabase (RLS altında) kalıcılar → Realtime abonelikleri diğer istemcileri günceller.**
-
-NestJS tarafı ise özellikle API dokümantasyonu (Swagger), modüler servis yapısı ve ileride mobil / harici istemcilerin bağlanması için hazır bir backend omurgası sunuyor.
+Veritabanı değişikliklerini (`postgres_changes`) dinleyen abonelikler — Kanban'da durum değişince diğer kullanıcının panosu anında güncelleniyor, yeni yorum/bildirim akıyor.
 
 ---
 
-## 4. Frontend ile Backend / Veri Katmanı Nasıl Haberleşiyor?
-
-Basitleştirilmiş akış şöyle:
+## 7. Veri Akışı — İki Farklı Yol
 
 ```text
-[ Tarayıcı - Next.js UI ]
-        │
-        │  Server Action çağrısı / (gerekirse) Nest API
-        ▼
-[ Sunucu - Next.js Server Actions  (± NestJS) ]
-        │
-        │  Supabase JS Client (JWT ile)
-        ▼
-[ Supabase: Auth + PostgreSQL + Storage + Realtime ]
-        │
-        │  postgres_changes (WebSocket)
-        ▼
-[ Diğer tarayıcılar - anlık UI güncellemesi ]
+WEB YOLU:
+[ Tarayıcı - Next.js UI ] → Server Action → Supabase JS Client (JWT) → Postgres (RLS) → Realtime → diğer istemciler
+
+MOBİL YOLU:
+[ Flutter UI ] → Dio (JWT Bearer) → NestJS API (Guard + RBAC) → Supabase (admin/service client) → Postgres
+                                                                        │
+                                                                        └─► Socket.IO Gateway → diğer mobil istemciler
 ```
 
-1. Kullanıcı giriş yapar → Supabase Auth JWT üretir  
-2. Bu oturum cookie / client tarafında tutulur  
-3. Server Action, kullanıcı adına sorguları çalıştırır (RLS `auth.uid()` ile devreye girer)  
-4. INSERT/UPDATE/DELETE olunca Realtime yayınlar → abone olan ekranlar state’i günceller  
-
-Bu model sayesinde “sayfayı yenile, belki görünür” yerine **canlı bir işbirliği hissi** hedefliyoruz.
+Her iki yolda da kullanıcı önce Supabase Auth'tan bir JWT alıyor; web bunu cookie/localStorage'da, mobil `flutter_secure_storage`'da tutuyor. Sonrasında yollar ayrılıyor: web RLS'ye, mobil NestJS guard'larına güveniyor.
 
 ---
 
-## 5. Geliştirme Araçları ve Çalışma Disiplinimiz
+## 8. Production Ortamı — Render.com
 
-### Cursor (AI-Assisted IDE)
+Proje, geliştirmenin belirli bir noktasında yerel Docker Compose ortamından çıkarılıp **gerçek bir production ortamına** taşındı:
 
-Mimari kararları netleştirirken, tekrarlayan CRUD / UI kalıplarını hızlandırırken ve hata ayıklarken yapay zekâyı bir **geliştirme ortağı** gibi kullandık. Kritik nokta: AI’nın ürettiği kodu körü körüne değil; RLS, tip güvenliği ve mevcut proje desenleriyle uyum açısından gözden geçirerek almak oldu.
+- **`staj-projesi-api`:** NestJS API, Docker runtime, Frankfurt bölgesi, `/health` healthcheck.
+- **`staj-projesi-web`:** Next.js, Node runtime.
+- **Redis:** Render Dashboard'dan manuel bağlanan bir Key-Value instance'ı.
+- **CI/CD:** `main` dalına her push'ta backend/frontend/mobil build+test çalıştıran bir GitHub Actions pipeline'ı; ücretsiz planın "cold start" (uykuya dalma) gecikmesini azaltmak için periyodik bir "keep-alive" ping job'ı.
+- **Mobil dağıtım:** Production API'sine bağlı bir release APK derlenip hem fiziksel cihazlara hem (debug-signed, Play Store dışı) GitHub Releases üzerinden herkese açık bir indirme linkine yüklendi.
+
+---
+
+## 9. Geliştirme Araçları ve Çalışma Disiplinimiz
+
+### AI-Destekli Geliştirme (Cursor / Claude Code)
+
+Mimari kararları netleştirirken, tekrarlayan CRUD/UI kalıplarını hızlandırırken ve hata ayıklarken yapay zekâyı bir **geliştirme ortağı** gibi kullandık. Kritik nokta: AI'nın ürettiği kodu körü körüne değil; RLS, tip güvenliği ve mevcut proje desenleriyle uyum açısından gözden geçirerek almak oldu. Staj ilerledikçe, "önce ölç, sonra düzelt" ve "varsayımla değil kanıtla" gibi disiplinleri hem kendimize hem AI asistanına açıkça kural olarak koyduk (bkz. Bölüm 10).
 
 ### Git & GitHub
 
-Versiyon kontrolünü `main` dalında, anlamlı commit mesajlarıyla yönettik. Örnek ön ekler:
+Versiyon kontrolünü `main` dalında, anlamlı commit mesajlarıyla yönettik (`feat:`, `fix:`, `refactor:`, `chore:`, `perf:`, `revert:`, `docs:` önekleriyle).
 
-- `feat:` yeni özellik (activity feed, dashboard grafikleri, bildirim paneli…)  
-- `fix:` hata / eksik davranış (görev atamada bildirim tetiklenmemesi, grafik render, RLS…)  
-- `refactor:` yapısal iyileştirme (aktivite panelinin Sheet’e alınması, analitiğin Dashboard’da toplanması)  
-- `chore:` bakım (staj raporu dosyalarının repodan ayrılması vb.)  
+### `PROGRESS.md` ve `CLAUDE.md`
 
-Ayrıca günlük ilerlemeyi `PROGRESS.md` ile kayıt altına aldık; böylece “bugün ne yaptık?” sorusu hem ekip hem staj defteri için izlenebilir kaldı.
+Günlük ilerlemeyi `PROGRESS.md`'de (GitHub'a gönderilen, tarihli günlük kayıt) tuttuk; ayrıca yerel kalan bir `CLAUDE.md` dosyasında mimari kararların **gerekçelerini**, bilinen eksikleri ve "bir daha aynı hataya düşmemek için" öğrenilen tuzakları biriktirdik. Bu, hem staj defteri hem de gelecekteki geliştirme oturumları için hızlı bağlam sağladı.
 
 ---
 
-## 6. Öne Çıkan Zorluklar ve Çözümlerimiz (Staj Kazanımları)
+## 10. Öne Çıkan Zorluklar ve Çözümlerimiz (Staj Kazanımları)
 
 ### Realtime senkronizasyonu
 
-**Zorluk:** Çok kullanıcılı senaryoda herkesin manuel yenilemesi kötü UX.  
-**Çözüm:** `tasks`, yorum/ek, `notifications`, `activity_logs` için Realtime abonelikleri; cleanup ile bellek sızıntısını önleme; publication migration’ları (`enable_global_realtime.sql`).
+**Zorluk:** Çok kullanıcılı senaryoda herkesin manuel yenilemesi kötü UX.
+**Çözüm:** `tasks`, yorum/ek, `notifications`, `activity_logs` için Realtime abonelikleri; cleanup ile bellek sızıntısını önleme; mobilde aynı ihtiyaç Socket.IO gateway'iyle karşılandı.
 
-### Verimli layout düzeni (Kanban + Aktivite)
+### RBAC + RLS birlikte çalışmalı
 
-**Zorluk:** Aktivite panelini sabit sağ sidebar yapınca Kanban kolonları daralıp sıkışıyordu.  
-**Çözüm:** Aktiviteyi toolbar’dan açılan **Collapsible Sheet / Drawer**’a taşıdık; Kanban tekrar tam genişlik aldı. Kapalıyken bile Realtime dinlemeye devam edebiliyoruz (yeni aktivitede küçük rozet).
+**Zorluk:** "Arayüzde gizledim" yetmez; Member/Guest yanlışlıkla başkasının görevini görmemeli — hem web hem mobil için.
+**Çözüm:** Workspace-scoped roller, assignee bazlı görünürlük hem Supabase RLS politikalarında hem NestJS `WorkspaceRoleGuard`'ında **paralel olarak** uygulandı — Bölüm 2'de bahsedilen "iki yerde bakım" bedelini gerçek anlamda yaşadığımız yer burasıydı.
 
-### Bütüncül bildirim altyapısı
+### Çift-onaylı görev silme (dual approval)
 
-**Zorluk:** Zil UI’ı vardı ama görev atanınca otomatik kayıt oluşmuyordu; ayrıca INSERT RLS sadece admin/self’e izin veriyordu.  
-**Çözüm:** `createTask` / `updateTask` içinde `createTaskAssignedNotification` tetikledik; workspace üyelerinin birbirine bildirim yazabilmesi için RLS’i güncelledik. Header popover’da davet Kabul/Reddet, okunmamış rozet ve Realtime toast tamamlandı.
+**Zorluk:** Yanlışlıkla veya kötü niyetle görev silinmesini önlemek.
+**Çözüm:** Bir görevi silme isteği önce atanan kişiye veya başka bir admin'e onay için gidiyor; kural web ve backend'de birebir aynı fonksiyonda (`resolveDeletionApprover`/`requestOrDelete`) merkezi tutuluyor — böylece "iki yerde bakım" riskini bu spesifik kural için en aza indirdik.
 
-### Dashboard analitiği
+### Web-Mobil parite denetimi
 
-**Zorluk:** Grafik kartlarında bazen sadece başlık görünüyordu.  
-**Çözüm:** Recharts + sabit yükseklikli `ResponsiveContainer`, empty state, Dashboard’ı workspace komuta merkezi yapıp proje sayfasını sade Kanban + aktivite çekmecesine indirdik.
+**Zorluk:** Mobil, web'den belirli bir süre sonra eklenince, iki istemcinin gerçekten aynı davranışı sergilediğinden emin olmak gerekiyordu.
+**Çözüm:** Birkaç ayrı oturumda madde madde bir parite denetimi yapıldı (MFA, leave-workspace, presence, global arama, admin rol değiştirme vb.); platform kısıtı nedeniyle **bilinçli olarak farklı bırakılan** noktalar (örn. web Cmd+K komut paleti vs. mobil tam ekran arama) da açıkça dokümante edildi — her fark bir hata değil, bazıları kasıtlı tasarım kararı.
 
-### Güvenlik ve roller (RBAC + RLS)
+### Performans: "önce ölç, sonra düzelt"
 
-**Zorluk:** “UI’da gizledim” yetmez; Member yanlışlıkla her projeyi görmemeli.  
-**Çözüm:** Workspace-scoped roller, assignee bazlı görünürlük ve Supabase RLS politikaları birlikte çalışıyor.
+**Zorluk:** "Şurası yavaş gibi" hissiyle kod değiştirmek, gerçek darboğazı kaçırıp gereksiz karmaşıklık eklemek riski taşıyor.
+**Çözüm:** Birkaç performans turunda, önce gerçek ölçüm (prod'a karşı throwaway test verisiyle Node.js script'leri, ya da tam bir kod incelemesi) yapılıp **yalnızca gerçekten kanıtlanan** darboğazlar (sıralı ama bağımsız sorguların paralelleştirilmesi, aynı guard'ın bir route'ta yanlışlıkla iki kez çalışması, aynı verinin birden fazla bileşen tarafından ayrı ayrı çekilmesi) düzeltildi. Bulunmayan yerlerde zorlama bir "iyileştirme" yapılmadı — bu disiplin, staj boyunca en çok içselleştirdiğimiz alışkanlıklardan biri oldu.
+
+### Bir özelliğin platform kısıtına çarpması ve dürüstçe geri alınması
+
+**Zorluk:** Girişte e-posta ile ikinci bir doğrulama adımı (Login OTP) eklendi, backend/web/mobil tarafında eksiksiz çalışıyordu — ama gerçek bir e-posta sağlayıcısı (Gmail SMTP) bağlanmaya çalışılınca, önce bir kütüphane kaynaklı bir DNS/IPv6 hatası, sonra da **barındırma sağlayıcısının (Render) ücretsiz planının giden SMTP bağlantılarını tamamen engellediği** ortaya çıktı — bu, kodla çözülemeyecek bir platform kısıtıydı, canlı bir ağ testiyle (`net.connect()` ile doğrudan port testi) kesin olarak kanıtlandı.
+**Çözüm:** Özelliği yarım/kırık bırakmak yerine, hem bu yeni özellik hem daha önce eklenmiş olan alternatif bir iki-adımlı-doğrulama yöntemi (TOTP/Authenticator) **tamamen ve temiz bir şekilde geri alındı** — kullanıcıları girişte kilitleyen bozuk bir ara duruma bırakmamak, "çalışıyormuş gibi görünen ama aslında kırık" bir özellikten çok daha değerli. Bu, staj boyunca öğrendiğim en önemli derslerden biri oldu: bazen doğru mühendislik kararı, üzerinde emek harcanmış bir özelliği kaybetmeyi göze alıp geri çekilmektir — özellikle sorun kendi kontrolümüz dışındaki bir altyapı kısıtından kaynaklanıyorsa.
+
+### Rebrand: "Ant"
+
+**Zorluk:** Proje, geçici bir çalışma adından (`staj-projesi`) kalıcı bir ürün kimliğine geçmeliydi.
+**Çözüm:** Yeni bir isim ("Ant") ve simge (mevcut turuncu-siyah marka renklerine uygun, minimalist bir karınca silüeti) hem web hem mobilde tutarlı şekilde uygulandı; mobil tarafta yeni ikon gerçek bir cihaza kurulup doğrulandı.
 
 ---
 
-## 7. Kısa Mimari Özet (Tek Bakışta)
+## 11. Kısa Mimari Özet (Tek Bakışta)
 
 | Katman | Teknoloji | Rolü |
 |--------|-----------|------|
-| UI | Next.js, React, TypeScript | Sayfalar, Kanban, Sheet, Dashboard |
-| Stil / bileşen | Tailwind, Shadcn UI | Tema, tutarlı UX |
-| Grafik | Recharts | Analitik görselleştirme |
-| İş mantığı (web) | Server Actions | Tip güvenli sunucu işlemleri |
-| API (ek) | NestJS + Swagger | Modüler backend / dokümantasyon |
+| Web UI | Next.js 16, React 19, TypeScript | Sayfalar, Kanban, Sheet, Dashboard |
+| Web stil/bileşen | Tailwind, Shadcn/Radix UI | Tema, tutarlı UX |
+| Web grafik/arama | Recharts, `cmdk`, `@dnd-kit/core` | Analitik, komut paleti, sürükle-bırak |
+| Web iş mantığı | Server Actions | Tip güvenli sunucu işlemleri (RLS altında) |
+| Mobil UI | Flutter, Dart | Android/iOS istemcisi |
+| Mobil state | Riverpod, go_router | Durum yönetimi, auth-guard'lı navigasyon |
+| Mobil ağ | Dio, `flutter_secure_storage`, `socket_io_client` | JWT'li API istekleri, güvenli token, realtime |
+| API (mobil + ortak) | NestJS 11, Swagger | Guard/RBAC, modüler backend, dokümantasyon |
+| Cache/limit | Redis (`cache-manager`), `@nestjs/throttler` | Performans, brute-force koruması |
+| Gözlemlenebilirlik | Sentry (env-gated) | Production hata izleme |
 | Veri & Auth | Supabase PostgreSQL + Auth | Kalıcılık, oturum, RLS |
-| Canlılık | Supabase Realtime | Anlık çok kullanıcılı senkron |
-| Dosya | Supabase Storage | Görev ekleri |
-| Süreç | GitHub, Cursor, PROGRESS.md | Versiyonlama ve öğrenme kaydı |
+| Canlılık | Supabase Realtime (web), Socket.IO (mobil) | Anlık çok kullanıcılı senkron |
+| Dosya | Supabase Storage | Görev/kişisel dosya ekleri |
+| Deploy | Render.com (Docker API + Node Web) | Production barındırma |
+| Süreç | GitHub, GitHub Actions (CI/CD), `PROGRESS.md`/`CLAUDE.md` | Versiyonlama, otomatik test, öğrenme kaydı |
 
 ---
 
-## 8. Kapanış
+## 12. Kapanış
 
-Bu staj sürecinde en çok öğrendiğim şey, modern bir web ürününün tek bir “framework seçimi”nden ibaret olmadığı: **UI, sunucu eylemleri, veritabanı güvenliği (RLS) ve realtime**’ın birlikte düşünülmesi gerektiği. Yanlış yerde yetki kontrolü, dar layout veya unutulmuş bildirim tetikleyicisi gibi detaylar kullanıcı deneyimini doğrudan bozuyor; bunları görüp adım adım düzeltmek benim için en değerli kazanımlardan biri oldu.
+Bu staj sürecinde en çok öğrendiğim şey, modern bir ürünün tek bir "framework seçimi"nden ibaret olmadığı: **UI, sunucu eylemleri, veritabanı güvenliği (RLS), realtime — ve artık buna ek olarak, ikinci bir istemci (mobil) için ayrı ama tutarlı bir backend yolu, gerçek bir production ortamının kısıtları (cold start, port engelleri, ücretsiz plan sınırları) ve bir özelliği gerektiğinde dürüstçe geri alabilme cesareti** birlikte düşünülmesi gerektiği. Yanlış yerde yetki kontrolü, dar layout, unutulmuş bildirim tetikleyicisi veya üzerinde emek harcanmış ama platform kısıtına çarpan bir özellik gibi detaylar kullanıcı deneyimini doğrudan bozuyor; bunları görüp adım adım (ve bazen geri adım atarak) düzeltmek benim için en değerli kazanımlardan biri oldu.
 
-Hazırlayan: Stajyer geliştirici (İş Yönetim Sistemi / Workspace App)  
+Hazırlayan: Stajyer geliştirici (Ant — İş Yönetim Sistemi / Workspace App)
 Doküman amacı: Mentor / staj sorumlusu teknik sunumu
