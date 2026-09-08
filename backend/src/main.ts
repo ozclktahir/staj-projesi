@@ -54,10 +54,8 @@ async function bootstrap() {
   app.useGlobalInterceptors(new SentryInterceptor());
 
   const config = new DocumentBuilder()
-    .setTitle('staj-projesi API')
-    .setDescription(
-      'İş ve Çalışma Alanı Yönetim Sistemi (staj-projesi) API Dokümantasyonu',
-    )
+    .setTitle('Ant API')
+    .setDescription('İş ve Çalışma Alanı Yönetim Sistemi (Ant) API Dokümantasyonu')
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);

@@ -25,7 +25,7 @@ export default async function OnboardingPage() {
       <div className="w-full max-w-md space-y-6">
         <div className="space-y-2 text-center">
           <p className="text-sm font-medium uppercase tracking-wide text-primary">
-            İş Yönetim Sistemi
+            Ant
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             {hasInvitations ? "Bekleyen Davetin Var" : "Workspace Oluştur"}

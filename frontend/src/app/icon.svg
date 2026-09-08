@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#0a0a0a"/>
+  <g stroke="#ea580c" stroke-width="30" stroke-linecap="round" fill="none">
+    <!-- legs: 3 pairs, attached near the thorax -->
+    <path d="M 452 388 L 300 322 L 214 284"/>
+    <path d="M 434 442 L 262 456 L 158 494"/>
+    <path d="M 452 494 L 300 562 L 216 622"/>
+    <path d="M 572 388 L 724 322 L 810 284"/>
+    <path d="M 590 442 L 762 456 L 866 494"/>
+    <path d="M 572 494 L 724 562 L 808 622"/>
+    <!-- antennae -->
+    <path d="M 486 244 L 420 150 L 388 108"/>
+    <path d="M 538 244 L 604 150 L 636 108"/>
+  </g>
+  <circle cx="388" cy="102" r="14" fill="#ea580c"/>
+  <circle cx="636" cy="102" r="14" fill="#ea580c"/>
+  <g fill="#ea580c">
+    <circle cx="512" cy="298" r="72"/>
+    <circle cx="512" cy="440" r="88"/>
+    <ellipse cx="512" cy="646" rx="136" ry="168"/>
+  </g>
+</svg>

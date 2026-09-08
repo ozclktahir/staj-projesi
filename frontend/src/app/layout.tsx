@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "staj-projesi",
+  title: "Ant",
   description: "İş ve Çalışma Alanı Yönetim Sistemi",
 };
 

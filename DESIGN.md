@@ -1,6 +1,6 @@
 # DESIGN.md — UI/UX Tasarım Sistemi
 
-**Proje:** İş Yönetim Sistemi (Workspace App)  
+**Proje:** Ant — İş Yönetim Sistemi (Workspace App)  
 **Estetik:** Linear (minimalist, hızlı) + Notion (modüler, temiz)  
 **Güncelleme:** 20 Temmuz 2026
 

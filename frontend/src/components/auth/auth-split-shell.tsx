@@ -18,7 +18,7 @@ export function AuthSplitShell({ children }: AuthSplitShellProps) {
         />
         <div className="relative z-10 flex flex-col items-center justify-center gap-4">
           <p className="text-sm font-medium tracking-[0.25em] text-primary uppercase">
-            staj-projesi
+            Ant
           </p>
           <h1 className="text-4xl font-semibold tracking-tight text-zinc-50 md:text-5xl">
             Task <span className="text-primary">Management</span>
