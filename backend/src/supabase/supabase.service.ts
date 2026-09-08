@@ -81,8 +81,8 @@ export class SupabaseService implements OnModuleInit {
 
   /**
    * Paylaşılan singleton `client`'tan BAĞIMSIZ, her çağrıda taze bir istemci
-   * üretir. MFA challenge/verify gibi `auth.setSession()` çağıran akışlar
-   * için ZORUNLU: singleton üzerinde setSession çağırmak GoTrue'nin dahili
+   * üretir. `auth.signInWithPassword()`/`setSession()` gibi çağıran akışlar
+   * için ZORUNLU: singleton üzerinde bu çağrıları yapmak GoTrue'nin dahili
    * oturum durumunu global olarak değiştirir ve eşzamanlı isteklerde
    * kullanıcılar arası oturum karışmasına (session bleed) yol açar.
    */

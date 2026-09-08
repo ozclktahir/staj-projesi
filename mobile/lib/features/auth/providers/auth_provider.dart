@@ -14,25 +14,6 @@ enum AuthStatus {
   unknown,
   authenticated,
   unauthenticated,
-  // Şifre doğru ama hesapta MFA (TOTP) açık — TOTP kodu bekleniyor.
-  // Web'deki LoginPage'in yerel `mfaPending` state'iyle aynı adım.
-  mfaPending,
-  // Şifre doğru, TOTP aktif DEĞİL — e-postaya gönderilen 6 haneli giriş
-  // onay kodu bekleniyor. Web'deki yerel `otpPending` state'iyle aynı adım;
-  // TOTP ile karşılıklı dışlayıcıdır (backend ikisini asla birlikte istemez).
-  otpPending,
-}
-
-/// register()'ın üç olası sonucu — web'deki register/page.tsx'in
-/// `data.access_token` var/yok dallanmasıyla aynı ayrım.
-enum RegisterOutcome {
-  /// Oturum doğrudan alındı, kullanıcı authenticated.
-  authenticated,
-  /// Kayıt başarılı ama otomatik oturum alınamadı (e-posta onayı ya da
-  /// e-posta OTP bekleniyor) — kullanıcı /login'den manuel giriş yapmalı.
-  needsManualLogin,
-  /// Kayıt isteği başarısız oldu (errorMessage'a bakın).
-  failed,
 }
 
 @immutable
@@ -43,11 +24,6 @@ class AuthState {
     this.userId,
     this.isSubmitting = false,
     this.errorMessage,
-    this.mfaAccessToken,
-    this.mfaRefreshToken,
-    this.otpUserId,
-    this.otpEmail,
-    this.otpPassword,
   });
 
   const AuthState.unknown()
@@ -55,77 +31,26 @@ class AuthState {
         token = null,
         userId = null,
         isSubmitting = false,
-        errorMessage = null,
-        mfaAccessToken = null,
-        mfaRefreshToken = null,
-        otpUserId = null,
-        otpEmail = null,
-        otpPassword = null;
+        errorMessage = null;
 
   const AuthState.authenticated({
     required String this.token,
     this.userId,
   })  : status = AuthStatus.authenticated,
         isSubmitting = false,
-        errorMessage = null,
-        mfaAccessToken = null,
-        mfaRefreshToken = null,
-        otpUserId = null,
-        otpEmail = null,
-        otpPassword = null;
+        errorMessage = null;
 
   const AuthState.unauthenticated({this.errorMessage})
       : status = AuthStatus.unauthenticated,
         token = null,
         userId = null,
-        isSubmitting = false,
-        mfaAccessToken = null,
-        mfaRefreshToken = null,
-        otpUserId = null,
-        otpEmail = null,
-        otpPassword = null;
-
-  /// Şifre doğrulandı, TOTP kodu bekleniyor. `mfaAccessToken`/`mfaRefreshToken`
-  /// Supabase'in verdiği AAL1 (geçici) oturumu — verify başarılı olunca
-  /// gerçek (AAL2) oturumla değiştirilir, o ana kadar kalıcı depoya yazılmaz.
-  const AuthState.mfaPending({
-    required String this.mfaAccessToken,
-    this.mfaRefreshToken,
-    this.userId,
-  })  : status = AuthStatus.mfaPending,
-        token = null,
-        isSubmitting = false,
-        errorMessage = null,
-        otpUserId = null,
-        otpEmail = null,
-        otpPassword = null;
-
-  /// Şifre doğrulandı, TOTP aktif değil — e-postaya gönderilen kod
-  /// bekleniyor. `otpEmail`/`otpPassword`, "kodu tekrar gönder" ucu
-  /// (`/auth/login/request-otp`) şifreyi yeniden doğruladığı için saklanır
-  /// (web'deki `EmailOtpChallengeCard`'ın aynı ihtiyacı).
-  const AuthState.otpPending({
-    required String this.otpUserId,
-    required String this.otpEmail,
-    required String this.otpPassword,
-  })  : status = AuthStatus.otpPending,
-        token = null,
-        userId = null,
-        isSubmitting = false,
-        errorMessage = null,
-        mfaAccessToken = null,
-        mfaRefreshToken = null;
+        isSubmitting = false;
 
   final AuthStatus status;
   final String? token;
   final String? userId;
   final bool isSubmitting;
   final String? errorMessage;
-  final String? mfaAccessToken;
-  final String? mfaRefreshToken;
-  final String? otpUserId;
-  final String? otpEmail;
-  final String? otpPassword;
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
 
@@ -145,11 +70,6 @@ class AuthState {
       userId: clearUserId ? null : (userId ?? this.userId),
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
-      mfaAccessToken: mfaAccessToken,
-      mfaRefreshToken: mfaRefreshToken,
-      otpUserId: otpUserId,
-      otpEmail: otpEmail,
-      otpPassword: otpPassword,
     );
   }
 }
@@ -230,43 +150,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
-      final result = await repository.login(
+      final session = await repository.login(
         LoginDto(email: email, password: password),
       );
-
-      // TOTP aktif değilse backend session yerine e-posta OTP ister —
-      // web'deki `onSubmit`'in `data.otp_required` dalıyla aynı kontrol.
-      if (result.isOtpRequired) {
-        state = AuthState.otpPending(
-          otpUserId: result.otpUserId!,
-          otpEmail: email,
-          otpPassword: password,
-        );
-        return false;
-      }
-
-      final session = result.session!;
-
-      // Web'deki needsMfaChallenge() ile aynı kontrol: hesapta doğrulanmış
-      // bir TOTP faktörü varsa AAL1 oturumu tek başına yeterli değildir.
-      if (session.refreshToken != null && session.refreshToken!.isNotEmpty) {
-        try {
-          // Geçici (AAL1) token'ı belleğe koy — mfaStatus isteği bunu kullanır.
-          onTokensUpdated(session.accessToken, session.refreshToken);
-          final mfa = await repository.mfaStatus(session.refreshToken!);
-          if (mfa.needsChallenge) {
-            state = AuthState.mfaPending(
-              mfaAccessToken: session.accessToken,
-              mfaRefreshToken: session.refreshToken,
-              userId: session.userId,
-            );
-            return false;
-          }
-        } on AuthException {
-          // MFA durumu sorgulanamadıysa girişi bloklama — normal akışa devam.
-        }
-      }
-
       await _persistSession(session);
       state = AuthState.authenticated(
         token: session.accessToken,
@@ -286,129 +172,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// MFA ekranında girilen TOTP kodunu doğrular; başarılıysa AAL2 oturumunu
-  /// kalıcı depoya yazıp kullanıcıyı authenticated yapar.
-  Future<bool> submitMfaCode(String code) async {
-    if (state.status != AuthStatus.mfaPending) return false;
-    final refreshToken = state.mfaRefreshToken;
-    if (refreshToken == null || refreshToken.isEmpty) {
-      state = const AuthState.unauthenticated(
-        errorMessage: 'Oturum bilgisi eksik. Lütfen tekrar giriş yapın.',
-      );
-      return false;
-    }
-
-    state = state.copyWith(isSubmitting: true, clearError: true);
-    try {
-      final challenge = await repository.mfaChallenge(refreshToken);
-      final session = await repository.mfaVerify(
-        refreshToken: refreshToken,
-        factorId: challenge.factorId,
-        challengeId: challenge.challengeId,
-        code: code,
-      );
-      await _persistSession(session);
-      state = AuthState.authenticated(
-        token: session.accessToken,
-        userId: session.userId,
-      );
-      return true;
-    } on AuthException catch (error) {
-      state = state.copyWith(isSubmitting: false, errorMessage: error.message);
-      return false;
-    } catch (_) {
-      state = state.copyWith(
-        isSubmitting: false,
-        errorMessage: 'Doğrulama sırasında beklenmeyen bir hata oluştu.',
-      );
-      return false;
-    }
-  }
-
-  /// MFA ekranından "vazgeç" — geçici oturumu tamamen temizler.
-  void cancelMfaChallenge() {
-    onTokensUpdated(null, null);
-    state = const AuthState.unauthenticated();
-  }
-
-  /// E-posta OTP ekranında girilen kodu doğrular; başarılıysa oturumu
-  /// kalıcı depoya yazıp kullanıcıyı authenticated yapar.
-  Future<bool> submitEmailOtpCode(String code) async {
-    if (state.status != AuthStatus.otpPending) return false;
-    final userId = state.otpUserId;
-    if (userId == null || userId.isEmpty) {
-      state = const AuthState.unauthenticated(
-        errorMessage: 'Oturum bilgisi eksik. Lütfen tekrar giriş yapın.',
-      );
-      return false;
-    }
-
-    state = state.copyWith(isSubmitting: true, clearError: true);
-    try {
-      final session = await repository.verifyLoginOtp(
-        userId: userId,
-        code: code,
-      );
-      await _persistSession(session);
-      state = AuthState.authenticated(
-        token: session.accessToken,
-        userId: session.userId,
-      );
-      return true;
-    } on AuthException catch (error) {
-      state = state.copyWith(isSubmitting: false, errorMessage: error.message);
-      return false;
-    } catch (_) {
-      state = state.copyWith(
-        isSubmitting: false,
-        errorMessage: 'Doğrulama sırasında beklenmeyen bir hata oluştu.',
-      );
-      return false;
-    }
-  }
-
-  /// "Kodu tekrar gönder" — 60 saniyelik cooldown backend'de uygulanıyor
-  /// (429 döner), burada yalnızca isteği iletip yeni user_id'yi saklarız.
-  Future<bool> resendEmailOtp() async {
-    if (state.status != AuthStatus.otpPending) return false;
-    final email = state.otpEmail;
-    final password = state.otpPassword;
-    final currentOtpUserId = state.otpUserId;
-    if (email == null || password == null || currentOtpUserId == null) {
-      return false;
-    }
-
-    state = state.copyWith(isSubmitting: true, clearError: true);
-    try {
-      final result = await repository.requestLoginOtp(
-        email: email,
-        password: password,
-      );
-      state = AuthState.otpPending(
-        otpUserId: result.otpUserId ?? currentOtpUserId,
-        otpEmail: email,
-        otpPassword: password,
-      );
-      return true;
-    } on AuthException catch (error) {
-      state = state.copyWith(isSubmitting: false, errorMessage: error.message);
-      return false;
-    } catch (_) {
-      state = state.copyWith(
-        isSubmitting: false,
-        errorMessage: 'Kod tekrar gönderilemedi.',
-      );
-      return false;
-    }
-  }
-
-  /// OTP ekranından "vazgeç" — geçici oturumu tamamen temizler.
-  void cancelEmailOtpChallenge() {
-    onTokensUpdated(null, null);
-    state = const AuthState.unauthenticated();
-  }
-
-  Future<RegisterOutcome> register({
+  Future<bool> register({
     required String email,
     required String password,
     required String firstName,
@@ -416,7 +180,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
-      final result = await repository.register(
+      final session = await repository.register(
         RegisterDto(
           email: email,
           password: password,
@@ -424,31 +188,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
           lastName: lastName,
         ),
       );
-
-      if (result.session == null) {
-        // Kayıt oluştu ama otomatik oturum alınamadı (e-posta onayı ya da
-        // e-posta OTP bekleniyor) — web'deki register/page.tsx'in
-        // `!data.access_token` dalıyla aynı düşüş: kullanıcı /login'den
-        // manuel giriş yapmalı.
-        state = const AuthState.unauthenticated();
-        return RegisterOutcome.needsManualLogin;
-      }
-
-      final session = result.session!;
       await _persistSession(session);
       state = AuthState.authenticated(
         token: session.accessToken,
         userId: session.userId,
       );
-      return RegisterOutcome.authenticated;
+      return true;
     } on AuthException catch (error) {
       state = AuthState.unauthenticated(errorMessage: error.message);
-      return RegisterOutcome.failed;
+      return false;
     } catch (_) {
       state = const AuthState.unauthenticated(
         errorMessage: 'Kayıt sırasında beklenmeyen bir hata oluştu.',
       );
-      return RegisterOutcome.failed;
+      return false;
     }
   }
 

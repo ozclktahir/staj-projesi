@@ -11,8 +11,6 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
-import { RequestLoginOtpDto, VerifyLoginOtpDto } from './dto/login-otp.dto';
-import { MfaSessionDto, MfaVerifyDto } from './dto/mfa.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 
@@ -50,41 +48,6 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Geçersiz kimlik bilgileri.' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
-  }
-
-  @Post('login/request-otp')
-  @Throttle(AUTH_THROTTLE)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary:
-      'Şifreyi doğrular ve (TOTP aktif değilse) e-posta ile giriş onay kodu gönderir',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Kod e-postaya gönderildi, otp_required + user_id döner.',
-  })
-  @ApiResponse({ status: 401, description: 'E-posta veya şifre hatalı.' })
-  @ApiResponse({
-    status: 429,
-    description: 'Çok sık istek — kısa süre sonra tekrar deneyin.',
-  })
-  requestLoginOtp(@Body() dto: RequestLoginOtpDto) {
-    return this.authService.requestLoginOtp(dto);
-  }
-
-  @Post('login/verify-otp')
-  @Throttle(AUTH_THROTTLE)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'E-posta ile gönderilen giriş onay kodunu doğrular ve oturumu döner',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Doğrulama başarılı, access_token ve kullanıcı bilgisi döner.',
-  })
-  @ApiResponse({ status: 401, description: 'Kod hatalı veya süresi dolmuş.' })
-  verifyLoginOtp(@Body() dto: VerifyLoginOtpDto) {
-    return this.authService.verifyLoginOtp(dto);
   }
 
   @Post('refresh')
@@ -127,54 +90,5 @@ export class AuthController {
       );
     }
     return token;
-  }
-
-  @Post('mfa/status')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary:
-      'Giriş yapan kullanıcı için MFA (TOTP) doğrulaması gerekip gerekmediğini döner (AAL1→AAL2)',
-  })
-  mfaStatus(
-    @Body() dto: MfaSessionDto,
-    @Headers('authorization') authorization?: string,
-  ) {
-    const token = this.extractBearerToken(authorization);
-    return this.authService.mfaStatus(token, dto.refresh_token);
-  }
-
-  @Post('mfa/challenge')
-  @Throttle(AUTH_THROTTLE)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Doğrulanmış TOTP faktörü için MFA challenge başlatır',
-  })
-  mfaChallenge(
-    @Body() dto: MfaSessionDto,
-    @Headers('authorization') authorization?: string,
-  ) {
-    const token = this.extractBearerToken(authorization);
-    return this.authService.mfaChallenge(token, dto.refresh_token);
-  }
-
-  @Post('mfa/verify')
-  @Throttle(AUTH_THROTTLE)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary:
-      'TOTP kodunu doğrular ve AAL2 seviyesine yükseltilmiş yeni oturumu döner',
-  })
-  mfaVerify(
-    @Body() dto: MfaVerifyDto,
-    @Headers('authorization') authorization?: string,
-  ) {
-    const token = this.extractBearerToken(authorization);
-    return this.authService.mfaVerify(
-      token,
-      dto.refresh_token,
-      dto.factor_id,
-      dto.challenge_id,
-      dto.code,
-    );
   }
 }

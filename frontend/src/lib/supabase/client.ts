@@ -20,26 +20,6 @@ export function createSupabaseBrowserClient() {
 }
 
 /**
- * Cookie yazmayan istemci — login/MFA sırasında @supabase/ssr cookie şişmesi
- * yüzünden sb_access_token kaybolmasın (redirect loop önlemi).
- */
-export function createEphemeralSupabaseClient(): SupabaseClient {
-  const { url, anonKey } = getBrowserSupabaseEnv();
-  return createClient(url, anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-      storage: {
-        getItem: () => null,
-        setItem: () => {},
-        removeItem: () => {},
-      },
-    },
-  });
-}
-
-/**
  * Custom cookie/localStorage JWT ile Realtime dinlemek için.
  * SSR cookie chunk'larına dokunmaz.
  */

@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Languages, Monitor, Shield } from "lucide-react";
+import { Languages, Monitor } from "lucide-react";
 import { ThemeSelector } from "@/components/theme-selector";
 import { LanguageSelector } from "@/components/language-selector";
-import { MfaSecurityPanel } from "@/components/settings/mfa-security-panel";
 import {
   Card,
   CardContent,
@@ -16,9 +15,9 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n/use-translation";
 import { cn } from "@/lib/utils";
 
-type SettingsTab = "appearance" | "language" | "security";
+type SettingsTab = "appearance" | "language";
 
-/** Ayarlar — Görünüm / Dil / Güvenlik (2FA) sekmeleri. */
+/** Ayarlar — Görünüm / Dil sekmeleri. */
 export function SettingsPageContent() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<SettingsTab>("appearance");
@@ -26,7 +25,6 @@ export function SettingsPageContent() {
   const tabs: { id: SettingsTab; label: string; icon: typeof Monitor }[] = [
     { id: "appearance", label: t("settings.appearance"), icon: Monitor },
     { id: "language", label: t("settings.language"), icon: Languages },
-    { id: "security", label: t("settings.security"), icon: Shield },
   ];
 
   return (
@@ -83,20 +81,6 @@ export function SettingsPageContent() {
           </CardHeader>
           <CardContent>
             <LanguageSelector />
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {tab === "security" ? (
-        <Card className="rounded-[var(--radius)] border-border bg-card shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg text-foreground">
-              {t("settings.security")}
-            </CardTitle>
-            <CardDescription>{t("settings.securityDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MfaSecurityPanel />
           </CardContent>
         </Card>
       ) : null}

@@ -1,33 +1,16 @@
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   BadRequestException,
   HttpException,
   HttpStatus,
-  Inject,
   Injectable,
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
-import type { Cache } from 'cache-manager';
-import { randomInt } from 'crypto';
+import type { Session, User } from '@supabase/supabase-js';
 import { MailService } from '../mail/mail.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { LoginDto } from './dto/login.dto';
-import { RequestLoginOtpDto, VerifyLoginOtpDto } from './dto/login-otp.dto';
 import { RegisterDto } from './dto/register.dto';
-
-/** Login OTP — kod + oturum 5 dakika Redis'te tutulur, doğrulanınca silinir. */
-const LOGIN_OTP_TTL_MS = 5 * 60 * 1000;
-/** Aynı kullanıcı için art arda kod isteme (spam/brute-force) koruması. */
-const LOGIN_OTP_COOLDOWN_MS = 60 * 1000;
-
-type LoginOtpPayload = {
-  code: string;
-  access_token: string;
-  refresh_token: string | null;
-  user: User;
-};
 
 @Injectable()
 export class AuthService {
@@ -36,7 +19,6 @@ export class AuthService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly mailService: MailService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   private normalizeEmail(email: string): string {
@@ -278,137 +260,16 @@ export class AuthService {
     return { client, session: data.session, user: data.user };
   }
 
-  /** Hesapta doğrulanmış bir TOTP faktörü var mı? (varsa e-posta OTP'ye gerek yok) */
-  private async hasVerifiedTotp(client: SupabaseClient): Promise<boolean> {
-    const { data, error } = await client.auth.mfa.listFactors();
-    if (error) {
-      this.logger.warn(`MFA faktörleri okunamadı: ${error.message}`);
-      return false;
-    }
-    return (data.totp ?? []).some((factor) => factor.status === 'verified');
-  }
-
-  private generateOtpCode(): string {
-    return String(randomInt(100000, 1000000));
-  }
-
-  /**
-   * Login OTP kodu üretir, Redis'e (session ile birlikte) yazar ve e-posta
-   * gönderir. `session`, signInWithPassword'dan zaten elde edilmiş olmalı —
-   * verifyLoginOtp() bu tokenları AYNEN geri döner (token üretim mantığını
-   * tekrar etmez).
-   */
-  private async issueLoginOtp(user: User, session: Session) {
-    if (!user.email) {
-      throw new BadRequestException('Kullanıcının e-posta adresi bulunamadı.');
-    }
-
-    const cooldownKey = `login_otp_cooldown:${user.id}`;
-    const cooldownUntil = await this.cacheManager.get<number>(cooldownKey);
-    if (cooldownUntil && cooldownUntil > Date.now()) {
-      const remaining = Math.max(1, Math.ceil((cooldownUntil - Date.now()) / 1000));
-      throw new HttpException(
-        `Çok sık kod istediniz. ${remaining} saniye sonra tekrar deneyin.`,
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
-
-    const code = this.generateOtpCode();
-    const payload: LoginOtpPayload = {
-      code,
-      access_token: session.access_token,
-      refresh_token: session.refresh_token ?? null,
-      user,
-    };
-
-    await this.cacheManager.set(
-      `login_otp:${user.id}`,
-      JSON.stringify(payload),
-      LOGIN_OTP_TTL_MS,
-    );
-    await this.cacheManager.set(
-      cooldownKey,
-      Date.now() + LOGIN_OTP_COOLDOWN_MS,
-      LOGIN_OTP_COOLDOWN_MS,
-    );
-
-    await this.mailService.sendLoginOtpEmail(user.email, code);
-
-    return {
-      otp_required: true as const,
-      user_id: user.id,
-      message: 'Giriş onay kodu e-postanıza gönderildi.',
-    };
-  }
-
   async login(dto: LoginDto) {
-    const { client, session, user } = await this.passwordSignIn(
+    const { session, user } = await this.passwordSignIn(
       dto.email,
       dto.password,
     );
-
-    if (await this.hasVerifiedTotp(client)) {
-      return {
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        user,
-      };
-    }
-
-    return this.issueLoginOtp(user, session);
-  }
-
-  /**
-   * "Kodu tekrar gönder" ve login()'in e-posta-OTP dalıyla aynı akış —
-   * şifreyi tekrar doğrular (taze bir session/kod üretmek için) ve TOTP aktif
-   * bir hesap için çağrılırsa reddeder (bu uç yalnızca e-posta OTP akışı içindir).
-   */
-  async requestLoginOtp(dto: RequestLoginOtpDto) {
-    const { client, session, user } = await this.passwordSignIn(
-      dto.email,
-      dto.password,
-    );
-
-    if (await this.hasVerifiedTotp(client)) {
-      throw new BadRequestException(
-        'Bu hesapta authenticator uygulaması (TOTP) aktif; e-posta kodu kullanılamaz.',
-      );
-    }
-
-    return this.issueLoginOtp(user, session);
-  }
-
-  /** E-postaya gönderilen kodu doğrular ve login()'de üretilmiş oturumu döner. */
-  async verifyLoginOtp(dto: VerifyLoginOtpDto) {
-    const key = `login_otp:${dto.user_id}`;
-    const raw = await this.cacheManager.get<string>(key);
-
-    if (!raw) {
-      throw new UnauthorizedException(
-        'Kod süresi doldu veya bulunamadı. Lütfen yeni bir kod isteyin.',
-      );
-    }
-
-    let payload: LoginOtpPayload;
-    try {
-      payload = JSON.parse(raw) as LoginOtpPayload;
-    } catch {
-      await this.cacheManager.del(key);
-      throw new UnauthorizedException(
-        'Kod doğrulanamadı. Lütfen yeni bir kod isteyin.',
-      );
-    }
-
-    if (payload.code !== dto.code.trim()) {
-      throw new UnauthorizedException('Kod hatalı.');
-    }
-
-    await this.cacheManager.del(key);
 
     return {
-      access_token: payload.access_token,
-      refresh_token: payload.refresh_token,
-      user: payload.user,
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      user,
     };
   }
 
@@ -427,95 +288,6 @@ export class AuthService {
     }
 
     return { message: 'Çıkış işlemi başarıyla tamamlandı.' };
-  }
-
-  /**
-   * Verilen access/refresh token çiftiyle TAZE bir Supabase istemcisi kurar
-   * (paylaşılan singleton ASLA kullanılmaz — bkz. SupabaseService.createEphemeralClient).
-   */
-  private async sessionClient(accessToken: string, refreshToken: string) {
-    const client = this.supabaseService.createEphemeralClient();
-    const { error } = await client.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
-    if (error) {
-      throw new UnauthorizedException('Oturum doğrulanamadı: ' + error.message);
-    }
-    return client;
-  }
-
-  /** Web'deki needsMfaChallenge() ile aynı mantık: AAL1→AAL2 yükseltmesi gerekiyor mu? */
-  async mfaStatus(accessToken: string, refreshToken: string) {
-    const client = await this.sessionClient(accessToken, refreshToken);
-    const { data, error } =
-      await client.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (error) {
-      throw new BadRequestException(error.message);
-    }
-    return {
-      needsChallenge:
-        data.currentLevel === 'aal1' && data.nextLevel === 'aal2',
-    };
-  }
-
-  /** Doğrulanmış TOTP faktörü için challenge başlatır (web'deki MfaChallengeCard.submit ile aynı akış). */
-  async mfaChallenge(accessToken: string, refreshToken: string) {
-    const client = await this.sessionClient(accessToken, refreshToken);
-
-    const { data: factorsData, error: factorsError } =
-      await client.auth.mfa.listFactors();
-    if (factorsError) {
-      throw new BadRequestException(factorsError.message);
-    }
-
-    const factor = (factorsData.totp ?? []).find(
-      (f) => f.status === 'verified',
-    );
-    if (!factor) {
-      throw new BadRequestException('Doğrulanmış bir MFA yöntemi bulunamadı.');
-    }
-
-    const { data, error } = await client.auth.mfa.challenge({
-      factorId: factor.id,
-    });
-    if (error) {
-      throw new BadRequestException(error.message);
-    }
-
-    return { factor_id: factor.id, challenge_id: data.id };
-  }
-
-  /** TOTP kodunu doğrular ve AAL2'ye yükseltilmiş yeni oturumu döner. */
-  async mfaVerify(
-    accessToken: string,
-    refreshToken: string,
-    factorId: string,
-    challengeId: string,
-    code: string,
-  ) {
-    const client = await this.sessionClient(accessToken, refreshToken);
-
-    const { error } = await client.auth.mfa.verify({
-      factorId,
-      challengeId,
-      code,
-    });
-    if (error) {
-      throw new UnauthorizedException(error.message);
-    }
-
-    const { data: sessionData, error: sessionError } =
-      await client.auth.getSession();
-    if (sessionError || !sessionData.session) {
-      throw new UnauthorizedException('Doğrulanmış oturum alınamadı.');
-    }
-
-    return {
-      access_token: sessionData.session.access_token,
-      refresh_token: sessionData.session.refresh_token,
-      user: sessionData.session.user,
-    };
   }
 
   /** Access token yenileme — Supabase refreshSession. */

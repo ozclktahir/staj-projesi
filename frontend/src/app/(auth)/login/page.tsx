@@ -9,11 +9,6 @@ import { toast } from "sonner";
 import { resolvePostLoginRedirect } from "@/app/actions/notifications";
 import { setActiveWorkspaceCookie } from "@/app/actions/set-active-workspace";
 import { AuthSplitShell } from "@/components/auth/auth-split-shell";
-import {
-  EmailOtpChallengeCard,
-  type EmailOtpTokens,
-} from "@/components/auth/email-otp-challenge-card";
-import { MfaChallengeCard } from "@/components/auth/mfa-challenge-card";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,35 +22,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "@/i18n/use-translation";
 import apiClient from "@/lib/api-client";
-import { clearAuthSession, persistAuthSession } from "@/lib/auth-session";
+import { persistAuthSession } from "@/lib/auth-session";
 import { writeActiveWorkspaceId } from "@/hooks/use-workspaces";
 import {
   createLoginSchema,
   formatAuthApiError,
   type LoginFormValues,
 } from "@/lib/validations/auth";
-import {
-  ensureSupabaseAuthSession,
-  needsMfaChallenge,
-} from "@/lib/supabase-mfa";
-
-type LoginTokens = {
-  access_token: string;
-  refresh_token?: string | null;
-  user?: unknown;
-};
-
-type OtpPending = {
-  userId: string;
-  email: string;
-  password: string;
-};
 
 export default function LoginPage() {
   const { t, locale } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [mfaPending, setMfaPending] = useState(false);
-  const [otpPending, setOtpPending] = useState<OtpPending | null>(null);
   const schema = useMemo(() => createLoginSchema(locale), [locale]);
 
   const {
@@ -94,76 +71,18 @@ export default function LoginPage() {
     window.location.assign(href);
   }
 
-  async function afterAuthenticated(tokens: LoginTokens) {
-    try {
-      await persistAuthSession(
-        tokens.access_token,
-        tokens.user,
-        tokens.refresh_token,
-      );
-      await ensureSupabaseAuthSession();
-
-      if (await needsMfaChallenge()) {
-        setOtpPending(null);
-        setMfaPending(true);
-        setIsSubmitting(false);
-        return;
-      }
-
-      // MFA/istemci yan etkileri cookie'yi bozmuş olabilir — yönlendirmeden önce yenile
-      await persistAuthSession(
-        tokens.access_token,
-        tokens.user,
-        tokens.refresh_token,
-      );
-    } catch (persistError) {
-      console.error("[login] persist/MFA check:", persistError);
-      toast.error(
-        persistError instanceof Error
-          ? persistError.message
-          : t("auth.badCredentials"),
-      );
-      setIsSubmitting(false);
-      return;
-    }
-
-    await finishLoginRedirect();
-  }
-
-  async function handleOtpVerified(tokens: EmailOtpTokens) {
-    await afterAuthenticated({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      user: tokens.user,
-    });
-  }
-
   const onSubmit = async (values: LoginFormValues) => {
     setIsSubmitting(true);
 
-    const email = values.email.trim().toLowerCase();
-    let tokens: LoginTokens;
     try {
       const { data } = await apiClient.post<{
         access_token?: string;
         refresh_token?: string;
         user?: unknown;
-        otp_required?: boolean;
-        user_id?: string;
       }>("/auth/login", {
-        email,
+        email: values.email.trim().toLowerCase(),
         password: values.password,
       });
-
-      if (data.otp_required && data.user_id) {
-        setOtpPending({
-          userId: data.user_id,
-          email,
-          password: values.password,
-        });
-        setIsSubmitting(false);
-        return;
-      }
 
       if (!data.access_token) {
         toast.error(t("auth.tokenMissing"));
@@ -171,11 +90,7 @@ export default function LoginPage() {
         return;
       }
 
-      tokens = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        user: data.user,
-      };
+      await persistAuthSession(data.access_token, data.user, data.refresh_token);
     } catch (error) {
       const message = isAxiosError(error)
         ? (error.response?.data?.message ?? t("auth.badCredentials"))
@@ -188,39 +103,8 @@ export default function LoginPage() {
       return;
     }
 
-    await afterAuthenticated(tokens);
+    await finishLoginRedirect();
   };
-
-  if (mfaPending) {
-    return (
-      <AuthSplitShell>
-        <MfaChallengeCard
-          onVerified={() => finishLoginRedirect()}
-          onCancel={async () => {
-            await clearAuthSession();
-            setMfaPending(false);
-          }}
-        />
-      </AuthSplitShell>
-    );
-  }
-
-  if (otpPending) {
-    return (
-      <AuthSplitShell>
-        <EmailOtpChallengeCard
-          email={otpPending.email}
-          password={otpPending.password}
-          userId={otpPending.userId}
-          onVerified={handleOtpVerified}
-          onCancel={async () => {
-            await clearAuthSession();
-            setOtpPending(null);
-          }}
-        />
-      </AuthSplitShell>
-    );
-  }
 
   return (
     <AuthSplitShell>

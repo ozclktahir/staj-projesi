@@ -78,29 +78,9 @@ class AppStrings {
   String get authRegister => t('auth.register');
   String get authRegisterSubtitle => t('auth.registerSubtitle');
   String get authRegisterFailed => t('auth.registerFailed');
-  String get authRegisterSuccessLogin => t('auth.registerSuccessLogin');
   String get authHaveAccount => t('auth.haveAccount');
   String get authBackToLogin => t('auth.backToLogin');
   String get authCheckingSession => t('auth.checkingSession');
-  String get authMfaTitle => t('auth.mfaTitle');
-  String get authMfaSubtitle => t('auth.mfaSubtitle');
-  String get authMfaCode => t('auth.mfaCode');
-  String get authMfaVerify => t('auth.mfaVerify');
-  String get authMfaCancel => t('auth.mfaCancel');
-  String get authMfaSuccess => t('auth.mfaSuccess');
-  String get authMfaFail => t('auth.mfaFail');
-  String get authOtpTitle => t('auth.otpTitle');
-  String authOtpSubtitle(String email) => t('auth.otpSubtitle', {'email': email});
-  String get authOtpCode => t('auth.otpCode');
-  String get authOtpVerify => t('auth.otpVerify');
-  String get authOtpCancel => t('auth.otpCancel');
-  String get authOtpSuccess => t('auth.otpSuccess');
-  String get authOtpFail => t('auth.otpFail');
-  String get authOtpResend => t('auth.otpResend');
-  String authOtpResendCountdown(int seconds) =>
-      t('auth.otpResendCountdown', {'n': '$seconds'});
-  String get authOtpResendSuccess => t('auth.otpResendSuccess');
-  String get authOtpResendFail => t('auth.otpResendFail');
 
   String get notificationsTitle => t('notifications.title');
   String get notificationsEmpty => t('notifications.empty');
@@ -336,28 +316,9 @@ class AppStrings {
     'auth.register': 'Kayıt Ol',
     'auth.registerSubtitle': 'Yeni hesap oluştur',
     'auth.registerFailed': 'Kayıt başarısız.',
-    'auth.registerSuccessLogin': 'Kayıt başarılı. Giriş yapabilirsiniz.',
     'auth.haveAccount': 'Zaten hesabın var mı? Giriş yap',
     'auth.backToLogin': 'Girişe dön',
     'auth.checkingSession': 'Oturum kontrol ediliyor…',
-    'auth.mfaTitle': 'İki adımlı doğrulama',
-    'auth.mfaSubtitle': 'Authenticator uygulamanızdaki 6 haneli kodu girin.',
-    'auth.mfaCode': 'Doğrulama kodu',
-    'auth.mfaVerify': 'Doğrula ve devam et',
-    'auth.mfaCancel': 'İptal',
-    'auth.mfaSuccess': '2FA doğrulandı',
-    'auth.mfaFail': 'Doğrulama kodu hatalı.',
-    'auth.otpTitle': 'E-posta doğrulama',
-    'auth.otpSubtitle': '{email} adresine gönderilen 6 haneli kodu girin.',
-    'auth.otpCode': 'Doğrulama kodu',
-    'auth.otpVerify': 'Doğrula ve devam et',
-    'auth.otpCancel': 'İptal',
-    'auth.otpSuccess': 'Giriş onaylandı',
-    'auth.otpFail': 'Kod hatalı veya süresi dolmuş.',
-    'auth.otpResend': 'Kodu tekrar gönder',
-    'auth.otpResendCountdown': 'Tekrar gönder ({n}sn)',
-    'auth.otpResendSuccess': 'Yeni kod gönderildi',
-    'auth.otpResendFail': 'Kod tekrar gönderilemedi',
     'notifications.title': 'Bildirimler',
     'notifications.empty': 'Bildirim yok.',
     'notifications.markAll': 'Tümünü okundu',
@@ -530,28 +491,9 @@ class AppStrings {
     'auth.register': 'Sign up',
     'auth.registerSubtitle': 'Create a new account',
     'auth.registerFailed': 'Sign-up failed.',
-    'auth.registerSuccessLogin': 'Account created. You can sign in.',
     'auth.haveAccount': 'Already have an account? Sign in',
     'auth.backToLogin': 'Back to sign in',
     'auth.checkingSession': 'Checking session…',
-    'auth.mfaTitle': 'Two-factor authentication',
-    'auth.mfaSubtitle': 'Enter the 6-digit code from your authenticator app.',
-    'auth.mfaCode': 'Verification code',
-    'auth.mfaVerify': 'Verify and continue',
-    'auth.mfaCancel': 'Cancel',
-    'auth.mfaSuccess': '2FA verified',
-    'auth.mfaFail': 'Invalid verification code.',
-    'auth.otpTitle': 'Email verification',
-    'auth.otpSubtitle': 'Enter the 6-digit code sent to {email}.',
-    'auth.otpCode': 'Verification code',
-    'auth.otpVerify': 'Verify and continue',
-    'auth.otpCancel': 'Cancel',
-    'auth.otpSuccess': 'Login confirmed',
-    'auth.otpFail': 'Invalid or expired code.',
-    'auth.otpResend': 'Resend code',
-    'auth.otpResendCountdown': 'Resend ({n}s)',
-    'auth.otpResendSuccess': 'New code sent',
-    'auth.otpResendFail': 'Could not resend code',
     'notifications.title': 'Notifications',
     'notifications.empty': 'No notifications.',
     'notifications.markAll': 'Mark all read',
