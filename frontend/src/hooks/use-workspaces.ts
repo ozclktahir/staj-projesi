@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { setActiveWorkspaceCookie, clearActiveWorkspaceCookie } from "@/app/actions/set-active-workspace";
-import { getWorkspaces } from "@/app/actions/workspaces";
+import { getWorkspaces, type GetWorkspacesResult } from "@/app/actions/workspaces";
 import {
   ACTIVE_WORKSPACE_COOKIE,
   WORKSPACE_QUERY_KEY,
@@ -13,6 +13,26 @@ import { pickDefaultAdminWorkspace } from "@/lib/member-labels";
 import type { WorkspaceListItem } from "@/lib/supabase/types";
 
 export const ACTIVE_WORKSPACE_KEY = "active_workspace_id";
+
+/**
+ * `useWorkspaces()` sayfa-yerel bir hook (paylaşımlı bir Context değil) —
+ * dashboard mount olduğunda sidebar/header/global-search/presence-provider
+ * gibi 4 ayrı bileşen aynı anda kendi instance'ını kuruyor, hepsi de mount'ta
+ * `getWorkspaces()` çağırıyordu. Aynı veriyi isteyen 4 eşzamanlı network
+ * isteğini TEK isteğe düşürmek için basit bir "in-flight" paylaşımı: ilk
+ * çağrı gerçek isteği başlatır, mount'u üst üste binen diğerleri (React aynı
+ * commit'teki effect'leri arka arkaya, senkron şekilde çalıştırdığı için)
+ * SONUÇ gelmeden bu değişkeni görüp AYNI promise'i bekler.
+ */
+let inFlightWorkspacesRequest: Promise<GetWorkspacesResult> | null = null;
+
+function fetchWorkspacesShared(): Promise<GetWorkspacesResult> {
+  if (inFlightWorkspacesRequest) return inFlightWorkspacesRequest;
+  inFlightWorkspacesRequest = getWorkspaces().finally(() => {
+    inFlightWorkspacesRequest = null;
+  });
+  return inFlightWorkspacesRequest;
+}
 
 function decodeCookieValue(raw: string | null | undefined): string | null {
   if (!raw) return null;
@@ -156,7 +176,7 @@ export function useWorkspaces() {
     setLoading(true);
     setError(null);
 
-    const result = await getWorkspaces();
+    const result = await fetchWorkspacesShared();
     if (!result.success) {
       // Mevcut listeyi silme — geçici hata dropdown'u boşaltmasın
       console.error("[useWorkspaces] getWorkspaces failed:", result.error);

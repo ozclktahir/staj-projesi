@@ -28,7 +28,12 @@ export async function resolvePostLoginRedirect(): Promise<{
       return { href: "/", workspaceId: null };
     }
 
-    const result = await getWorkspaces();
+    // Zaten doğrulanmış istemci/user id'yi geçir — getWorkspaces() kendi
+    // içinde İKİNCİ bir auth.getUser() round-trip'i atmasın.
+    const result = await getWorkspaces({
+      supabase: auth.supabase,
+      userId: auth.user.id,
+    });
     if (!result.success || result.workspaces.length === 0) {
       return { href: "/onboarding", workspaceId: null };
     }

@@ -88,8 +88,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final void Function(String? access, String? refresh) onTokensUpdated;
 
   Future<void> _bootstrap() async {
-    final token = await secureStorage.read(key: StorageKeys.accessToken);
-    final refresh = await secureStorage.read(key: StorageKeys.refreshToken);
+    // İki bağımsız secure-storage okuması (ayrı platform-channel round-trip'i,
+    // biri diğerinin sonucuna bağlı değil) — paralel.
+    final results = await Future.wait([
+      secureStorage.read(key: StorageKeys.accessToken),
+      secureStorage.read(key: StorageKeys.refreshToken),
+    ]);
+    final token = results[0];
+    final refresh = results[1];
 
     if (token != null && token.isNotEmpty && !isJwtExpired(token)) {
       var userId = await secureStorage.read(key: StorageKeys.userId);
@@ -117,30 +123,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
     }
 
-    await secureStorage.delete(key: StorageKeys.accessToken);
-    await secureStorage.delete(key: StorageKeys.refreshToken);
-    await secureStorage.delete(key: StorageKeys.userId);
+    await _clearStoredTokens();
     onTokensUpdated(null, null);
     state = const AuthState.unauthenticated();
   }
 
+  /// Üç bağımsız secure-storage silme işlemi — paralel (aksi halde 3 ayrı
+  /// platform-channel round-trip'i sıralı beklenir). `logout()`,
+  /// `clearSessionLocally()` ve bootstrap'ın temizlik dalında ortak kullanılır.
+  Future<void> _clearStoredTokens() {
+    return Future.wait([
+      secureStorage.delete(key: StorageKeys.accessToken),
+      secureStorage.delete(key: StorageKeys.refreshToken),
+      secureStorage.delete(key: StorageKeys.userId),
+    ]);
+  }
+
   Future<void> _persistSession(AuthSession session) async {
-    await secureStorage.write(
-      key: StorageKeys.accessToken,
-      value: session.accessToken,
-    );
-    if (session.refreshToken != null) {
-      await secureStorage.write(
-        key: StorageKeys.refreshToken,
-        value: session.refreshToken,
-      );
-    }
-    if (session.userId != null) {
-      await secureStorage.write(
-        key: StorageKeys.userId,
-        value: session.userId,
-      );
-    }
+    // Bağımsız yazmalar (farklı anahtarlar) — paralel.
+    await Future.wait([
+      secureStorage.write(
+        key: StorageKeys.accessToken,
+        value: session.accessToken,
+      ),
+      if (session.refreshToken != null)
+        secureStorage.write(
+          key: StorageKeys.refreshToken,
+          value: session.refreshToken!,
+        ),
+      if (session.userId != null)
+        secureStorage.write(key: StorageKeys.userId, value: session.userId!),
+    ]);
     onTokensUpdated(session.accessToken, session.refreshToken);
   }
 
@@ -210,18 +223,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       await repository.logout();
     } finally {
-      await secureStorage.delete(key: StorageKeys.accessToken);
-      await secureStorage.delete(key: StorageKeys.refreshToken);
-      await secureStorage.delete(key: StorageKeys.userId);
+      await _clearStoredTokens();
       state = const AuthState.unauthenticated();
     }
   }
 
   /// 401 sonrası: API çağrısı yapmadan yerel oturumu temizler → router /login.
   Future<void> clearSessionLocally() async {
-    await secureStorage.delete(key: StorageKeys.accessToken);
-    await secureStorage.delete(key: StorageKeys.refreshToken);
-    await secureStorage.delete(key: StorageKeys.userId);
+    await _clearStoredTokens();
     state = const AuthState.unauthenticated(
       errorMessage: 'Oturum süreniz doldu. Lütfen tekrar giriş yapın.',
     );

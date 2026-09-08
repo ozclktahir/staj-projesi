@@ -109,47 +109,69 @@ async function getAccessToken(): Promise<string | null> {
  * Kullanıcının TÜM workspace'lerini döner.
  * ASLA active_workspace_id ile filtrelenmez.
  * Kaynak: owner_id == user.id  VEYA  workspace_members.user_id == user.id
+ *
+ * `preAuth` opsiyonel: çağıran taraf `getAuthenticatedUser()`'ı zaten
+ * çalıştırdıysa (örn. `resolvePostLoginRedirect`), aynı bearer-token'lı
+ * istemciyi ve doğrulanmış user id'yi geçirerek burada TEKRAR bir
+ * `supabase.auth.getUser()` round-trip'i (GoTrue'ya ikinci bir doğrulama
+ * isteği) atılmasını önler.
  */
-export async function getWorkspaces(): Promise<GetWorkspacesResult> {
+export async function getWorkspaces(preAuth?: {
+  supabase: SupabaseClient;
+  userId: string;
+}): Promise<GetWorkspacesResult> {
   try {
-    const env = getSupabaseEnv();
-    if (!env) {
-      return {
-        success: false,
-        error:
-          "NEXT_PUBLIC_SUPABASE_URL veya NEXT_PUBLIC_SUPABASE_ANON_KEY tanımlı değil.",
-      };
+    let supabase: SupabaseClient;
+    let authUid: string;
+
+    if (preAuth) {
+      supabase = preAuth.supabase;
+      authUid = preAuth.userId;
+    } else {
+      const env = getSupabaseEnv();
+      if (!env) {
+        return {
+          success: false,
+          error:
+            "NEXT_PUBLIC_SUPABASE_URL veya NEXT_PUBLIC_SUPABASE_ANON_KEY tanımlı değil.",
+        };
+      }
+
+      const token = await getAccessToken();
+      if (!token) {
+        return {
+          success: false,
+          error: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
+        };
+      }
+
+      supabase = createUserScopedClient(env.url, env.anonKey, token);
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser(token);
+
+      if (userError || !user?.id) {
+        return {
+          success: false,
+          error: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
+        };
+      }
+
+      authUid = user.id;
     }
 
-    const token = await getAccessToken();
-    if (!token) {
-      return {
-        success: false,
-        error: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
-      };
-    }
-
-    const supabase = createUserScopedClient(env.url, env.anonKey, token);
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser(token);
-
-    if (userError || !user?.id) {
-      return {
-        success: false,
-        error: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
-      };
-    }
-
-    const authUid = user.id;
     console.log("[getWorkspaces] listing ALL workspaces for user", authUid);
 
-    // 1) Sahip olunan workspace'ler (üyelik satırı eksik olsa bile)
-    let ownedQuery = await supabase
-      .from("workspaces")
-      .select(WORKSPACE_SELECT)
-      .eq("owner_id", authUid);
+    // 1) Sahip olunan + 2) üye olunan workspace'ler — birbirinden bağımsız
+    // iki sorgu, aktif filtre YOK. Paralel atılır (önceden sıralıydı).
+    let [ownedQuery, memberQuery] = await Promise.all([
+      supabase.from("workspaces").select(WORKSPACE_SELECT).eq("owner_id", authUid),
+      supabase
+        .from("workspace_members")
+        .select(`role, workspaces(${WORKSPACE_SELECT})`)
+        .eq("user_id", authUid),
+    ]);
 
     if (
       ownedQuery.error &&
@@ -168,12 +190,6 @@ export async function getWorkspaces(): Promise<GetWorkspacesResult> {
         error: toPlainErrorMessage(ownedQuery.error),
       };
     }
-
-    // 2) Üye olunan workspace'ler (aktif filtre YOK)
-    let memberQuery = await supabase
-      .from("workspace_members")
-      .select(`role, workspaces(${WORKSPACE_SELECT})`)
-      .eq("user_id", authUid);
 
     if (
       memberQuery.error &&
